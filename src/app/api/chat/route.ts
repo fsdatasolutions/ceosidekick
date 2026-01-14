@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { streamConversation, UserSettings } from "@/agents/graph";
 import { AgentType } from "@/agents/types";
 import { eq, desc } from "drizzle-orm";
+import { RAG_CONFIG } from "@/lib/rag-config";
 
 // Lazy database imports
 async function getDb() {
@@ -103,9 +104,10 @@ async function getRAGContext(
 
     console.log("[getRAGContext] Searching documents for:", query.slice(0, 50));
 
+    // Use centralized config - no hardcoded values!
     const results = await searchDocuments(query, userId, organizationId, {
-      limit: 5,
-      threshold: 0.4,
+      limit: RAG_CONFIG.DEFAULT_LIMIT,
+      threshold: RAG_CONFIG.DEFAULT_THRESHOLD,
     });
 
     console.log("[getRAGContext] Found", results.length, "relevant chunks");
@@ -114,7 +116,7 @@ async function getRAGContext(
       return "## Relevant Information from Documents\n\nNo relevant documents found in your knowledge base.";
     }
 
-    return formatResultsForContext(results, 3000);
+    return formatResultsForContext(results, RAG_CONFIG.DEFAULT_MAX_CONTEXT_TOKENS);
   } catch (error) {
     console.error("[getRAGContext] Error:", error);
     return undefined;

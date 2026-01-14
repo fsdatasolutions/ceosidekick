@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { RAG_CONFIG, normalizeRAGOptions } from "@/lib/rag-config";
 
 /**
  * POST /api/documents/search
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     const orgId = (session.user as { organizationId?: string }).organizationId;
 
     const body = await req.json();
-    const { query, limit = 5, threshold = 0.4 } = body;
+    const { query, limit, threshold } = body;
 
     if (!query || typeof query !== "string") {
       return NextResponse.json(
@@ -47,11 +48,11 @@ export async function POST(req: NextRequest) {
     // Dynamic import of search utilities
     const { searchDocuments, formatResultsForContext } = await import("@/lib/vector-search");
 
+    // Use centralized config for defaults and bounds
+    const normalizedOptions = normalizeRAGOptions({ limit, threshold });
+
     // Search documents
-    const results = await searchDocuments(query, userId, orgId, {
-      limit: Math.min(limit, 20),
-      threshold: Math.max(0.3, Math.min(threshold, 0.95)), // Min 0.3, max 0.95
-    });
+    const results = await searchDocuments(query, userId, orgId, normalizedOptions);
 
     // Format for LLM context
     const formattedContext = formatResultsForContext(results);

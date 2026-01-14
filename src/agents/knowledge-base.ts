@@ -2,6 +2,7 @@
 // Knowledge Base agent configuration with RAG support
 
 import { AgentConfig } from "./types";
+import { RAG_CONFIG } from "@/lib/rag-config";
 
 export const knowledgeBaseConfig: AgentConfig = {
   id: "knowledge",
@@ -11,12 +12,12 @@ export const knowledgeBaseConfig: AgentConfig = {
   temperature: 0.3, // Lower temperature for more factual responses
   maxTokens: 4096,
 
-  // Enable RAG for this agent
+  // Enable RAG for this agent - uses centralized config for consistency
   useRAG: true,
   ragOptions: {
-    limit: 5,           // Number of chunks to retrieve
-    threshold: 0.4,     // Minimum similarity score (0.4-0.5 is typical for semantic search)
-    maxContextTokens: 3000,  // Max tokens for context
+    limit: RAG_CONFIG.DEFAULT_LIMIT,
+    threshold: RAG_CONFIG.DEFAULT_THRESHOLD,
+    maxContextTokens: RAG_CONFIG.DEFAULT_MAX_CONTEXT_TOKENS,
   },
 
   systemPrompt: `You are the Knowledge Base assistant for CEO Sidekick. You help users find and understand information from their uploaded documents.

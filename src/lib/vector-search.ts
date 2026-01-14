@@ -1,8 +1,9 @@
 // src/lib/vector-search.ts
-// Vector similarity search for CEO Sidekick Knowledge Base
+// Hybrid search: Vector similarity + Keyword matching for CEO Sidekick Knowledge Base
 
 import { sql } from "drizzle-orm";
 import { generateEmbedding } from "./embeddings";
+import { RAG_CONFIG, normalizeRAGOptions } from "./rag-config";
 
 // Lazy database import
 async function getDb() {
@@ -19,6 +20,7 @@ export interface SearchResult {
   similarity: number;
   chunkIndex: number;
   metadata: Record<string, unknown> | null;
+  matchType?: 'semantic' | 'keyword' | 'hybrid';
 }
 
 export interface SearchOptions {
@@ -39,15 +41,58 @@ interface ChunkSearchRow {
   chunk_index: number;
   metadata: Record<string, unknown> | null;
   similarity: string | number;
+  keyword_rank?: string | number | null;
 }
 
-const DEFAULT_OPTIONS: Required<SearchOptions> = {
-  limit: 5,
-  threshold: 0.4, // Lowered to 0.4 to ensure matches
-};
+interface DocumentSearchRow {
+  id: string;
+  name: string;
+  name_similarity: string | number;
+}
 
 /**
- * Search for similar documents using vector similarity
+ * Extract meaningful search terms from a query
+ * Removes common words and keeps significant terms
+ */
+function extractSearchTerms(query: string): string[] {
+  const stopWords = new Set([
+    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'must', 'can', 'could',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'her', 'its', 'our', 'their',
+    'this', 'that', 'these', 'those',
+    'what', 'which', 'who', 'whom', 'whose', 'where', 'when', 'why', 'how',
+    'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such',
+    'no', 'not', 'only', 'same', 'so', 'than', 'too', 'very',
+    'just', 'about', 'into', 'through', 'during', 'before', 'after',
+    'above', 'below', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under',
+    'again', 'further', 'then', 'once', 'here', 'there', 'and', 'but', 'or',
+    'give', 'tell', 'show', 'find', 'get', 'make', 'know', 'think', 'see', 'come', 'go',
+    'want', 'use', 'say', 'ask', 'need', 'try', 'let', 'put', 'take', 'help',
+    'please', 'can', 'could', 'would', 'describe', 'explain', 'summary', 'summarize',
+    'document', 'file', 'information', 'details', 'content'
+  ]);
+
+  return query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')  // Remove punctuation
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stopWords.has(word));
+}
+
+/**
+ * Create a PostgreSQL tsquery from search terms
+ */
+function createTsQuery(terms: string[]): string {
+  if (terms.length === 0) return '';
+  // Use prefix matching (:*) for partial word matches
+  return terms.map(term => `${term}:*`).join(' | ');
+}
+
+/**
+ * Search for similar documents using HYBRID search
+ * Combines: 1) Document name matching, 2) Keyword search, 3) Vector similarity
  */
 export async function searchDocuments(
     query: string,
@@ -55,7 +100,7 @@ export async function searchDocuments(
     organizationId?: string,
     options: SearchOptions = {}
 ): Promise<SearchResult[]> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const opts = normalizeRAGOptions(options);
 
   const db = await getDb();
   if (!db) {
@@ -63,37 +108,37 @@ export async function searchDocuments(
     return [];
   }
 
-  // Check if OpenAI is configured
   if (!process.env.OPENAI_API_KEY) {
     console.log("[Search] OPENAI_API_KEY not configured");
     return [];
   }
 
   try {
-    // Generate embedding for the search query
     console.log("[Search] Generating embedding for query:", query.slice(0, 50));
     const queryEmbedding = await generateEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(",")}]`;
 
-    // First get document IDs the user can access
+    // Extract search terms for keyword matching
+    const searchTerms = extractSearchTerms(query);
+    const tsQuery = createTsQuery(searchTerms);
+    console.log("[Search] Extracted keywords:", searchTerms.slice(0, 5).join(", "));
+
+    // Get accessible document IDs
     let accessibleDocs;
     if (organizationId) {
-      // User has org - search both private and org docs
       accessibleDocs = await db.execute(sql`
-        SELECT id FROM documents
-        WHERE status = 'ready'
-          AND ((user_id = ${userId} AND organization_id IS NULL)
-          OR organization_id = ${organizationId})
+        SELECT id FROM documents 
+        WHERE status = 'ready' 
+        AND ((user_id = ${userId} AND organization_id IS NULL) 
+             OR organization_id = ${organizationId})
       `);
     } else {
-      // No org - only user's private docs
       accessibleDocs = await db.execute(sql`
-        SELECT id FROM documents
+        SELECT id FROM documents 
         WHERE status = 'ready' AND user_id = ${userId}
       `);
     }
 
-    // Drizzle execute() returns RowList directly, not { rows: [] }
     const docIds = (accessibleDocs as unknown as DocumentIdRow[]).map((d) => d.id);
 
     if (docIds.length === 0) {
@@ -102,78 +147,233 @@ export async function searchDocuments(
     }
 
     console.log("[Search] Searching across", docIds.length, "documents");
-
-    // Format docIds as PostgreSQL array literal: {uuid1,uuid2,...}
     const docIdsArrayLiteral = `{${docIds.join(",")}}`;
 
-    // Debug: Check how many chunks exist and have embeddings
+    // ============================================
+    // STEP 1: Check for document NAME matches
+    // This catches searches like "show me the FSDS document"
+    // ============================================
+    const documentNameResults: SearchResult[] = [];
+
+    if (searchTerms.length > 0) {
+      const nameSearchPattern = `%${searchTerms.join('%')}%`;
+
+      const docNameMatches = await db.execute(sql`
+        SELECT DISTINCT
+          d.id,
+          d.name,
+          CASE 
+            WHEN LOWER(d.name) LIKE LOWER(${nameSearchPattern}) THEN 0.95
+            WHEN LOWER(d.name) LIKE ANY(ARRAY[${sql.raw(searchTerms.map(t => `'%${t}%'`).join(','))}]) THEN 0.85
+            ELSE 0.7
+          END as name_similarity
+        FROM documents d
+        WHERE d.id = ANY(${docIdsArrayLiteral}::uuid[])
+          AND (
+            LOWER(d.name) LIKE LOWER(${nameSearchPattern})
+            OR LOWER(d.name) LIKE ANY(ARRAY[${sql.raw(searchTerms.map(t => `'%${t}%'`).join(','))}])
+          )
+        LIMIT 3
+      `);
+
+      const nameMatches = docNameMatches as unknown as DocumentSearchRow[];
+
+      if (nameMatches.length > 0) {
+        console.log("[Search] Found", nameMatches.length, "document name matches");
+
+        // Get the first chunk of each matching document
+        for (const doc of nameMatches) {
+          const firstChunk = await db.execute(sql`
+            SELECT 
+              dc.id as chunk_id,
+              dc.document_id,
+              d.name as document_name,
+              dc.content,
+              dc.chunk_index,
+              dc.metadata
+            FROM document_chunks dc
+            JOIN documents d ON d.id = dc.document_id
+            WHERE dc.document_id = ${doc.id}::uuid
+            ORDER BY dc.chunk_index
+            LIMIT 1
+          `);
+
+          const chunk = (firstChunk as unknown as ChunkSearchRow[])[0];
+          if (chunk) {
+            const similarity = typeof doc.name_similarity === 'string'
+                ? parseFloat(doc.name_similarity)
+                : doc.name_similarity;
+
+            documentNameResults.push({
+              chunkId: chunk.chunk_id,
+              documentId: chunk.document_id,
+              documentName: chunk.document_name,
+              content: chunk.content,
+              similarity: similarity,
+              chunkIndex: chunk.chunk_index,
+              metadata: chunk.metadata,
+              matchType: 'keyword'
+            });
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // STEP 2: Hybrid search on chunk content
+    // Combines vector similarity with keyword matching
+    // ============================================
+    let contentResults: SearchResult[] = [];
+
+    // Check chunk stats for debugging
     const chunkStats = await db.execute(sql`
-      SELECT
+      SELECT 
         COUNT(*) as total_chunks,
         COUNT(embedding) as chunks_with_embeddings
-      FROM document_chunks
+      FROM document_chunks 
       WHERE document_id = ANY(${docIdsArrayLiteral}::uuid[])
     `);
     const stats = (chunkStats as unknown as Array<{ total_chunks: string; chunks_with_embeddings: string }>)[0];
     console.log("[Search] Chunk stats - Total:", stats?.total_chunks, "With embeddings:", stats?.chunks_with_embeddings);
 
-    // Debug: Check similarity scores without threshold to see what we're getting
-    if (stats?.chunks_with_embeddings && parseInt(stats.chunks_with_embeddings) > 0) {
-      const debugSimilarity = await db.execute(sql`
-        SELECT
+    if (tsQuery && searchTerms.length > 0) {
+      // HYBRID: Combine vector similarity with full-text search
+      console.log("[Search] Running hybrid search with keywords:", tsQuery);
+
+      const hybridResults = await db.execute(sql`
+        WITH vector_search AS (
+          SELECT 
+            dc.id as chunk_id,
+            dc.document_id,
+            d.name as document_name,
+            dc.content,
+            dc.chunk_index,
+            dc.metadata,
+            1 - (dc.embedding <=> ${embeddingStr}::vector) as vector_similarity
+          FROM document_chunks dc
+          JOIN documents d ON d.id = dc.document_id
+          WHERE dc.document_id = ANY(${docIdsArrayLiteral}::uuid[])
+            AND dc.embedding IS NOT NULL
+        ),
+        keyword_search AS (
+          SELECT 
+            dc.id as chunk_id,
+            ts_rank_cd(to_tsvector('english', dc.content), to_tsquery('english', ${tsQuery})) as keyword_rank
+          FROM document_chunks dc
+          WHERE dc.document_id = ANY(${docIdsArrayLiteral}::uuid[])
+            AND to_tsvector('english', dc.content) @@ to_tsquery('english', ${tsQuery})
+        )
+        SELECT 
+          v.chunk_id,
+          v.document_id,
+          v.document_name,
+          v.content,
+          v.chunk_index,
+          v.metadata,
+          v.vector_similarity,
+          k.keyword_rank,
+          -- Hybrid score: boost vector similarity when keywords match
+          CASE 
+            WHEN k.keyword_rank IS NOT NULL THEN 
+              GREATEST(v.vector_similarity, 0.5) + (COALESCE(k.keyword_rank, 0) * 0.3)
+            ELSE 
+              v.vector_similarity
+          END as similarity
+        FROM vector_search v
+        LEFT JOIN keyword_search k ON v.chunk_id = k.chunk_id
+        ORDER BY similarity DESC
+        LIMIT ${opts.limit * 2}
+      `);
+
+      const rows = hybridResults as unknown as (ChunkSearchRow & { vector_similarity: string | number })[];
+
+      contentResults = rows
+          .filter(row => {
+            const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity;
+            return sim >= opts.threshold;
+          })
+          .slice(0, opts.limit)
+          .map(row => ({
+            chunkId: row.chunk_id,
+            documentId: row.document_id,
+            documentName: row.document_name,
+            content: row.content,
+            similarity: typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity,
+            chunkIndex: row.chunk_index,
+            metadata: row.metadata,
+            matchType: row.keyword_rank ? 'hybrid' as const : 'semantic' as const
+          }));
+
+    } else {
+      // Pure vector search (fallback when no good keywords)
+      console.log("[Search] Running pure vector search (no keywords extracted)");
+
+      const vectorResults = await db.execute(sql`
+        SELECT 
+          dc.id as chunk_id,
+          dc.document_id,
+          d.name as document_name,
+          dc.content,
+          dc.chunk_index,
+          dc.metadata,
           1 - (dc.embedding <=> ${embeddingStr}::vector) as similarity
         FROM document_chunks dc
+        JOIN documents d ON d.id = dc.document_id
         WHERE dc.document_id = ANY(${docIdsArrayLiteral}::uuid[])
           AND dc.embedding IS NOT NULL
         ORDER BY dc.embedding <=> ${embeddingStr}::vector
-          LIMIT 3
+        LIMIT ${opts.limit * 2}
       `);
-      const topScores = (debugSimilarity as unknown as Array<{ similarity: string }>);
-      console.log("[Search] Top similarity scores:", topScores.map(r => parseFloat(r.similarity).toFixed(3)));
+
+      const rows = vectorResults as unknown as ChunkSearchRow[];
+
+      contentResults = rows
+          .filter(row => {
+            const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity;
+            return sim >= opts.threshold;
+          })
+          .slice(0, opts.limit)
+          .map(row => ({
+            chunkId: row.chunk_id,
+            documentId: row.document_id,
+            documentName: row.document_name,
+            content: row.content,
+            similarity: typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity,
+            chunkIndex: row.chunk_index,
+            metadata: row.metadata,
+            matchType: 'semantic' as const
+          }));
     }
 
-    console.log("[Search] Using threshold:", opts.threshold);
+    // ============================================
+    // STEP 3: Merge and deduplicate results
+    // Prioritize: document name matches > hybrid > semantic
+    // ============================================
+    const seenChunks = new Set<string>();
+    const finalResults: SearchResult[] = [];
 
-    // Search chunks with vector similarity using pgvector
-    // Using cosine distance: 1 - (a <=> b) gives similarity
-    // Note: Threshold filtering done in JavaScript for reliability
-    const results = await db.execute(sql`
-      SELECT
-        dc.id as chunk_id,
-        dc.document_id,
-        d.name as document_name,
-        dc.content,
-        dc.chunk_index,
-        dc.metadata,
-        1 - (dc.embedding <=> ${embeddingStr}::vector) as similarity
-      FROM document_chunks dc
-             JOIN documents d ON d.id = dc.document_id
-      WHERE dc.document_id = ANY(${docIdsArrayLiteral}::uuid[])
-        AND dc.embedding IS NOT NULL
-      ORDER BY dc.embedding <=> ${embeddingStr}::vector
-        LIMIT ${opts.limit * 2}
-    `);
+    // Add document name matches first (highest priority)
+    for (const result of documentNameResults) {
+      if (!seenChunks.has(result.chunkId)) {
+        seenChunks.add(result.chunkId);
+        finalResults.push(result);
+      }
+    }
 
-    // Drizzle execute() returns RowList directly
-    const resultRows = results as unknown as ChunkSearchRow[];
+    // Add content matches
+    for (const result of contentResults) {
+      if (!seenChunks.has(result.chunkId) && finalResults.length < opts.limit) {
+        seenChunks.add(result.chunkId);
+        finalResults.push(result);
+      }
+    }
 
-    // Filter by threshold in JavaScript for reliability
-    const filteredRows = resultRows.filter(row => {
-      const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity;
-      return sim >= opts.threshold;
-    }).slice(0, opts.limit);
+    console.log("[Search] Final results:", finalResults.length,
+        "- Name matches:", documentNameResults.length,
+        "- Content matches:", contentResults.length);
 
-    console.log("[Search] Found", resultRows.length, "chunks before threshold,", filteredRows.length, "after threshold filter");
+    return finalResults.slice(0, opts.limit);
 
-    return filteredRows.map((row) => ({
-      chunkId: row.chunk_id,
-      documentId: row.document_id,
-      documentName: row.document_name,
-      content: row.content,
-      similarity: typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity,
-      chunkIndex: row.chunk_index,
-      metadata: row.metadata,
-    }));
   } catch (error) {
     console.error("[Search] Error:", error);
     return [];
@@ -192,10 +392,12 @@ export function formatResultsForContext(
   }
 
   let context = "## Relevant Information from Documents\n\n";
-  let tokenCount = 50; // Buffer for header
+  let tokenCount = 50;
 
   for (const result of results) {
-    const section = `### From "${result.documentName}" (relevance: ${(result.similarity * 100).toFixed(0)}%)\n${result.content}\n\n`;
+    const matchLabel = result.matchType === 'keyword' ? ' [name match]' :
+        result.matchType === 'hybrid' ? ' [keyword+semantic]' : '';
+    const section = `### From "${result.documentName}"${matchLabel} (relevance: ${(result.similarity * 100).toFixed(0)}%)\n${result.content}\n\n`;
     const sectionTokens = Math.ceil(section.length / 4);
 
     if (tokenCount + sectionTokens > maxTokens) {
