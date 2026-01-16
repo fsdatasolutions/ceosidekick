@@ -216,7 +216,7 @@ export const documents = pgTable(
     }),
     name: varchar("name", { length: 255 }).notNull(),
     originalName: varchar("original_name", { length: 255 }), // NEW: Original filename
-    type: varchar("type", { length: 50 }).notNull(), // "pdf" | "docx" | "txt" | "md"
+    type: varchar("type", { length: 100 }).notNull(), // "pdf" | "docx" | "txt" | "md"
     size: integer("size").notNull(), // bytes
     url: varchar("url", { length: 500 }), // Public URL (if applicable)
     storageKey: varchar("storage_key", { length: 500 }), // NEW: GCS object key
@@ -325,6 +325,56 @@ export const usageLogs = pgTable(
   ]
 );
 
+// Add this to src/db/schema.ts after the usage_logs table
+
+// ============================================
+// FEEDBACK (Bug Reports & Feature Requests)
+// ============================================
+
+export const feedback = pgTable(
+    "feedback",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        type: varchar("type", { length: 50 }).notNull(), // 'bug' | 'feature_request'
+        title: varchar("title", { length: 255 }).notNull(),
+        description: text("description").notNull(),
+        status: varchar("status", { length: 50 }).default("open").notNull(), // 'open' | 'in_progress' | 'resolved' | 'closed'
+        priority: varchar("priority", { length: 50 }).default("medium").notNull(), // 'low' | 'medium' | 'high' | 'critical'
+
+        // Bug report specific fields
+        stepsToReproduce: text("steps_to_reproduce"),
+        expectedBehavior: text("expected_behavior"),
+        actualBehavior: text("actual_behavior"),
+
+        // Feature request specific fields
+        useCase: text("use_case"),
+
+        // Additional context
+        pageUrl: varchar("page_url", { length: 500 }), // Where the bug occurred
+        userAgent: varchar("user_agent", { length: 500 }), // Browser info
+        metadata: jsonb("metadata"), // Any additional data
+
+        // Admin fields
+        adminNotes: text("admin_notes"),
+        resolvedAt: timestamp("resolved_at"),
+        resolvedBy: uuid("resolved_by").references(() => users.id),
+
+        // Timestamps
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("feedback_user_id_idx").on(table.userId),
+        index("feedback_type_idx").on(table.type),
+        index("feedback_status_idx").on(table.status),
+        index("feedback_created_at_idx").on(table.createdAt),
+    ]
+);
+
+
 // ============================================
 // RELATIONS
 // ============================================
@@ -337,6 +387,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   documents: many(documents),
   usageLogs: many(usageLogs),
   settings: one(userSettings),
+  feedback: many(feedback)
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -428,4 +479,15 @@ export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
     fields: [usageLogs.organizationId],
     references: [organizations.id],
   }),
+}));
+
+export const feedbackRelations = relations(feedback, ({ one }) => ({
+    user: one(users, {
+        fields: [feedback.userId],
+        references: [users.id],
+    }),
+    resolver: one(users, {
+        fields: [feedback.resolvedBy],
+        references: [users.id],
+    }),
 }));

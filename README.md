@@ -6,9 +6,28 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?logo=tailwind-css)
 ![LangGraph](https://img.shields.io/badge/LangGraph-0.2-orange)
-![License](https://img.shields.io/badge/License-Proprietary-red)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791?logo=postgresql)
 
 CEO Sidekick provides entrepreneurs and small business owners with enterprise-grade executive guidance at a fraction of the cost of a traditional C-suite. Our AI advisors are trained on best practices across every business function.
+
+---
+
+## Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [Database Setup](#-database-setup)
+- [Agent System](#-agent-system)
+- [Chat System](#-chat-system)
+- [Knowledge Base & RAG](#-knowledge-base--rag)
+- [Settings & Personalization](#-settings--personalization)
+- [API Reference](#-api-reference)
+- [Design System](#-design-system)
+- [Environment Variables](#-environment-variables)
+- [Scripts & Commands](#-scripts--commands)
+- [Troubleshooting](#-troubleshooting)
+- [Roadmap](#-roadmap)
 
 ---
 
@@ -32,59 +51,48 @@ CEO Sidekick provides entrepreneurs and small business owners with enterprise-gr
 - 🔐 **Secure Authentication** — OAuth (Google, GitHub) and email/password via NextAuth.js
 - 💬 **Streaming AI Chat** — Real-time responses with LangGraph orchestration
 - 🎯 **Personalized Advice** — AI adapts to your company context, goals, and preferences
-- 📄 **Document Intelligence** — Upload and query your company documents (coming soon)
+- 📄 **Document Intelligence** — Upload PDF, DOCX, TXT, and MD files with RAG-powered Q&A
 - 📊 **Usage Analytics** — Track message usage, conversations, and documents
 - ⚙️ **Comprehensive Settings** — 4-section setup for personalized AI responses
-- 🎨 **Beautiful UI** — Clean, professional design with FSDS brand colors
+- 📝 **Markdown Rendering** — Rich formatting in AI responses (bold, lists, code blocks)
+- 🕐 **Chat History** — Browse and continue past conversations
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js 18.17 or later
-- PostgreSQL database
+- PostgreSQL database (Neon recommended)
 - Anthropic API key
+- OpenAI API key (for embeddings)
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/fsdatasolutions/ceosidekick.git
-   cd ceosidekick
-   ```
+```bash
+# 1. Clone the repository
+git clone https://github.com/fsdatasolutions/ceosidekick.git
+cd ceosidekick
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+# 2. Install dependencies
+npm install
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
+# 3. Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your credentials (see Environment Variables section)
 
-   Required variables:
-   ```env
-   DATABASE_URL=postgresql://user:pass@localhost:5432/ceosidekick
-   NEXTAUTH_URL=http://localhost:3000
-   NEXTAUTH_SECRET=your-32-character-secret
-   ANTHROPIC_API_KEY=sk-ant-api03-...
-   ```
+# 4. Run database migrations
+npm run db:push
 
-4. **Run database migrations**
-   ```bash
-   npx drizzle-kit push
-   ```
+# 5. Seed demo data (optional)
+npm run db:seed
 
-5. **Run the development server**
-   ```bash
-   npm run dev
-   ```
+# 6. Start development server
+npm run dev
+```
 
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ---
 
@@ -103,7 +111,7 @@ ceosidekick/
 │   │   ├── hr-partner.ts          # HR/People operations
 │   │   ├── marketing-partner.ts   # Marketing strategy
 │   │   ├── sales-partner.ts       # Sales strategy
-│   │   ├── knowledge-base.ts      # Document Q&A
+│   │   ├── knowledge-base.ts      # Document Q&A (RAG)
 │   │   └── content-engine.ts      # Content creation
 │   │
 │   ├── app/                       # Next.js App Router
@@ -117,6 +125,7 @@ ceosidekick/
 │   │   │   ├── auth/              # NextAuth endpoints
 │   │   │   ├── chat/              # Streaming chat endpoint
 │   │   │   ├── conversations/     # CRUD for conversations
+│   │   │   ├── documents/         # Document upload & search
 │   │   │   ├── settings/          # User settings CRUD
 │   │   │   └── usage/             # Usage statistics
 │   │   ├── globals.css            # Design tokens & utilities
@@ -129,19 +138,122 @@ ceosidekick/
 │   │
 │   ├── db/
 │   │   ├── index.ts               # Drizzle client
-│   │   └── schema.ts              # Database schema
+│   │   ├── schema.ts              # Database schema
+│   │   └── seed.ts                # Seed script
 │   │
 │   ├── lib/
 │   │   ├── auth.ts                # NextAuth configuration
-│   │   └── utils.ts               # Utility functions
+│   │   ├── utils.ts               # Utility functions
+│   │   ├── rag-config.ts          # Centralized RAG configuration
+│   │   ├── embeddings.ts          # OpenAI embedding utilities
+│   │   ├── chunking.ts            # Text chunking
+│   │   ├── storage.ts             # GCS utilities
+│   │   ├── vector-search.ts       # Hybrid vector search (pgvector)
+│   │   └── document-processor.ts  # Document processing pipeline (PDF, DOCX, TXT, MD)
 │   │
 │   └── middleware.ts              # Auth protection
 │
+├── drizzle/                       # Generated migrations
 ├── drizzle.config.ts              # Drizzle ORM config
 ├── next.config.ts
 ├── package.json
 └── tsconfig.json
 ```
+
+---
+
+## 🗄️ Database Setup
+
+### Quick Start with Neon (Recommended)
+
+1. Go to [neon.tech](https://neon.tech) and create a free account
+2. Create a new project
+3. Copy the connection string to `.env.local`:
+   ```env
+   DATABASE_URL="postgresql://username:password@host:5432/database?sslmode=require"
+   ```
+4. Push the schema:
+   ```bash
+   npm run db:push
+   ```
+
+### Alternative Options
+
+**Supabase (Free tier)**
+1. Go to [supabase.com](https://supabase.com)
+2. Create a new project
+3. Go to Settings → Database → Connection string (URI)
+
+**Local PostgreSQL**
+```bash
+# macOS with Homebrew
+brew install postgresql@15
+brew services start postgresql@15
+createdb ceosidekick
+
+# Connection string
+DATABASE_URL="postgresql://localhost:5432/ceosidekick"
+```
+
+### Enable pgvector Extension
+
+Run in your database SQL editor:
+
+```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Add embedding column to document_chunks
+ALTER TABLE document_chunks 
+ADD COLUMN IF NOT EXISTS embedding vector(1536);
+
+-- Create HNSW index for fast similarity search
+CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx 
+ON document_chunks 
+USING hnsw (embedding vector_cosine_ops);
+
+-- Ensure type column can hold DOCX MIME type (71 chars)
+ALTER TABLE documents ALTER COLUMN type TYPE varchar(100);
+```
+
+### Database Schema
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts (email, password, name) |
+| `accounts` | OAuth provider accounts (Google, GitHub) |
+| `sessions` | User sessions |
+| `organizations` | Companies/teams |
+| `org_members` | User-organization relationships |
+| `conversations` | Chat sessions with AI agents |
+| `messages` | Individual messages in conversations |
+| `documents` | Uploaded files for knowledge base |
+| `document_chunks` | Chunked documents with embeddings for RAG |
+| `user_settings` | Personalization data |
+| `usage_logs` | Token usage and analytics |
+
+### Entity Relationships
+
+```
+users
+  ├── accounts (OAuth)
+  ├── sessions
+  ├── org_members ─── organizations
+  ├── conversations ─── messages
+  ├── documents ─── document_chunks
+  ├── user_settings (1:1)
+  └── usage_logs
+```
+
+### Database Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run db:push` | Push schema changes to database (dev) |
+| `npm run db:generate` | Generate migration files |
+| `npm run db:migrate` | Run migrations (production) |
+| `npm run db:studio` | Open Drizzle Studio (database GUI) |
+| `npm run db:seed` | Seed demo data |
 
 ---
 
@@ -157,89 +269,186 @@ type AgentType =
   | "hr"           // HR Partner
   | "marketing"    // Marketing Partner
   | "sales"        // Sales Partner
-  | "knowledge"    // Knowledge Base
+  | "knowledge"    // Knowledge Base (RAG)
   | "content";     // Content Engine
 ```
 
 ### Agent Configuration
 
 Each agent has:
-- **System Prompt** — Detailed persona, expertise, and guidelines
-- **Temperature** — 0.3-0.8 depending on creativity needs
-- **UI Config** — Colors, icons, capabilities list, example queries
+- `id` — Unique identifier
+- `name` — Display name
+- `subtitle` — Role description
+- `description` — Capabilities summary
+- `systemPrompt` — Core instructions
+- `temperature` — Response creativity (0-1)
+- `maxTokens` — Response length limit
 
-### Adding a New Agent
+### RAG-Enabled Agents
 
-1. Create `src/agents/[agent-name].ts` with `AgentConfig`
-2. Add to `AgentType` in `src/agents/types.ts`
-3. Register in `agentConfigs` in `src/agents/graph.ts`
-4. Add UI config in `src/agents/index.ts`
-5. Update dashboard and chat pages
+The Knowledge Base agent uses RAG (Retrieval-Augmented Generation):
 
----
-
-## 🗄️ Database Schema
-
-Using **Drizzle ORM** with PostgreSQL:
-
-### Core Tables
-
-| Table | Description |
-|-------|-------------|
-| `users` | User accounts (email, name, image) |
-| `accounts` | OAuth provider links |
-| `sessions` | Active sessions |
-| `organizations` | Multi-tenant workspaces |
-| `org_members` | User-organization relationships |
-| `conversations` | Chat conversations by agent |
-| `messages` | Individual messages (user/assistant) |
-| `documents` | Uploaded files metadata |
-| `document_chunks` | Chunked content for RAG |
-| `user_settings` | Personalization data |
-| `usage_logs` | Token usage tracking |
-
-### Key Relationships
-
-```
-users
-  ├── org_members → organizations
-  ├── conversations → messages
-  ├── documents → document_chunks
-  ├── user_settings (1:1)
-  └── usage_logs
+```typescript
+// src/agents/knowledge-base.ts
+export const knowledgeBaseConfig: AgentConfig = {
+  id: "knowledge",
+  name: "Knowledge Base",
+  useRAG: true,
+  ragOptions: {
+    limit: 5,           // Max chunks to retrieve
+    threshold: 0.4,     // Min similarity score
+    maxContextTokens: 3000,
+  },
+  // ...
+};
 ```
 
 ---
 
-## 🔌 API Routes
+## 📚 Knowledge Base & RAG
 
-### Authentication
-- `POST /api/auth/signup` — Create account with email/password
-- `GET/POST /api/auth/[...nextauth]` — NextAuth handlers
+### Supported File Types
+
+| Format | Extension | MIME Type | Library |
+|--------|-----------|-----------|---------|
+| Plain Text | `.txt` | `text/plain` | Built-in |
+| Markdown | `.md` | `text/markdown` | Built-in |
+| PDF | `.pdf` | `application/pdf` | `unpdf` |
+| Word Document | `.docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `mammoth` |
+
+### Document Processing Pipeline
+
+```
+Upload → Extract Text → Chunk → Generate Embeddings → Store in pgvector
+```
+
+1. **Text Extraction**
+    - TXT/MD: Direct UTF-8 conversion
+    - PDF: `unpdf` library (serverless-friendly, works with Node.js)
+    - DOCX: `mammoth` library for Word documents
+
+2. **Chunking**
+    - Target: ~500 tokens per chunk
+    - Overlap: 50 tokens between chunks
+    - Semantic boundaries: Respects paragraphs, sentences, words
+
+3. **Embedding**
+    - Model: OpenAI `text-embedding-3-small`
+    - Dimensions: 1536
+    - Batch processing: 100 chunks per API call
+
+4. **Storage**
+    - PostgreSQL with pgvector extension
+    - HNSW index for fast similarity search
+
+### Hybrid Search Strategy
+
+The search combines three approaches:
+
+1. **Document Name Matching** — Catches queries like "show me the FSDS document"
+2. **PostgreSQL Full-Text Search** — Keyword matching with `ts_rank`
+3. **Vector Similarity** — Semantic search via embeddings
+
+Results are merged and deduplicated by priority.
+
+### RAG Configuration
+
+Centralized in `src/lib/rag-config.ts`:
+
+```typescript
+export const RAG_CONFIG = {
+  DEFAULT_THRESHOLD: 0.4,  // Similarity threshold (0.3-0.6 typical)
+  MIN_THRESHOLD: 0.3,
+  MAX_THRESHOLD: 0.95,
+  DEFAULT_LIMIT: 5,        // Chunks to retrieve
+  MAX_LIMIT: 20,
+  DEFAULT_MAX_CONTEXT_TOKENS: 3000,
+};
+```
+
+### File Size Limits
+
+- Current limit: 10MB per file
+- Processing: Synchronous (suitable for files up to ~5MB)
+- Future: Background job queue for larger files
+
+---
+
+## ⚙️ Settings & Personalization
+
+### Four Settings Sections
+
+1. **Company Profile** — Name, industry, size, revenue, products/services
+2. **Your Role** — Title, experience, areas of focus
+3. **Business Context** — Challenges, goals, tech stack, team structure
+4. **Preferences** — Communication style, response length
+
+Settings are injected into agent system prompts to personalize responses.
+
+---
+
+## 📡 API Reference
 
 ### Chat
-- `POST /api/chat` — Streaming chat with agents
-  ```json
-  {
-    "message": "How should I structure my tech team?",
-    "agent": "technology",
-    "conversationId": "optional-uuid"
-  }
-  ```
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/chat` | POST | Streaming chat (SSE) |
+
+**Request Body:**
+```json
+{
+  "message": "Help me write a job description",
+  "agent": "hr",
+  "conversationId": "uuid-optional"
+}
+```
 
 ### Conversations
-- `GET /api/conversations` — List user's conversations
-- `POST /api/conversations` — Create conversation
-- `GET /api/conversations/[id]` — Get with messages
-- `PATCH /api/conversations/[id]` — Update (title, archive)
-- `DELETE /api/conversations/[id]` — Delete
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/conversations` | GET | List user's conversations |
+| `/api/conversations` | POST | Create new conversation |
+| `/api/conversations/[id]` | GET | Get conversation with messages |
+| `/api/conversations/[id]` | DELETE | Delete conversation |
+
+### Documents
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/documents` | GET | List user's documents |
+| `/api/documents` | POST | Upload document (multipart/form-data) |
+| `/api/documents?id=xxx` | DELETE | Delete document |
+| `/api/documents/[id]` | GET | Get document details + chunks |
+| `/api/documents/[id]` | POST | Reprocess failed document |
+| `/api/documents/search` | POST | Hybrid vector search |
+
+**Upload Request (multipart/form-data):**
+- `file`: The document file (PDF, DOCX, TXT, MD)
+- `shared`: `"true"` to share with organization
+
+**Search Request:**
+```json
+{
+  "query": "What is our PTO policy?",
+  "limit": 5,
+  "threshold": 0.4
+}
+```
 
 ### Settings
-- `GET /api/settings` — Get user settings
-- `PUT /api/settings` — Update settings
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/settings` | GET | Get user settings |
+| `/api/settings` | PUT | Update settings |
 
 ### Usage
-- `GET /api/usage` — Get usage statistics (messages, conversations, docs)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/usage` | GET | Get usage statistics |
 
 ---
 
@@ -274,67 +483,128 @@ users
 | Body | DM Sans | Body text |
 | Mono | JetBrains Mono | Code |
 
----
+### Markdown Styling
 
-## ⚙️ Settings System
-
-Four-section personalization flow:
-
-### 1. Your Profile
-- Role/title
-- Years of experience
-- Areas of focus
-
-### 2. Company Profile
-- Company name & industry
-- Company size & revenue
-- Products/services & target market
-
-### 3. Business Context
-- Current challenges
-- Short-term goals (3-6 months)
-- Long-term goals (1-3 years)
-- Tech stack & team structure
-
-### 4. AI Preferences
-- Communication style (formal/casual/technical)
-- Response length (concise/detailed/comprehensive)
-
-These are injected into agent system prompts for personalized advice.
+```css
+prose prose-sm max-w-none prose-neutral 
+prose-p:my-2 prose-headings:my-3 
+prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 
+prose-pre:bg-neutral-800 prose-pre:text-neutral-100
+```
 
 ---
 
-## 🏗️ Tech Stack
+## 🔐 Environment Variables
 
-### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 16.1 | App Router, SSR |
-| React | 19 | UI library |
-| TypeScript | 5.x | Type safety |
-| Tailwind CSS | 4.0 | Styling |
-| Lucide React | Latest | Icons |
+```env
+# ===================
+# Required
+# ===================
+DATABASE_URL=postgresql://user:pass@host:5432/ceosidekick?sslmode=require
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate-with-openssl-rand-base64-32
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
 
-### Backend
-| Technology | Purpose |
-|------------|---------|
-| Next.js API Routes | REST endpoints |
-| NextAuth.js | Authentication |
-| Drizzle ORM | Database ORM |
-| PostgreSQL | Primary database |
+# ===================
+# Knowledge Base (RAG)
+# ===================
+OPENAI_API_KEY=sk-proj-xxxxx
 
-### AI/ML
-| Service | Purpose |
-|---------|---------|
-| Anthropic Claude | LLM (claude-sonnet-4) |
-| LangGraph | Conversation orchestration |
-| LangChain | LLM abstractions |
+# Google Cloud Storage (optional - for document storage)
+GOOGLE_CLOUD_PROJECT=your-project-id
+GCS_BUCKET_NAME=ceosidekick-documents
+GCS_CREDENTIALS='{"type":"service_account",...}'
 
-### Infrastructure
-| Service | Purpose |
-|---------|---------|
-| Render.com | Hosting |
-| Neon/Supabase | Managed PostgreSQL |
+# ===================
+# OAuth (Optional)
+# ===================
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+# ===================
+# Future
+# ===================
+STRIPE_SECRET_KEY=
+```
+
+---
+
+## 📜 Scripts & Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run start` | Production server |
+| `npm run lint` | ESLint |
+| `npm run db:push` | Push schema to DB (dev) |
+| `npm run db:generate` | Generate migrations |
+| `npm run db:migrate` | Run migrations (prod) |
+| `npm run db:studio` | Database GUI |
+| `npm run db:seed` | Seed demo data |
+
+---
+
+## 🔧 Troubleshooting
+
+### Database Issues
+
+**"DATABASE_URL is not set"**
+- Add to `.env.local`: `DATABASE_URL="your-connection-string"`
+
+**"Connection refused"**
+- Check if PostgreSQL is running
+- Verify connection string format
+- For cloud: ensure SSL mode (`?sslmode=require`)
+
+**"Table does not exist"**
+- Run: `npm run db:push`
+
+### Knowledge Base Issues
+
+**"pgvector extension not found"**
+- Run in SQL Editor: `CREATE EXTENSION IF NOT EXISTS vector;`
+
+**"No search results" even with documents**
+- Check threshold (default 0.4, try 0.3)
+- Verify documents have status "ready"
+- Check chunks have embeddings:
+  ```sql
+  SELECT COUNT(*) FROM document_chunks WHERE embedding IS NOT NULL;
+  ```
+
+**"Embedding dimension mismatch"**
+- Ensure column uses 1536 dimensions (text-embedding-3-small)
+
+**PDF upload fails with "DOMMatrix is not defined"**
+- This is a known issue with `pdf-parse` in Next.js/Turbopack
+- Solution: Use `unpdf` library instead (already implemented)
+
+**DOCX upload fails with schema error**
+- The DOCX MIME type is 71 characters
+- Run: `ALTER TABLE documents ALTER COLUMN type TYPE varchar(100);`
+
+### Chat Issues
+
+**Settings not being applied**
+- Check server logs for `[API] Loaded user settings: yes`
+- Verify settings exist in database
+
+**Markdown not rendering**
+- Ensure `@tailwindcss/typography` is installed
+- Check `@plugin "@tailwindcss/typography"` in globals.css
+
+**History not loading**
+- Check browser console for API errors
+- Verify `/api/conversations` endpoint returns data
+
+### GCS Issues
+
+**"Permission denied"**
+- Check service account has Storage Admin role
+- Verify bucket name in env vars
 
 ---
 
@@ -351,15 +621,29 @@ These are injected into agent system prompts for personalized advice.
 - [x] All 8 agent configurations
 - [x] Streaming chat API
 - [x] Usage tracking
+- [x] Chat history & markdown rendering
 
-### Phase 2 — Core Features (Current)
-- [ ] Chat UI polish & conversation history
-- [ ] Knowledge Base RAG implementation
-- [ ] Document upload & processing
+### Phase 2 — Knowledge Base ✅ Complete
+- [x] Document upload & processing
+- [x] Text chunking with semantic boundaries
+- [x] OpenAI embeddings
+- [x] pgvector storage
+- [x] Hybrid search (vector + keyword + name matching)
+- [x] RAG integration with Knowledge Base agent
+- [x] Centralized RAG configuration
+- [x] PDF support (using `unpdf`)
+- [x] DOCX support (using `mammoth`)
+- [x] Batch database inserts for performance
+
+### Phase 3 — Polish & Scale (Current)
+- [ ] Large file support (50-100MB)
+- [ ] Background job queue (Inngest/BullMQ)
+- [ ] Real-time processing progress
 - [ ] Stripe billing integration
 - [ ] Content Engine integration
+- [ ] Document preview
 
-### Phase 3 — Scale & Enterprise
+### Phase 4 — Enterprise
 - [ ] Mobile app
 - [ ] API access
 - [ ] Integrations (Slack, Google Drive)
@@ -368,38 +652,20 @@ These are injected into agent system prompts for personalized advice.
 
 ---
 
-## 🔧 Environment Variables
+## 💰 Cost Estimates
 
-```env
-# Required
-DATABASE_URL=postgresql://...
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=generate-with-openssl
-ANTHROPIC_API_KEY=sk-ant-...
+### OpenAI Embeddings
+- Model: text-embedding-3-small
+- Cost: ~$0.02 per 1M tokens
+- 100 documents × 5KB each ≈ $0.003
 
-# OAuth (Optional)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+### Google Cloud Storage
+- Storage: $0.02/GB/month
+- 100MB of docs ≈ $0.002/month
 
-# Future
-STRIPE_SECRET_KEY=
-OPENAI_API_KEY=  # For embeddings
-```
-
----
-
-## 📜 Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Development server |
-| `npm run build` | Production build |
-| `npm run start` | Production server |
-| `npm run lint` | ESLint |
-| `npx drizzle-kit push` | Push schema to DB |
-| `npx drizzle-kit studio` | Database GUI |
+### Neon PostgreSQL
+- Free tier: 0.5GB storage, 192 compute hours
+- Pro: $19/month for more storage/compute
 
 ---
 
@@ -410,6 +676,32 @@ OPENAI_API_KEY=  # For embeddings
 - Rate limiting on API endpoints
 - Legal disclaimer on Legal Advisor
 - No PII in logs
+- Documents stored in private GCS bucket
+- Signed URLs for time-limited access
+
+---
+
+## 📦 Key Dependencies
+
+### Document Processing
+| Package | Purpose |
+|---------|---------|
+| `unpdf` | PDF text extraction (serverless-friendly) |
+| `mammoth` | DOCX text extraction |
+| `openai` | Embeddings generation |
+
+### Database
+| Package | Purpose |
+|---------|---------|
+| `drizzle-orm` | Type-safe ORM |
+| `postgres` | PostgreSQL driver |
+| `pgvector` | Vector similarity search |
+
+### AI & Chat
+| Package | Purpose |
+|---------|---------|
+| `@anthropic-ai/sdk` | Claude API |
+| `@langchain/langgraph` | Conversation orchestration |
 
 ---
 

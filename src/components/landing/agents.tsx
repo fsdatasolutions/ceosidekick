@@ -1,25 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Cpu,
-  Target,
-  Scale,
-  Users,
-  BookOpen,
-  PenTool,
-  TrendingUp,
-  DollarSign,
-  ArrowRight
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AgentAvatar } from "@/components/ui/agent-avatar";
 
 const agents = [
   {
     id: "technology",
     name: "Technology Partner",
     subtitle: "Virtual CTO/CIO",
-    icon: Cpu,
     color: "bg-accent-teal",
     lightColor: "bg-accent-teal-light",
     textColor: "text-accent-teal",
@@ -38,7 +28,6 @@ const agents = [
     id: "coach",
     name: "Executive Coach",
     subtitle: "Leadership Partner",
-    icon: Target,
     color: "bg-agent-coach",
     lightColor: "bg-purple-100",
     textColor: "text-agent-coach",
@@ -57,7 +46,6 @@ const agents = [
     id: "legal",
     name: "Legal Advisor",
     subtitle: "Contract & Compliance",
-    icon: Scale,
     color: "bg-agent-legal",
     lightColor: "bg-blue-100",
     textColor: "text-agent-legal",
@@ -77,7 +65,6 @@ const agents = [
     id: "hr",
     name: "HR Partner",
     subtitle: "People Operations",
-    icon: Users,
     color: "bg-agent-hr",
     lightColor: "bg-green-100",
     textColor: "text-agent-hr",
@@ -96,7 +83,6 @@ const agents = [
     id: "marketing",
     name: "Marketing Partner",
     subtitle: "Growth & Brand",
-    icon: TrendingUp,
     color: "bg-pink-600",
     lightColor: "bg-pink-100",
     textColor: "text-pink-600",
@@ -115,7 +101,6 @@ const agents = [
     id: "sales",
     name: "Sales Partner",
     subtitle: "Revenue & Deals",
-    icon: DollarSign,
     color: "bg-orange-600",
     lightColor: "bg-orange-100",
     textColor: "text-orange-600",
@@ -134,7 +119,6 @@ const agents = [
     id: "knowledge",
     name: "Knowledge Base",
     subtitle: "Company AI",
-    icon: BookOpen,
     color: "bg-agent-knowledge",
     lightColor: "bg-indigo-100",
     textColor: "text-agent-knowledge",
@@ -153,7 +137,6 @@ const agents = [
     id: "content",
     name: "Content Engine",
     subtitle: "Thought Leadership",
-    icon: PenTool,
     color: "bg-primary-red",
     lightColor: "bg-primary-red-light",
     textColor: "text-primary-red",
@@ -198,9 +181,7 @@ export function Agents() {
                   {/* Card Header */}
                   <div className={`p-5 ${agent.lightColor}`}>
                     <div className="flex items-start justify-between mb-3">
-                      <div className={`w-11 h-11 rounded-xl ${agent.color} flex items-center justify-center shadow-lg`}>
-                        <agent.icon className="w-5 h-5 text-white" />
-                      </div>
+                      <AgentAvatar agentId={agent.id} size="lg" className="shadow-lg" />
                       <span className={`text-[10px] font-semibold ${agent.textColor} uppercase tracking-wide`}>
                     {agent.subtitle}
                   </span>

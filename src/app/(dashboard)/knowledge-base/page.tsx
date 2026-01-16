@@ -32,6 +32,15 @@ interface Document {
   organizationId: string | null;
 }
 
+// Supported file types
+const ACCEPTED_FILE_TYPES = ".txt,.md,.pdf,.docx";
+const ACCEPTED_MIME_TYPES = [
+  "text/plain",
+  "text/markdown",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+].join(",");
+
 export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,17 +93,32 @@ export default function KnowledgeBasePage() {
       formData.append("file", file);
 
       try {
+        // Show which file is being processed
+        console.log(`[Upload] Processing ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)...`);
+
         const res = await fetch("/api/documents", {
           method: "POST",
           body: formData,
         });
 
+        const data = await res.json();
+
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error || "Upload failed");
         }
+
+        // Check if processing failed but document was created
+        if (data.document?.status === "failed") {
+          setError(`${file.name}: Processing failed. You can retry from the document list.`);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
+        const message = err instanceof Error ? err.message : "Upload failed";
+        // Check if it's a timeout error
+        if (message.includes("timeout") || message.includes("network")) {
+          setError(`${file.name}: Upload timed out. Large files may take a few minutes to process.`);
+        } else {
+          setError(`${file.name}: ${message}`);
+        }
       }
     }
 
@@ -189,6 +213,13 @@ export default function KnowledgeBasePage() {
     return date.toLocaleDateString();
   };
 
+  // Get file type icon color based on extension
+  const getFileTypeColor = (type: string) => {
+    if (type === "application/pdf") return "text-red-600 bg-red-50";
+    if (type.includes("wordprocessingml")) return "text-blue-600 bg-blue-50";
+    return "text-primary-red bg-primary-red-light";
+  };
+
   return (
       <div className="p-8">
         {/* Header */}
@@ -208,19 +239,27 @@ export default function KnowledgeBasePage() {
                 Ask Questions
               </Button>
             </Link>
-            <Button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+            >
               {uploading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
               ) : (
-                  <Upload className="w-5 h-5" />
+                  <>
+                    <Upload className="w-5 h-5" />
+                    Upload Documents
+                  </>
               )}
-              Upload Documents
             </Button>
             <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".txt,.md"
+                accept={`${ACCEPTED_FILE_TYPES},${ACCEPTED_MIME_TYPES}`}
                 className="hidden"
                 onChange={(e) => handleUpload(e.target.files)}
             />
@@ -293,7 +332,7 @@ export default function KnowledgeBasePage() {
             Drag and drop files here, or click to browse
           </p>
           <p className="text-sm text-neutral-400">
-            Supports PDF, DOCX, TXT, and MD files up to 10MB each
+            Supports PDF, DOCX, TXT, and MD files up to 10MB. Large files may take 1-2 minutes to process.
           </p>
         </div>
 
@@ -332,16 +371,24 @@ export default function KnowledgeBasePage() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                 {filteredDocuments.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-neutral-50 transition-colors">
+                    <tr
+                        key={doc.id}
+                        className="hover:bg-neutral-50 transition-colors"
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary-red-light flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-primary-red" />
+                          <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${getFileTypeColor(doc.type)}`}
+                          >
+                            <FileText className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="font-medium text-neutral-900">{doc.name}</p>
+                            <p className="font-medium text-neutral-900">
+                              {doc.name}
+                            </p>
                             <p className="text-sm text-neutral-500">
-                              {doc.chunkCount > 0 && `${doc.chunkCount} chunks indexed`}
+                              {doc.chunkCount > 0 &&
+                                  `${doc.chunkCount} chunks indexed`}
                             </p>
                           </div>
                         </div>

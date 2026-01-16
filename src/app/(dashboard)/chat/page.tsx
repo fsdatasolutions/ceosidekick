@@ -3,18 +3,11 @@
 import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { AgentAvatar } from "@/components/ui/agent-avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Send,
-  Cpu,
-  Target,
-  Scale,
-  Users,
-  BookOpen,
-  PenTool,
-  TrendingUp,
-  DollarSign,
   Loader2,
   Plus,
   AlertCircle,
@@ -47,56 +40,48 @@ const agents = {
   technology: {
     name: "Technology Partner",
     subtitle: "Virtual CTO/CIO",
-    icon: Cpu,
     color: "bg-accent-teal",
     description: "Technology strategy, build vs. buy, vendor evaluation, digital transformation",
   },
   coach: {
     name: "Executive Coach",
     subtitle: "Leadership Partner",
-    icon: Target,
     color: "bg-agent-coach",
     description: "Leadership development, decision frameworks, strategic thinking",
   },
   legal: {
     name: "Legal Advisor",
     subtitle: "Contract & Compliance",
-    icon: Scale,
     color: "bg-agent-legal",
     description: "Contract review, terms of service, compliance guidance",
   },
   hr: {
     name: "HR Partner",
     subtitle: "People Operations",
-    icon: Users,
     color: "bg-agent-hr",
     description: "Job descriptions, hiring, performance reviews, policies",
   },
   marketing: {
     name: "Marketing Partner",
     subtitle: "Growth & Brand",
-    icon: TrendingUp,
     color: "bg-pink-600",
     description: "Marketing strategy, brand development, campaigns, analytics",
   },
   sales: {
     name: "Sales Partner",
     subtitle: "Revenue & Deals",
-    icon: DollarSign,
     color: "bg-orange-600",
     description: "Sales process, pipeline management, objection handling, pricing",
   },
   knowledge: {
     name: "Knowledge Base",
     subtitle: "Company AI",
-    icon: BookOpen,
     color: "bg-agent-knowledge",
     description: "Ask questions about your uploaded documents",
   },
   content: {
     name: "Content Engine",
     subtitle: "Thought Leadership",
-    icon: PenTool,
     color: "bg-primary-red",
     description: "Blog posts, social media, marketing copy",
   },
@@ -147,9 +132,7 @@ const suggestedPrompts: Record<AgentType, string[]> = {
 };
 
 // Preprocess markdown to ensure proper spacing
-// Adds blank lines before bold text that starts a line (AI often uses **text** as headers)
 function formatMarkdown(content: string): string {
-  // Split into lines
   const lines = content.split('\n');
   const result: string[] = [];
 
@@ -157,16 +140,14 @@ function formatMarkdown(content: string): string {
     const line = lines[i];
     const prevLine = i > 0 ? lines[i - 1] : '';
 
-    // If this line starts with bold text and previous line is not empty
-    // and previous line is not a header/list, add a blank line before
     if (
-        line.match(/^\*\*[^*]+\*\*/) && // Line starts with **text**
-        prevLine.trim() !== '' && // Previous line is not empty
-        !prevLine.match(/^#{1,6}\s/) && // Previous is not a header
-        !prevLine.match(/^[-*]\s/) && // Previous is not a list item
-        !prevLine.match(/^\d+\.\s/) // Previous is not a numbered list
+        line.match(/^\*\*[^*]+\*\*/) &&
+        prevLine.trim() !== '' &&
+        !prevLine.match(/^#{1,6}\s/) &&
+        !prevLine.match(/^[-*]\s/) &&
+        !prevLine.match(/^\d+\.\s/)
     ) {
-      result.push(''); // Add blank line for separation
+      result.push('');
     }
 
     result.push(line);
@@ -198,7 +179,6 @@ function ChatContent() {
   const agentSelectorRef = useRef<HTMLDivElement>(null);
 
   const currentAgent = agents[agent];
-  const AgentIcon = currentAgent.icon;
 
   // Close agent selector when clicking outside
   useEffect(() => {
@@ -207,11 +187,31 @@ function ChatContent() {
         setShowAgentSelector(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Scroll to bottom when messages change
+  // Update URL when agent changes
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("agent", agent);
+    if (conversationId) {
+      url.searchParams.set("id", conversationId);
+    } else {
+      url.searchParams.delete("id");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [agent, conversationId]);
+
+  // Load conversation if ID provided
+  useEffect(() => {
+    if (conversationIdParam) {
+      loadConversation(conversationIdParam);
+    }
+  }, [conversationIdParam]);
+
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -224,260 +224,142 @@ function ChatContent() {
     }
   }, [input]);
 
-  // Load conversation history if ID provided
-  useEffect(() => {
-    if (conversationIdParam) {
-      loadConversation(conversationIdParam);
-    }
-  }, [conversationIdParam]);
-
-  // Load chat history when sidebar opens
+  // Fetch conversation history when sidebar opens
   useEffect(() => {
     if (showHistory) {
-      loadChatHistory();
+      fetchConversations();
     }
-  }, [showHistory, agent]);
+  }, [showHistory]);
 
-  async function loadChatHistory() {
+  const fetchConversations = async () => {
     setLoadingHistory(true);
     try {
-      const response = await fetch(`/api/conversations?agent=${agent}`);
-      if (response.ok) {
-        const data = await response.json();
-        setConversations(data.conversations || []);
-      }
+      const res = await fetch(`/api/conversations?agent=${agent}`);
+      if (!res.ok) throw new Error("Failed to fetch conversations");
+      const data = await res.json();
+      setConversations(data.conversations || []);
     } catch (err) {
-      console.error("Failed to load chat history:", err);
+      console.error("Failed to fetch conversations:", err);
     } finally {
       setLoadingHistory(false);
     }
-  }
+  };
 
-  async function loadConversation(id: string) {
+  const loadConversation = async (id: string) => {
     try {
-      const response = await fetch(`/api/chat?conversationId=${id}`);
-      if (response.ok) {
-        const data = await response.json();
+      const res = await fetch(`/api/conversations/${id}`);
+      if (!res.ok) throw new Error("Failed to load conversation");
+      const data = await res.json();
+
+      if (data.conversation) {
+        setAgent(data.conversation.agent);
         setMessages(
-            data.messages.map((m: { id: string; role: string; content: string; createdAt: string }) => ({
+            data.conversation.messages.map((m: Message) => ({
               ...m,
               createdAt: new Date(m.createdAt),
             }))
         );
+        setConversationId(id);
       }
     } catch (err) {
       console.error("Failed to load conversation:", err);
+      setError("Failed to load conversation");
     }
-  }
+  };
 
-  async function handleSubmit(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const messageContent = input.trim();
-    const userMessageId = `user-${Date.now()}`;
-    const assistantMessageId = `assistant-${Date.now() + 1}`;
-
-    const userMsg: Message = {
-      id: userMessageId,
-      role: "user",
-      content: messageContent,
-      createdAt: new Date(),
-    };
-
-    const assistantMsg: Message = {
-      id: assistantMessageId,
-      role: "assistant",
-      content: "",
-      createdAt: new Date(),
-    };
-
-    // Capture existing messages to avoid closure issues
-    const existingMessages = [...messages];
-    const allMessages = [...existingMessages, userMsg, assistantMsg];
-
-    setMessages(allMessages);
-    setInput("");
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: messageContent,
-          conversationId,
-          agent,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let fullContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === "conversation_id") {
-                setConversationId(data.id);
-                window.history.replaceState({}, "", `/chat?agent=${agent}&id=${data.id}`);
-              } else if (data.type === "content") {
-                fullContent += data.content;
-                // Create fresh array with updated content
-                setMessages([
-                  ...existingMessages,
-                  userMsg,
-                  { ...assistantMsg, content: fullContent },
-                ]);
-              } else if (data.type === "error") {
-                throw new Error(data.error);
-              }
-            } catch (e) {
-              // Ignore parse errors for incomplete chunks
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Chat error:", err);
-      setError(err instanceof Error ? err.message : "Failed to send message");
-      setMessages(existingMessages); // Restore previous state
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  }
-
-  function startNewConversation() {
-    setMessages([]);
-    setConversationId(null);
-    setError(null);
-    setShowHistory(false);
-    window.history.replaceState({}, "", `/chat?agent=${agent}`);
-  }
-
-  function switchAgent(newAgent: AgentType) {
-    if (newAgent === agent) {
-      setShowAgentSelector(false);
-      return;
-    }
-
-    // If there's an active conversation, confirm before switching
-    if (messages.length > 0) {
-      if (!confirm("Switch agent? This will start a new conversation.")) {
-        setShowAgentSelector(false);
-        return;
-      }
-    }
-
-    setAgent(newAgent);
-    setMessages([]);
-    setConversationId(null);
-    setError(null);
-    setShowAgentSelector(false);
-    setShowHistory(false);
-    window.history.replaceState({}, "", `/chat?agent=${newAgent}`);
-  }
-
-  function selectConversation(conv: Conversation) {
-    setConversationId(conv.id);
-    setAgent(conv.agent);
-    setShowHistory(false);
-    window.history.replaceState({}, "", `/chat?agent=${conv.agent}&id=${conv.id}`);
-    loadConversation(conv.id);
-  }
-
-  async function deleteConversation(convId: string, e: React.MouseEvent) {
+  const deleteConversation = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Delete this conversation?")) return;
 
     try {
-      const response = await fetch(`/api/conversations/${convId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setConversations(conversations.filter(c => c.id !== convId));
-        if (conversationId === convId) {
-          startNewConversation();
-        }
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+
+      if (id === conversationId) {
+        startNewConversation();
       }
     } catch (err) {
-      console.error("Failed to delete conversation:", err);
+      console.error("Failed to delete:", err);
     }
-  }
+  };
 
-  async function handlePromptClick(prompt: string) {
-    if (isLoading) return;
+  const startNewConversation = () => {
+    setMessages([]);
+    setConversationId(null);
+    setError(null);
+    setShowHistory(false);
 
-    console.log("[PromptClick] Starting with prompt:", prompt.slice(0, 50));
+    const url = new URL(window.location.href);
+    url.searchParams.delete("id");
+    window.history.replaceState({}, "", url.toString());
+  };
 
-    const userMessageId = `user-${Date.now()}`;
-    const assistantMessageId = `assistant-${Date.now() + 1}`;
+  const switchAgent = (newAgent: AgentType) => {
+    if (newAgent !== agent) {
+      setAgent(newAgent);
+      setMessages([]);
+      setConversationId(null);
+      setError(null);
+    }
+    setShowAgentSelector(false);
+  };
 
-    const userMsg: Message = {
-      id: userMessageId,
-      role: "user",
-      content: prompt,
-      createdAt: new Date(),
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-    const assistantMsg: Message = {
-      id: assistantMessageId,
-      role: "assistant",
-      content: "",
-      createdAt: new Date(),
-    };
-
-    // Keep track of all messages including new ones
-    const existingMessages = [...messages];
-    const allMessages = [...existingMessages, userMsg, assistantMsg];
-
-    setMessages(allMessages);
-    setIsLoading(true);
+    const userMessage = input.trim();
+    setInput("");
     setError(null);
 
+    const userMsgId = Date.now().toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: "user",
+        content: userMessage,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const assistantMsgId = (Date.now() + 1).toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date(),
+      },
+    ]);
+
+    setIsLoading(true);
+
     try {
-      const response = await fetch("/api/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: prompt,
-          conversationId,
+          message: userMessage,
           agent,
+          conversationId,
         }),
       });
 
-      if (!response.ok) {
+      if (!res.ok) {
         throw new Error("Failed to send message");
       }
 
-      const reader = response.body?.getReader();
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
       if (!reader) throw new Error("No response body");
 
-      const decoder = new TextDecoder();
       let fullContent = "";
+      let newConversationId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -491,91 +373,134 @@ function ChatContent() {
             try {
               const data = JSON.parse(line.slice(6));
 
-              if (data.type === "conversation_id") {
-                setConversationId(data.id);
-                window.history.replaceState({}, "", `/chat?agent=${agent}&id=${data.id}`);
-              } else if (data.type === "content") {
-                fullContent += data.content;
-                // Create fresh array with updated content
-                setMessages([
-                  ...existingMessages,
-                  userMsg,
-                  { ...assistantMsg, content: fullContent },
-                ]);
-              } else if (data.type === "error") {
-                throw new Error(data.error);
+              if (data.conversationId) {
+                newConversationId = data.conversationId;
               }
-            } catch (parseErr) {
-              // Ignore parse errors
+
+              if (data.content) {
+                fullContent += data.content;
+                setMessages((prev) =>
+                    prev.map((msg) =>
+                        msg.id === assistantMsgId
+                            ? { ...msg, content: fullContent }
+                            : msg
+                    )
+                );
+              }
+
+              if (data.error) {
+                setError(data.error);
+              }
+            } catch {
+              // Ignore JSON parse errors for incomplete chunks
             }
           }
         }
       }
-    } catch (err) {
-      console.error("Chat error:", err);
-      setError(err instanceof Error ? err.message : "Failed to send message");
-      setMessages(existingMessages); // Restore previous state
+
+      if (newConversationId) {
+        setConversationId(newConversationId);
+      }
+    } catch {
+      setError("Failed to send message. Please try again.");
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
     } finally {
       setIsLoading(false);
     }
-  }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
 
   return (
       <div className="h-screen flex">
         {/* History Sidebar */}
-        {showHistory && (
-            <div className="w-80 border-r border-neutral-200 bg-white flex flex-col flex-shrink-0">
-              <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
-                <h2 className="font-semibold text-neutral-900">Chat History</h2>
-                <button
-                    onClick={() => setShowHistory(false)}
-                    className="p-1 hover:bg-neutral-100 rounded"
-                >
-                  <ChevronLeft className="w-5 h-5 text-neutral-500" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {loadingHistory ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
-                    </div>
-                ) : conversations.length === 0 ? (
-                    <div className="p-4 text-center text-neutral-500 text-sm">
-                      No conversations yet
-                    </div>
-                ) : (
-                    <div className="p-2 space-y-1">
-                      {conversations.map((conv) => (
+        <div
+            className={`${
+                showHistory ? "w-80" : "w-0"
+            } transition-all duration-300 overflow-hidden border-r border-neutral-200 bg-white flex flex-col`}
+        >
+          <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
+            <h2 className="font-semibold text-neutral-900">Chat History</h2>
+            <button
+                onClick={() => setShowHistory(false)}
+                className="p-1 hover:bg-neutral-100 rounded-lg"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
+                </div>
+            ) : conversations.length === 0 ? (
+                <div className="p-4 text-center text-neutral-500 text-sm">
+                  No conversations yet
+                </div>
+            ) : (
+                <div className="divide-y divide-neutral-100">
+                  {conversations.map((conv) => (
+                      <button
+                          key={conv.id}
+                          onClick={() => {
+                            loadConversation(conv.id);
+                            setShowHistory(false);
+                          }}
+                          className={`w-full p-4 text-left hover:bg-neutral-50 transition-colors group ${
+                              conv.id === conversationId ? "bg-neutral-50" : ""
+                          }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <AgentAvatar agentId={conv.agent} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-neutral-900 truncate text-sm">
+                              {conv.title || "Untitled"}
+                            </p>
+                            <p className="text-xs text-neutral-500">
+                              {conv.messageCount} messages •{" "}
+                              {formatRelativeTime(conv.lastMessageAt)}
+                            </p>
+                          </div>
                           <button
-                              key={conv.id}
-                              onClick={() => selectConversation(conv)}
-                              className={`w-full text-left p-3 rounded-lg hover:bg-neutral-50 transition-colors group ${
-                                  conversationId === conv.id ? "bg-neutral-100" : ""
-                              }`}
+                              onClick={(e) => deleteConversation(conv.id, e)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-200 rounded transition-opacity"
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-neutral-900 truncate text-sm">
-                                  {conv.title || "Untitled conversation"}
-                                </p>
-                                <p className="text-xs text-neutral-500 mt-1">
-                                  {new Date(conv.lastMessageAt).toLocaleDateString()} · {conv.messageCount} messages
-                                </p>
-                              </div>
-                              <button
-                                  onClick={(e) => deleteConversation(conv.id, e)}
-                                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-neutral-200 rounded transition-opacity"
-                              >
-                                <Trash2 className="w-4 h-4 text-neutral-400" />
-                              </button>
-                            </div>
+                            <Trash2 className="w-4 h-4 text-neutral-400" />
                           </button>
-                      ))}
-                    </div>
-                )}
-              </div>
-            </div>
-        )}
+                        </div>
+                      </button>
+                  ))}
+                </div>
+            )}
+          </div>
+        </div>
 
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -583,27 +508,23 @@ function ChatContent() {
           <div className="flex-shrink-0 border-b border-neutral-200 bg-white px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className={`p-2 rounded-lg transition-colors ${
-                        showHistory ? "bg-neutral-100" : "hover:bg-neutral-100"
-                    }`}
-                    title="Chat History"
-                >
-                  <History className="w-5 h-5 text-neutral-600" />
-                </button>
+                {!showHistory && (
+                    <button
+                        onClick={() => setShowHistory(true)}
+                        className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                        title="Chat History"
+                    >
+                      <History className="w-5 h-5 text-neutral-600" />
+                    </button>
+                )}
 
                 {/* Agent Selector */}
                 <div className="relative" ref={agentSelectorRef}>
                   <button
                       onClick={() => setShowAgentSelector(!showAgentSelector)}
-                      className="flex items-center gap-3 p-2 -m-2 rounded-xl hover:bg-neutral-50 transition-colors"
+                      className="flex items-center gap-4 hover:opacity-80 transition-opacity"
                   >
-                    <div
-                        className={`w-12 h-12 rounded-xl ${currentAgent.color} flex items-center justify-center`}
-                    >
-                      <AgentIcon className="w-6 h-6 text-white" />
-                    </div>
+                    <AgentAvatar agentId={agent} size="lg" />
                     <div className="text-left">
                       <div className="flex items-center gap-2">
                         <h1 className="font-display text-xl font-semibold text-neutral-900">
@@ -619,7 +540,6 @@ function ChatContent() {
                   {showAgentSelector && (
                       <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl border border-neutral-200 shadow-lg z-50 py-2 max-h-[70vh] overflow-y-auto">
                         {(Object.entries(agents) as [AgentType, typeof agents.technology][]).map(([agentKey, agentInfo]) => {
-                          const AgentItemIcon = agentInfo.icon;
                           const isSelected = agentKey === agent;
 
                           return (
@@ -630,11 +550,7 @@ function ChatContent() {
                                       isSelected ? "bg-neutral-50" : ""
                                   }`}
                               >
-                                <div
-                                    className={`w-10 h-10 rounded-lg ${agentInfo.color} flex items-center justify-center flex-shrink-0`}
-                                >
-                                  <AgentItemIcon className="w-5 h-5 text-white" />
-                                </div>
+                                <AgentAvatar agentId={agentKey} size="md" />
                                 <div className="flex-1 text-left">
                                   <div className="font-medium text-neutral-900">{agentInfo.name}</div>
                                   <div className="text-xs text-neutral-500">{agentInfo.description}</div>
@@ -660,10 +576,8 @@ function ChatContent() {
           <div className="flex-1 overflow-y-auto p-6">
             {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
-                  <div
-                      className={`w-16 h-16 rounded-2xl ${currentAgent.color} flex items-center justify-center mb-6`}
-                  >
-                    <AgentIcon className="w-8 h-8 text-white" />
+                  <div className="w-20 h-20 mb-6">
+                    <AgentAvatar agentId={agent} size="lg" className="w-20 h-20 rounded-2xl" />
                   </div>
                   <h2 className="font-display text-2xl font-bold text-neutral-900 mb-2">
                     How can I help you today?
@@ -693,11 +607,7 @@ function ChatContent() {
                           }`}
                       >
                         {message.role === "assistant" && (
-                            <div
-                                className={`w-8 h-8 rounded-lg ${currentAgent.color} flex items-center justify-center flex-shrink-0`}
-                            >
-                              <AgentIcon className="w-4 h-4 text-white" />
-                            </div>
+                            <AgentAvatar agentId={agent} size="sm" className="flex-shrink-0" />
                         )}
                         <div
                             className={`max-w-[80%] rounded-2xl ${
@@ -744,16 +654,16 @@ function ChatContent() {
           <div className="flex-shrink-0 border-t border-neutral-200 bg-white p-4">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={handleSubmit} className="relative">
-            <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={`Message ${currentAgent.name}...`}
-                rows={1}
-                disabled={isLoading}
-                className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red disabled:opacity-50 disabled:cursor-not-allowed"
-            />
+                <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={`Message ${currentAgent.name}...`}
+                    rows={1}
+                    disabled={isLoading}
+                    className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red disabled:opacity-50 disabled:cursor-not-allowed"
+                />
                 <Button
                     type="submit"
                     size="icon"
@@ -772,7 +682,7 @@ function ChatContent() {
               </p>
             </div>
           </div>
-        </div> {/* End Main Chat Area */}
+        </div>
       </div>
   );
 }

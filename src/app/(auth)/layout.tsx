@@ -19,8 +19,12 @@ export default function AuthLayout({
         {/* Content */}
         <div className="relative z-10">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary-red flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
+              <img
+                  src="/images/robin-logo.png"
+                  alt="CEO SideKick"
+                  className="w-6 h-6 object-contain"
+              />
             </div>
             <span className="font-display font-bold text-xl text-white">
               CEO Sidekick
