@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
     // Output standalone build for better performance on Render
     output: "standalone",
 
@@ -19,11 +18,6 @@ const nextConfig: NextConfig = {
                 hostname: "avatars.githubusercontent.com", // GitHub profile images
             },
         ],
-    },
-
-    // Experimental features (if needed)
-    experimental: {
-        // serverActions are stable in Next.js 14+
     },
 };
 
