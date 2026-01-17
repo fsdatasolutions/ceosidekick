@@ -1,5 +1,5 @@
 // src/app/api/chat/route.ts
-// Updated with RAG support for Knowledge Base agent
+// Updated with RAG support and paywall enforcement
 
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
@@ -7,6 +7,7 @@ import { streamConversation, UserSettings } from "@/agents/graph";
 import { AgentType } from "@/agents/types";
 import { eq, desc } from "drizzle-orm";
 import { RAG_CONFIG } from "@/lib/rag-config";
+import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
 
 // Lazy database imports
 async function getDb() {
@@ -79,7 +80,7 @@ async function getUserSettings(userId: string): Promise<UserSettings | undefined
 }
 
 // ============================================
-// RAG: Fetch relevant document context (NEW)
+// RAG: Fetch relevant document context
 // ============================================
 async function getRAGContext(
     query: string,
@@ -132,6 +133,26 @@ export async function POST(request: NextRequest) {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // ============================================
+    // PAYWALL: Check message allowance
+    // ============================================
+    const usageCheck = await checkMessageAllowance(session.user.id);
+
+    if (!usageCheck.allowed) {
+      console.log("[API] User hit message limit:", session.user.id);
+      return new Response(
+          JSON.stringify({
+            error: "MESSAGE_LIMIT_REACHED",
+            message: usageCheck.reason,
+            usage: usageCheck.usage,
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }
+      );
     }
 
     const body = await request.json();
@@ -211,7 +232,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // RAG: Fetch document context for Knowledge Base (NEW)
+    // RAG: Fetch document context for Knowledge Base
     // ============================================
     let ragContext: string | undefined;
     if (agent === "knowledge") {
@@ -251,7 +272,7 @@ export async function POST(request: NextRequest) {
             conversationId: currentConversationId,
             userId: session.user.id,
             settings: userSettings,
-            ragContext, // NEW: Pass RAG context to graph
+            ragContext,
           });
 
           let chunkIndex = 0;
@@ -287,6 +308,24 @@ export async function POST(request: NextRequest) {
                   updatedAt: new Date(),
                 })
                 .where(eq(conversations.id, currentConversationId));
+          }
+
+          // ============================================
+          // PAYWALL: Increment usage after successful response
+          // ============================================
+          try {
+            const updatedUsage = await incrementMessageUsage(session.user.id);
+            console.log("[API] Usage incremented:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+
+            // Send updated usage info to client
+            controller.enqueue(
+                encoder.encode(
+                    `data: ${JSON.stringify({ type: "usage", usage: updatedUsage })}\n\n`
+                )
+            );
+          } catch (usageError) {
+            console.error("[API] Failed to increment usage:", usageError);
+            // Don't fail the request if usage tracking fails
           }
 
           // Send completion signal

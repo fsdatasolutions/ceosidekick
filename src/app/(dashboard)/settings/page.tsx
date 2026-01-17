@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   User,
@@ -158,7 +159,8 @@ const settingsSections = [
     icon: CreditCard,
     title: "Billing & Plans",
     description: "Manage your subscription and payment methods",
-    implemented: false,
+    implemented: true,
+    href: "/pricing",
   },
   {
     id: "notifications" as const,
@@ -385,17 +387,8 @@ export default function SettingsPage() {
             {settingsSections.map((section) => {
               const isComplete = section.implemented && isSectionPopulated(section.id, settings);
 
-              return (
-                  <button
-                      key={section.id}
-                      onClick={() => section.implemented && setActiveSection(section.id)}
-                      disabled={!section.implemented}
-                      className={`flex items-center gap-4 p-5 bg-white rounded-xl border transition-all text-left ${
-                          section.implemented
-                              ? "border-neutral-200 hover:border-neutral-300 hover:shadow-sm cursor-pointer"
-                              : "border-neutral-100 opacity-50 cursor-not-allowed"
-                      } ${section.highlight ? "ring-1 ring-primary-red/20" : ""}`}
-                  >
+              const content = (
+                  <>
                     <div
                         className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                             isComplete
@@ -422,13 +415,13 @@ export default function SettingsPage() {
                         </h3>
                         {!section.implemented && (
                             <span className="text-xs px-2 py-0.5 bg-neutral-100 text-neutral-500 rounded-full">
-                        Coming Soon
-                      </span>
+                      Coming Soon
+                    </span>
                         )}
                         {isComplete && (
                             <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                        Complete
-                      </span>
+                      Complete
+                    </span>
                         )}
                       </div>
                       <p className="text-sm text-neutral-500">{section.description}</p>
@@ -448,6 +441,34 @@ export default function SettingsPage() {
                           />
                         </svg>
                     )}
+                  </>
+              );
+
+              // If section has an href, render as Link
+              if (section.href) {
+                return (
+                    <Link
+                        key={section.id}
+                        href={section.href}
+                        className="flex items-center gap-4 p-5 bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 hover:shadow-sm transition-all text-left"
+                    >
+                      {content}
+                    </Link>
+                );
+              }
+
+              return (
+                  <button
+                      key={section.id}
+                      onClick={() => section.implemented && setActiveSection(section.id)}
+                      disabled={!section.implemented}
+                      className={`flex items-center gap-4 p-5 bg-white rounded-xl border transition-all text-left ${
+                          section.implemented
+                              ? "border-neutral-200 hover:border-neutral-300 hover:shadow-sm cursor-pointer"
+                              : "border-neutral-100 opacity-50 cursor-not-allowed"
+                      } ${section.highlight ? "ring-1 ring-primary-red/20" : ""}`}
+                  >
+                    {content}
                   </button>
               );
             })}
@@ -463,9 +484,11 @@ export default function SettingsPage() {
                   {usage.messagesThisMonth} of {usage.messageLimit} messages used this month
                 </p>
               </div>
-              <Button variant="gold" size="sm">
-                Upgrade Plan
-              </Button>
+              <Link href="/pricing">
+                <Button variant="gold" size="sm">
+                  Upgrade Plan
+                </Button>
+              </Link>
             </div>
             <div className="mt-4 bg-white/10 rounded-full h-2">
               <div
