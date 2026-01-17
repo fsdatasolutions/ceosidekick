@@ -5,15 +5,15 @@ import Stripe from "stripe";
 
 // Initialize Stripe with API key
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2025-12-15.clover",
   typescript: true,
 });
 
 // Helper to get or create a Stripe customer for a user
 export async function getOrCreateStripeCustomer(
-  userId: string,
-  email: string,
-  name?: string | null
+    userId: string,
+    email: string,
+    name?: string | null
 ): Promise<string> {
   const { db } = await import("@/db");
   const { subscriptions } = await import("@/db/schema");
@@ -21,10 +21,10 @@ export async function getOrCreateStripeCustomer(
 
   // Check if user already has a Stripe customer ID
   const existingSub = await db
-    .select({ stripeCustomerId: subscriptions.stripeCustomerId })
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .limit(1);
+      .select({ stripeCustomerId: subscriptions.stripeCustomerId })
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId))
+      .limit(1);
 
   if (existingSub[0]?.stripeCustomerId) {
     return existingSub[0].stripeCustomerId;
