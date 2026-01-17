@@ -1,15 +1,23 @@
+// src/app/(dashboard)/dashboard/page.tsx
+// Dashboard with subscription tier and usage tracking
+
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { eq, and, gte, desc, count } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import {
   ArrowRight,
   MessageSquare,
   Clock,
   Sparkles,
   BookOpen,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentAvatar } from "@/components/ui/agent-avatar";
+import { UsageMeter } from "@/components/ui/usage-meter";
+import { getUserUsage, UsageInfo } from "@/lib/usage";
+import { getTier } from "@/lib/tiers";
 
 // Lazy load database to avoid build-time errors
 async function getDb() {
@@ -103,33 +111,15 @@ async function getDashboardData(userId: string) {
     return null;
   }
 
-  const { conversations, messages, documents, userSettings } = await getSchema();
-
-  // Get start of current month
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const { conversations, documents, userSettings } = await getSchema();
 
   // Fetch all data in parallel
   const [
-    messagesThisMonth,
     conversationCount,
     documentCount,
     recentConversations,
     settings,
   ] = await Promise.all([
-    // Count messages this month (user messages only)
-    db
-        .select({ count: count() })
-        .from(messages)
-        .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-        .where(
-            and(
-                eq(conversations.userId, userId),
-                eq(messages.role, "user"),
-                gte(messages.createdAt, startOfMonth)
-            )
-        ),
-
     // Count active conversations (not archived)
     db
         .select({ count: count() })
@@ -186,7 +176,6 @@ async function getDashboardData(userId: string) {
   const sectionsComplete = Object.values(settingsSections).filter(Boolean).length;
 
   return {
-    messagesThisMonth: messagesThisMonth[0]?.count ?? 0,
     conversationCount: conversationCount[0]?.count ?? 0,
     documentCount: documentCount[0]?.count ?? 0,
     recentConversations,
@@ -222,7 +211,6 @@ export default async function DashboardPage() {
   const firstName = session?.user?.name?.split(" ")[0] || "there";
 
   let dashboardData = {
-    messagesThisMonth: 0,
     conversationCount: 0,
     documentCount: 0,
     recentConversations: [] as {
@@ -237,19 +225,38 @@ export default async function DashboardPage() {
     companyName: null as string | null,
   };
 
+  // Default usage for non-authenticated users
+  let usageData: UsageInfo = {
+    tier: "free",
+    tierName: "Free",
+    messagesUsed: 0,
+    messagesLimit: 50,
+    bonusMessages: 0,
+    totalAvailable: 50,
+    remaining: 50,
+    percentage: 0,
+    status: "ok",
+    canSendMessage: true,
+    period: "",
+  };
+
   if (userId) {
     try {
-      const data = await getDashboardData(userId);
+      const [data, usage] = await Promise.all([
+        getDashboardData(userId),
+        getUserUsage(userId),
+      ]);
+
       if (data) {
         dashboardData = data;
       }
+      usageData = usage;
     } catch (error) {
       console.error("[Dashboard] Failed to fetch data:", error);
     }
   }
 
   const {
-    messagesThisMonth,
     conversationCount,
     documentCount,
     recentConversations,
@@ -258,8 +265,8 @@ export default async function DashboardPage() {
     companyName,
   } = dashboardData;
 
-  // Message limit based on plan (default to free tier)
-  const messageLimit = 500;
+  const tier = getTier(usageData.tier);
+  const showUpgradePrompt = usageData.status === "warning" || usageData.status === "critical" || usageData.status === "exceeded";
 
   return (
       <div className="p-8">
@@ -276,8 +283,54 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* Usage Alert - Show when approaching or at limit */}
+        {showUpgradePrompt && (
+            <div className={`mb-8 p-5 rounded-xl border ${
+                usageData.status === "exceeded"
+                    ? "bg-red-50 border-red-200"
+                    : "bg-amber-50 border-amber-200"
+            }`}>
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    usageData.status === "exceeded" ? "bg-red-100" : "bg-amber-100"
+                }`}>
+                  <Zap className={`w-6 h-6 ${
+                      usageData.status === "exceeded" ? "text-red-600" : "text-amber-600"
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-neutral-900 mb-1">
+                    {usageData.status === "exceeded"
+                        ? "Message Limit Reached"
+                        : "Running Low on Messages"
+                    }
+                  </h3>
+                  <p className="text-sm text-neutral-600 mb-3">
+                    {usageData.status === "exceeded"
+                        ? `You've used all ${usageData.totalAvailable} messages this month. Upgrade your plan or buy a message pack to continue.`
+                        : `You've used ${usageData.messagesUsed} of ${usageData.totalAvailable} messages (${usageData.percentage}%). Consider upgrading for more.`
+                    }
+                  </p>
+                  <div className="flex gap-2">
+                    <Link href="/pricing">
+                      <Button size="sm">
+                        <TrendingUp className="w-4 h-4" />
+                        Upgrade Plan
+                      </Button>
+                    </Link>
+                    <Link href="/pricing#packs">
+                      <Button size="sm" variant="outline">
+                        Buy Message Pack
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+        )}
+
         {/* Settings Prompt - Show if settings incomplete */}
-        {settingsComplete < 4 && (
+        {settingsComplete < 4 && !showUpgradePrompt && (
             <div className="mb-8 p-5 bg-gradient-to-r from-primary-red/10 to-amber-500/10 border border-primary-red/20 rounded-xl">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-lg bg-primary-red/10 flex items-center justify-center flex-shrink-0">
@@ -313,17 +366,43 @@ export default async function DashboardPage() {
             </div>
         )}
 
-        {/* Quick Stats */}
+        {/* Quick Stats - Now with real usage data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-neutral-600" />
+          {/* Messages Usage Card */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-neutral-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-neutral-900">{usageData.messagesUsed}</span>
+                  <span className="text-sm text-neutral-400">/ {usageData.totalAvailable}</span>
+                </div>
+                <p className="text-sm text-neutral-500">Messages This Month</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900">
-                {messagesThisMonth} <span className="text-sm font-normal text-neutral-400">/ {messageLimit}</span>
-              </p>
-              <p className="text-sm text-neutral-500">Messages This Month</p>
+            {/* Usage Progress Bar */}
+            <div className="w-full bg-neutral-100 rounded-full h-2">
+              <div
+                  className={`h-2 rounded-full transition-all ${
+                      usageData.status === "exceeded" ? "bg-red-500" :
+                          usageData.status === "critical" ? "bg-red-500" :
+                              usageData.status === "warning" ? "bg-amber-500" :
+                                  "bg-primary-red"
+                  }`}
+                  style={{ width: `${Math.min(usageData.percentage, 100)}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between mt-2">
+            <span className="text-xs text-neutral-500">
+              {tier.name} Plan
+            </span>
+              {usageData.bonusMessages > 0 && (
+                  <span className="text-xs text-green-600">
+                +{usageData.bonusMessages} bonus
+              </span>
+              )}
             </div>
           </div>
 

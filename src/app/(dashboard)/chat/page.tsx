@@ -4,6 +4,8 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AgentAvatar } from "@/components/ui/agent-avatar";
+import { UsageMeter } from "@/components/ui/usage-meter";
+import { UpgradeModal } from "@/components/ui/upgrade-modal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -17,6 +19,7 @@ import {
   Trash2,
   ChevronDown,
   Check,
+  Zap,
 } from "lucide-react";
 
 type AgentType = "technology" | "coach" | "legal" | "hr" | "marketing" | "sales" | "knowledge" | "content";
@@ -34,6 +37,19 @@ interface Conversation {
   agent: AgentType;
   lastMessageAt: string;
   messageCount: number;
+}
+
+interface UsageInfo {
+  tier: string;
+  tierName: string;
+  messagesUsed: number;
+  messagesLimit: number;
+  bonusMessages: number;
+  totalAvailable: number;
+  remaining: number;
+  percentage: number;
+  status: "ok" | "warning" | "critical" | "exceeded";
+  canSendMessage: boolean;
 }
 
 const agents = {
@@ -174,11 +190,32 @@ function ChatContent() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
 
+  // Usage tracking state
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const agentSelectorRef = useRef<HTMLDivElement>(null);
 
   const currentAgent = agents[agent];
+
+  // Fetch usage on mount
+  useEffect(() => {
+    fetchUsage();
+  }, []);
+
+  const fetchUsage = async () => {
+    try {
+      const res = await fetch("/api/usage");
+      if (res.ok) {
+        const data = await res.json();
+        setUsage(data.usage);
+      }
+    } catch (err) {
+      console.error("Failed to fetch usage:", err);
+    }
+  };
 
   // Close agent selector when clicking outside
   useEffect(() => {
@@ -254,7 +291,7 @@ function ChatContent() {
       if (data.conversation) {
         setAgent(data.conversation.agent);
         setMessages(
-            data.messages.map((m: Message) => ({  // Changed from data.conversation.messages
+            data.messages.map((m: Message) => ({
               ...m,
               createdAt: new Date(m.createdAt),
             }))
@@ -266,7 +303,7 @@ function ChatContent() {
       setError("Failed to load conversation");
     }
   };
-  
+
   const deleteConversation = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Delete this conversation?")) return;
@@ -310,6 +347,12 @@ function ChatContent() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    // Check if user can send messages
+    if (usage && !usage.canSendMessage) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     const userMessage = input.trim();
     setInput("");
     setError(null);
@@ -349,6 +392,23 @@ function ChatContent() {
         }),
       });
 
+      // Handle message limit reached (403)
+      if (res.status === 403) {
+        const errorData = await res.json();
+        if (errorData.error === "MESSAGE_LIMIT_REACHED") {
+          // Update usage from response
+          if (errorData.usage) {
+            setUsage(errorData.usage);
+          }
+          // Remove the empty assistant message
+          setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
+          // Show upgrade modal
+          setShowUpgradeModal(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (!res.ok) {
         throw new Error("Failed to send message");
       }
@@ -373,11 +433,13 @@ function ChatContent() {
             try {
               const data = JSON.parse(line.slice(6));
 
-              if (data.conversationId) {
-                newConversationId = data.conversationId;
+              // Handle conversation ID
+              if (data.type === "conversation_id" && data.id) {
+                newConversationId = data.id;
               }
 
-              if (data.content) {
+              // Handle content chunks
+              if (data.type === "content" && data.content) {
                 fullContent += data.content;
                 setMessages((prev) =>
                     prev.map((msg) =>
@@ -388,7 +450,13 @@ function ChatContent() {
                 );
               }
 
-              if (data.error) {
+              // Handle usage update from stream
+              if (data.type === "usage" && data.usage) {
+                setUsage(data.usage);
+              }
+
+              // Handle errors
+              if (data.type === "error" && data.error) {
                 setError(data.error);
               }
             } catch {
@@ -437,8 +505,22 @@ function ChatContent() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  // Check if input should be disabled
+  const isInputDisabled = isLoading || (usage !== null && !usage.canSendMessage);
+
   return (
       <div className="h-screen flex">
+        {/* Upgrade Modal */}
+        {usage && (
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                currentTier={usage.tier}
+                messagesUsed={usage.messagesUsed}
+                messagesLimit={usage.totalAvailable}
+            />
+        )}
+
         {/* History Sidebar */}
         <div
             className={`${
@@ -449,9 +531,9 @@ function ChatContent() {
             <h2 className="font-semibold text-neutral-900">Chat History</h2>
             <button
                 onClick={() => setShowHistory(false)}
-                className="p-1 hover:bg-neutral-100 rounded-lg"
+                className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-5 h-5 text-neutral-600" />
             </button>
           </div>
 
@@ -460,43 +542,43 @@ function ChatContent() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
                 </div>
-            ) : conversations.length === 0 ? (
-                <div className="p-4 text-center text-neutral-500 text-sm">
-                  No conversations yet
-                </div>
-            ) : (
+            ) : conversations.length > 0 ? (
                 <div className="divide-y divide-neutral-100">
                   {conversations.map((conv) => (
-                      <button
+                      <div
                           key={conv.id}
                           onClick={() => {
                             loadConversation(conv.id);
                             setShowHistory(false);
                           }}
-                          className={`w-full p-4 text-left hover:bg-neutral-50 transition-colors group ${
+                          className={`p-4 cursor-pointer hover:bg-neutral-50 transition-colors group ${
                               conv.id === conversationId ? "bg-neutral-50" : ""
                           }`}
                       >
                         <div className="flex items-start gap-3">
-                          <AgentAvatar agentId={conv.agent} size="sm" />
+                          <MessageSquare className="w-4 h-4 text-neutral-400 mt-1" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-neutral-900 truncate text-sm">
+                            <p className="text-sm font-medium text-neutral-900 truncate">
                               {conv.title || "Untitled"}
                             </p>
-                            <p className="text-xs text-neutral-500">
-                              {conv.messageCount} messages •{" "}
-                              {formatRelativeTime(conv.lastMessageAt)}
+                            <p className="text-xs text-neutral-500 mt-1">
+                              {formatRelativeTime(conv.lastMessageAt)} • {conv.messageCount} messages
                             </p>
                           </div>
                           <button
                               onClick={(e) => deleteConversation(conv.id, e)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-200 rounded transition-opacity"
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-200 rounded transition-all"
                           >
                             <Trash2 className="w-4 h-4 text-neutral-400" />
                           </button>
                         </div>
-                      </button>
+                      </div>
                   ))}
+                </div>
+            ) : (
+                <div className="p-8 text-center">
+                  <MessageSquare className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
+                  <p className="text-sm text-neutral-500">No conversations yet</p>
                 </div>
             )}
           </div>
@@ -565,10 +647,37 @@ function ChatContent() {
                   )}
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={startNewConversation}>
-                <Plus className="w-4 h-4" />
-                New Chat
-              </Button>
+
+              <div className="flex items-center gap-3">
+                {/* Usage Indicator */}
+                {usage && (
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                          usage.status === "exceeded" ? "bg-red-500" :
+                              usage.status === "critical" ? "bg-orange-500" :
+                                  usage.status === "warning" ? "bg-yellow-500" :
+                                      "bg-green-500"
+                      }`} />
+                      <span className="text-sm text-neutral-600">
+                      {usage.remaining} left
+                    </span>
+                      {(usage.status === "warning" || usage.status === "critical" || usage.status === "exceeded") && (
+                          <button
+                              onClick={() => setShowUpgradeModal(true)}
+                              className="text-xs text-primary-red hover:underline flex items-center gap-1"
+                          >
+                            <Zap className="w-3 h-3" />
+                            Upgrade
+                          </button>
+                      )}
+                    </div>
+                )}
+
+                <Button variant="outline" size="sm" onClick={startNewConversation}>
+                  <Plus className="w-4 h-4" />
+                  New Chat
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -650,6 +759,29 @@ function ChatContent() {
               </div>
           )}
 
+          {/* Message Limit Warning */}
+          {usage && usage.status === "exceeded" && (
+              <div className="px-6 pb-2">
+                <div className="max-w-3xl mx-auto p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <Zap className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-amber-800">Message limit reached</p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        You&apos;ve used all {usage.totalAvailable} messages this month.
+                      </p>
+                    </div>
+                    <Button
+                        size="sm"
+                        onClick={() => setShowUpgradeModal(true)}
+                    >
+                      Upgrade
+                    </Button>
+                  </div>
+                </div>
+              </div>
+          )}
+
           {/* Input */}
           <div className="flex-shrink-0 border-t border-neutral-200 bg-white p-4">
             <div className="max-w-3xl mx-auto">
@@ -659,15 +791,19 @@ function ChatContent() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={`Message ${currentAgent.name}...`}
+                    placeholder={
+                      usage && !usage.canSendMessage
+                          ? "Message limit reached — upgrade to continue"
+                          : `Message ${currentAgent.name}...`
+                    }
                     rows={1}
-                    disabled={isLoading}
+                    disabled={isInputDisabled}
                     className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <Button
                     type="submit"
                     size="icon"
-                    disabled={!input.trim() || isLoading}
+                    disabled={!input.trim() || isInputDisabled}
                     className="absolute right-2 bottom-2 h-9 w-9"
                 >
                   {isLoading ? (

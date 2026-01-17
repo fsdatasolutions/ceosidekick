@@ -7,6 +7,7 @@ import {
   BookOpen,
   Settings,
   Star,
+  CreditCard,
 } from "lucide-react";
 import { UserSection } from "@/components/user-section";
 
@@ -14,6 +15,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: MessageSquare, label: "Chat", href: "/chat" },
   { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
+  { icon: CreditCard, label: "Pricing", href: "/pricing" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 

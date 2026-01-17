@@ -1,18 +1,17 @@
+// src/app/api/usage/route.ts
+// API endpoint to get current user's usage information
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getUserUsage } from "@/lib/usage";
+import { getTier } from "@/lib/tiers";
 
-// Lazy load database
+// Lazy load for conversation/document counts
 async function getDb() {
     if (!process.env.DATABASE_URL) {
         return null;
     }
     const { db } = await import("@/db");
     return db;
-}
-
-async function getSchema() {
-    const { conversations, messages, documents } = await import("@/db/schema");
-    return { conversations, messages, documents };
 }
 
 export async function GET() {
@@ -30,41 +29,41 @@ export async function GET() {
         const db = await getDb();
 
         if (!db) {
-            // Return default values when database not configured
+            // Fallback when database not configured
             return NextResponse.json({
                 usage: {
+                    // Legacy fields (backward compat)
                     messagesThisMonth: 0,
-                    messageLimit: 500,
+                    messageLimit: 50,
                     conversationCount: 0,
                     documentCount: 0,
                     plan: "free",
+                    // New fields
+                    tier: "free",
+                    tierName: "Free",
+                    tierPrice: "$0",
+                    documentStorageMB: 10,
+                    messagesUsed: 0,
+                    messagesLimit: 50,
+                    bonusMessages: 0,
+                    totalAvailable: 50,
+                    remaining: 50,
+                    percentage: 0,
+                    period: "",
+                    status: "ok",
+                    canSendMessage: true,
                 },
             });
         }
 
-        const { conversations, messages, documents } = await getSchema();
-        const { eq, and, gte, count } = await import("drizzle-orm");
+        const usage = await getUserUsage(userId);
+        const tier = getTier(usage.tier);
 
-        // Get start of current month
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Get conversation and document counts (legacy fields)
+        const { conversations, documents } = await import("@/db/schema");
+        const { eq, and, count } = await import("drizzle-orm");
 
-        // Fetch all usage data in parallel
-        const [messagesResult, conversationResult, documentResult] = await Promise.all([
-            // Count user messages this month
-            db
-                .select({ count: count() })
-                .from(messages)
-                .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-                .where(
-                    and(
-                        eq(conversations.userId, userId),
-                        eq(messages.role, "user"),
-                        gte(messages.createdAt, startOfMonth)
-                    )
-                ),
-
-            // Count active conversations
+        const [conversationResult, documentResult] = await Promise.all([
             db
                 .select({ count: count() })
                 .from(conversations)
@@ -74,31 +73,32 @@ export async function GET() {
                         eq(conversations.isArchived, false)
                     )
                 ),
-
-            // Count documents
             db
                 .select({ count: count() })
                 .from(documents)
                 .where(eq(documents.userId, userId)),
         ]);
 
-        // TODO: Get actual plan from user's organization/subscription
-        const plan: string = "starter"; // Default to starter for now
-        const messageLimit = plan === "free" ? 50 : plan === "starter" ? 500 : plan === "professional" ? 2000 : 10000;
-
         return NextResponse.json({
             usage: {
-                messagesThisMonth: messagesResult[0]?.count || 0,
-                messageLimit,
+                // Spread all new usage fields from getUserUsage
+                ...usage,
+                // Legacy field aliases (backward compat for frontend)
+                messagesThisMonth: usage.messagesUsed,
+                messageLimit: usage.messagesLimit,
+                plan: usage.tier,
+                // Conversation and document counts (not in getUserUsage)
                 conversationCount: conversationResult[0]?.count || 0,
                 documentCount: documentResult[0]?.count || 0,
-                plan,
+                // Enriched tier info
+                tierPrice: tier.priceDisplay,
+                documentStorageMB: tier.documentStorageMB,
             },
         });
     } catch (error) {
         console.error("[Usage API] Error:", error);
         return NextResponse.json(
-            { error: "Failed to fetch usage" },
+            { error: "Failed to get usage information" },
             { status: 500 }
         );
     }
