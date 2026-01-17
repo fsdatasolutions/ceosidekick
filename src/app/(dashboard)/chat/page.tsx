@@ -254,7 +254,7 @@ function ChatContent() {
       if (data.conversation) {
         setAgent(data.conversation.agent);
         setMessages(
-            data.conversation.messages.map((m: Message) => ({
+            data.messages.map((m: Message) => ({  // Changed from data.conversation.messages
               ...m,
               createdAt: new Date(m.createdAt),
             }))
@@ -266,7 +266,7 @@ function ChatContent() {
       setError("Failed to load conversation");
     }
   };
-
+  
   const deleteConversation = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Delete this conversation?")) return;
