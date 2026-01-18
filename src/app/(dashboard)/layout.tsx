@@ -1,3 +1,4 @@
+// src/app/(dashboard)/layout.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -10,6 +11,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { UserSection } from "@/components/user-section";
+import { MobileNav } from "@/components/mobile-nav";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -37,8 +39,15 @@ export default async function DashboardLayout({
 
   return (
       <div className="min-h-screen bg-neutral-50 flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-neutral-200 flex flex-col">
+        {/* Mobile Navigation */}
+        <MobileNav
+            userName={userName}
+            userEmail={userEmail}
+            userImage={userImage}
+        />
+
+        {/* Desktop Sidebar - Hidden on mobile */}
+        <aside className="hidden md:flex w-64 bg-white border-r border-neutral-200 flex-col fixed h-full">
           {/* Logo */}
           <div className="p-6 border-b border-neutral-200">
             <Link href="/" className="flex items-center gap-2">
@@ -94,7 +103,7 @@ export default async function DashboardLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 md:ml-64 pt-14 md:pt-0 overflow-auto min-h-screen">
           {children}
         </main>
       </div>
