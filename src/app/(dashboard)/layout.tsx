@@ -2,24 +2,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  BookOpen,
-  Settings,
-  Star,
-  CreditCard,
-} from "lucide-react";
+import { checkAdminAccess } from "@/lib/admin";
 import { UserSection } from "@/components/user-section";
 import { MobileNav } from "@/components/mobile-nav";
-
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: MessageSquare, label: "Chat", href: "/chat" },
-  { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
-  { icon: CreditCard, label: "Pricing", href: "/pricing" },
-  { icon: Settings, label: "Settings", href: "/settings" },
-];
+import { SidebarNav } from "@/components/sidebar-nav";
 
 export default async function DashboardLayout({
                                                 children,
@@ -37,6 +23,9 @@ export default async function DashboardLayout({
   const userEmail = session.user.email || "";
   const userImage = session.user.image;
 
+  // Check admin status from database (secure server-side check)
+  const { isAdmin } = await checkAdminAccess(session.user.id);
+
   return (
       <div className="min-h-screen bg-neutral-50 flex">
         {/* Mobile Navigation */}
@@ -44,6 +33,7 @@ export default async function DashboardLayout({
             userName={userName}
             userEmail={userEmail}
             userImage={userImage}
+            isAdmin={isAdmin}
         />
 
         {/* Desktop Sidebar - Hidden on mobile */}
@@ -66,33 +56,8 @@ export default async function DashboardLayout({
             </Link>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4">
-            <ul className="space-y-1">
-              {navItems.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                        href={item.href}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {item.label}
-                    </Link>
-                  </li>
-              ))}
-
-              {/* Feedback - Bold Red */}
-              <li>
-                <Link
-                    href="/feedback"
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-primary-red font-bold hover:bg-red-50 transition-colors"
-                >
-                  <Star className="w-5 h-5" />
-                  Feedback
-                </Link>
-              </li>
-            </ul>
-          </nav>
+          {/* Navigation with Admin View Toggle */}
+          <SidebarNav isAdmin={isAdmin} />
 
           {/* User Section */}
           <UserSection

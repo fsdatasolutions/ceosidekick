@@ -46,6 +46,7 @@ export const users = pgTable(
         password: varchar("password", { length: 255 }), // null for OAuth-only users
         name: varchar("name", { length: 255 }),
         image: varchar("image", { length: 500 }),
+        role: text("role").default("user"),  // <-- ADD THIS LINE
         emailVerified: timestamp("email_verified"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -1,0 +1,1359 @@
+// src/app/api/documents/generate/route.ts
+// Generate document templates for paid users
+
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { getUserUsageInfo } from "@/lib/usage";
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  HeadingLevel,
+  AlignmentType,
+  BorderStyle,
+  WidthType,
+} from "docx";
+
+// Template metadata for validation
+const VALID_TEMPLATES = [
+  "business-plan",
+  "pitch-deck",
+  "meeting-notes",
+  "project-proposal",
+  "invoice",
+  "expense-report",
+  "employee-handbook",
+  "job-description",
+  "marketing-plan",
+  "brand-guidelines",
+] as const;
+
+type TemplateId = (typeof VALID_TEMPLATES)[number];
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Verify authentication
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    // 2. Check if user is on paid tier
+    const usage = await getUserUsageInfo(session.user.id);
+    if (usage.tier === "free") {
+      return NextResponse.json(
+        { error: "Document generation requires a paid subscription" },
+        { status: 403 }
+      );
+    }
+
+    // 3. Parse and validate request
+    const body = await request.json();
+    const { templateId } = body as { templateId: string };
+
+    if (!templateId || !VALID_TEMPLATES.includes(templateId as TemplateId)) {
+      return NextResponse.json({ error: "Invalid template ID" }, { status: 400 });
+    }
+
+    // 4. Generate the document based on template type
+    const result = await generateDocument(
+      templateId as TemplateId,
+      session.user
+    );
+
+    // 5. Return the document
+    return new NextResponse(result.buffer, {
+      headers: {
+        "Content-Type": result.contentType,
+        "Content-Disposition": `attachment; filename="${result.filename}"`,
+      },
+    });
+  } catch (error) {
+    console.error("[Document Generate] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to generate document" },
+      { status: 500 }
+    );
+  }
+}
+
+interface GenerateResult {
+  buffer: Buffer;
+  contentType: string;
+  filename: string;
+}
+
+// Page properties for US Letter size
+const pageProperties = {
+  page: {
+    size: { width: 12240, height: 15840 },
+    margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+  },
+};
+
+// Table border helper
+const border = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
+const borders = { top: border, bottom: border, left: border, right: border };
+
+async function generateDocument(
+  templateId: TemplateId,
+  user: { name?: string | null; email?: string | null }
+): Promise<GenerateResult> {
+  const userName = user.name || "User";
+  const userEmail = user.email || "";
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  switch (templateId) {
+    case "business-plan":
+      return generateBusinessPlan(userName, today);
+    case "meeting-notes":
+      return generateMeetingNotes(userName, today);
+    case "project-proposal":
+      return generateProjectProposal(userName, today);
+    case "job-description":
+      return generateJobDescription(userName, today);
+    case "invoice":
+      return generateInvoice(userName, userEmail, today);
+    case "pitch-deck":
+      return generatePitchDeck(userName, today);
+    case "expense-report":
+      return generateExpenseReport(userName, today);
+    case "employee-handbook":
+      return generateEmployeeHandbook(userName, today);
+    case "marketing-plan":
+      return generateMarketingPlan(userName, today);
+    case "brand-guidelines":
+      return generateBrandGuidelines(userName, today);
+    default:
+      throw new Error(`Unknown template: ${templateId}`);
+  }
+}
+
+// ============================================
+// DOCUMENT GENERATORS
+// ============================================
+
+async function generateBusinessPlan(
+  userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "BUSINESS PLAN", bold: true, size: 48 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "[Your Company Name]", size: 32 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [
+              new TextRun({
+                text: `Prepared by ${userName} | ${today}`,
+                size: 24,
+                color: "666666",
+              }),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "1. Executive Summary", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Provide a brief overview of your business, including your mission statement, products/services, and basic information about leadership, employees, and location.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "2. Company Description", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Describe your company in detail: what problems you solve, your target customers, and what makes your business unique.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "3. Market Analysis", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Analyze your industry, target market, and competitors. Include market size, growth potential, and trends.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "4. Products and Services", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Detail your products or services, their benefits, and how they meet customer needs.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "5. Marketing Strategy", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Outline how you will attract and retain customers, including pricing, promotion, and distribution strategies.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "6. Financial Projections", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Include revenue forecasts, profit and loss projections, cash flow statements, and break-even analysis.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "7. Funding Request", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[If seeking funding, specify the amount needed and how the funds will be used.]"
+              ),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "business-plan.docx",
+  };
+}
+
+async function generateMeetingNotes(
+  userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "MEETING NOTES", bold: true, size: 40 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: today, size: 24, color: "666666" })],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Meeting Details", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Date: ", bold: true }),
+              new TextRun("[Date]"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Time: ", bold: true }),
+              new TextRun("[Time]"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Location: ", bold: true }),
+              new TextRun("[Location/Virtual]"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Facilitator: ", bold: true }),
+              new TextRun(userName),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Attendees", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("- [Name 1]")] }),
+          new Paragraph({ children: [new TextRun("- [Name 2]")] }),
+          new Paragraph({ children: [new TextRun("- [Name 3]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Agenda", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("1. [Topic 1]")] }),
+          new Paragraph({ children: [new TextRun("2. [Topic 2]")] }),
+          new Paragraph({ children: [new TextRun("3. [Topic 3]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Discussion Notes", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Add detailed notes from the discussion here]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Action Items", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[ ] [Action item 1] - Assigned to: [Name] - Due: [Date]"
+              ),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[ ] [Action item 2] - Assigned to: [Name] - Due: [Date]"
+              ),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[ ] [Action item 3] - Assigned to: [Name] - Due: [Date]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Next Meeting", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("Date: [Next meeting date]")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Topics to cover: [Topics]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "meeting-notes.docx",
+  };
+}
+
+async function generateProjectProposal(
+  userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "PROJECT PROPOSAL", bold: true, size: 48 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "[Project Name]", size: 32 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [
+              new TextRun({
+                text: `Prepared by ${userName} | ${today}`,
+                size: 24,
+                color: "666666",
+              }),
+            ],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Project Overview", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Provide a brief description of the project and its objectives.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Scope of Work", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Detail the specific tasks, deliverables, and boundaries of the project.]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Timeline", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("Phase 1: [Description] - [Duration]")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Phase 2: [Description] - [Duration]")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Phase 3: [Description] - [Duration]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Budget", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Provide a detailed breakdown of project costs.]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Team and Resources", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[List team members and required resources.]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun({ text: "Success Metrics", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Define how success will be measured.]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "project-proposal.docx",
+  };
+}
+
+async function generateJobDescription(
+  _userName: string,
+  _today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "JOB DESCRIPTION", bold: true, size: 40 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: "[Job Title]", size: 32 })],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "About the Company", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Company description and mission]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Position Overview", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Brief description of the role and its importance]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Responsibilities", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("- [Responsibility 1]")] }),
+          new Paragraph({ children: [new TextRun("- [Responsibility 2]")] }),
+          new Paragraph({ children: [new TextRun("- [Responsibility 3]")] }),
+          new Paragraph({ children: [new TextRun("- [Responsibility 4]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Requirements", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("- [Requirement 1]")] }),
+          new Paragraph({ children: [new TextRun("- [Requirement 2]")] }),
+          new Paragraph({ children: [new TextRun("- [Requirement 3]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Nice to Have", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("- [Nice to have 1]")] }),
+          new Paragraph({ children: [new TextRun("- [Nice to have 2]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Benefits", bold: true })],
+          }),
+          new Paragraph({ children: [new TextRun("- Competitive salary")] }),
+          new Paragraph({ children: [new TextRun("- Health insurance")] }),
+          new Paragraph({ children: [new TextRun("- [Other benefits]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "How to Apply", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Application instructions]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "job-description.docx",
+  };
+}
+
+async function generateInvoice(
+  userName: string,
+  userEmail: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [new TextRun({ text: "INVOICE", bold: true, size: 48 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({
+                text: `Invoice #: INV-${Date.now().toString().slice(-6)}`,
+                size: 22,
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: `Date: ${today}`, size: 22 })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: "From:", bold: true, size: 24 })],
+          }),
+          new Paragraph({ children: [new TextRun(userName)] }),
+          new Paragraph({ children: [new TextRun(userEmail)] }),
+          new Paragraph({ children: [new TextRun("[Your Address]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            children: [new TextRun({ text: "Bill To:", bold: true, size: 24 })],
+          }),
+          new Paragraph({ children: [new TextRun("[Client Name]")] }),
+          new Paragraph({ children: [new TextRun("[Client Email]")] }),
+          new Paragraph({ children: [new TextRun("[Client Address]")] }),
+          new Paragraph({ children: [], spacing: { after: 400 } }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    width: { size: 5000, type: WidthType.DXA },
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: "Description", bold: true }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    width: { size: 1500, type: WidthType.DXA },
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Qty", bold: true })],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    width: { size: 1500, type: WidthType.DXA },
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Rate", bold: true })],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    width: { size: 1500, type: WidthType.DXA },
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Amount", bold: true })],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun("[Service/Product 1]")],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("1")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun("[Service/Product 2]")],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("1")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({ children: [], spacing: { after: 200 } }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [new TextRun({ text: "Subtotal: $0.00", size: 24 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [new TextRun({ text: "Tax (0%): $0.00", size: 24 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: "Total: $0.00", bold: true, size: 28 }),
+            ],
+          }),
+          new Paragraph({ children: [], spacing: { after: 400 } }),
+          new Paragraph({
+            children: [new TextRun({ text: "Payment Terms:", bold: true })],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "Due upon receipt. Please make payment to [payment details]."
+              ),
+            ],
+          }),
+          new Paragraph({ children: [], spacing: { after: 200 } }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Thank you for your business!",
+                italics: true,
+                color: "666666",
+              }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "invoice.docx",
+  };
+}
+
+async function generatePitchDeck(
+  _userName: string,
+  _today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "PITCH DECK OUTLINE", bold: true, size: 48 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [
+              new TextRun({
+                text: "Use this outline to create your investor presentation",
+                size: 24,
+                color: "666666",
+              }),
+            ],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 1: Title")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Company name, tagline, and your name/title")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 2: Problem")],
+          }),
+          new Paragraph({
+            children: [new TextRun("What problem are you solving? Make it relatable.")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 3: Solution")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Your product/service and how it solves the problem")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 4: Market Size")],
+          }),
+          new Paragraph({
+            children: [new TextRun("TAM, SAM, SOM - show the opportunity")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 5: Business Model")],
+          }),
+          new Paragraph({
+            children: [new TextRun("How do you make money?")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 6: Traction")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Key metrics, milestones, and growth")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 7: Competition")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Market landscape and your competitive advantage")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 8: Team")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Key team members and relevant experience")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 9: Financials")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Projections, runway, and key financial metrics")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Slide 10: The Ask")],
+          }),
+          new Paragraph({
+            children: [new TextRun("How much are you raising and what will you use it for?")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "pitch-deck-outline.docx",
+  };
+}
+
+async function generateExpenseReport(
+  userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "EXPENSE REPORT", bold: true, size: 40 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+            children: [
+              new TextRun({ text: `Submitted by: ${userName}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: `Date: ${today}`, size: 24 })],
+          }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Date", bold: true })],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Category", bold: true })],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: "Description", bold: true }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({
+                        children: [new TextRun({ text: "Amount", bold: true })],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Date]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Category]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Description]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Date]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Category]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("[Description]")] }),
+                    ],
+                  }),
+                  new TableCell({
+                    borders,
+                    children: [
+                      new Paragraph({ children: [new TextRun("$0.00")] }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({ children: [], spacing: { after: 200 } }),
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new TextRun({ text: "Total: $0.00", bold: true, size: 28 }),
+            ],
+          }),
+          new Paragraph({ children: [], spacing: { after: 400 } }),
+          new Paragraph({
+            children: [new TextRun({ text: "Approval:", bold: true })],
+          }),
+          new Paragraph({
+            children: [new TextRun("Manager Signature: _______________________")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Date: _______________________")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "expense-report.docx",
+  };
+}
+
+async function generateEmployeeHandbook(
+  _userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "EMPLOYEE HANDBOOK", bold: true, size: 48 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "[Company Name]", size: 32 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 600 },
+            children: [
+              new TextRun({
+                text: `Last Updated: ${today}`,
+                size: 22,
+                color: "666666",
+              }),
+            ],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Welcome")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Welcome message from leadership]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Company Overview")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Mission, vision, and values]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Employment Policies")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Equal opportunity, at-will employment, etc.]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Compensation & Benefits")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Pay periods, benefits overview, PTO policy]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Workplace Conduct")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Code of conduct, dress code, attendance]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Safety & Security")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Workplace safety, emergency procedures]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "employee-handbook.docx",
+  };
+}
+
+async function generateMarketingPlan(
+  _userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "MARKETING PLAN", bold: true, size: 48 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [
+              new TextRun({ text: today, size: 24, color: "666666" }),
+            ],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Executive Summary")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Brief overview of your marketing strategy]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Target Audience")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Demographics, psychographics, buyer personas]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Marketing Goals")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[SMART goals and KPIs]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Marketing Channels")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Social media, email, content, paid ads, etc.]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Budget")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Budget allocation by channel]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Timeline")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Campaign calendar and milestones]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "marketing-plan.docx",
+  };
+}
+
+async function generateBrandGuidelines(
+  _userName: string,
+  today: string
+): Promise<GenerateResult> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: pageProperties,
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "BRAND GUIDELINES", bold: true, size: 48 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: "[Company Name]", size: 32 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 600 },
+            children: [
+              new TextRun({
+                text: `Version 1.0 | ${today}`,
+                size: 22,
+                color: "666666",
+              }),
+            ],
+          }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Brand Overview")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Brand story, mission, and values]")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Logo Usage")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "[Logo variations, clear space, minimum sizes, dos and donts]"
+              ),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Color Palette")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Primary: [Color name] - #HEXCODE")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Secondary: [Color name] - #HEXCODE")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Accent: [Color name] - #HEXCODE")],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Typography")],
+          }),
+          new Paragraph({
+            children: [new TextRun("Headlines: [Font name]")],
+          }),
+          new Paragraph({ children: [new TextRun("Body: [Font name]")] }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Imagery")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun("[Photography style, illustration guidelines]"),
+            ],
+          }),
+          new Paragraph({ children: [] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("Voice & Tone")],
+          }),
+          new Paragraph({
+            children: [new TextRun("[Brand personality, writing guidelines]")],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return {
+    buffer: Buffer.from(buffer),
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    filename: "brand-guidelines.docx",
+  };
+}

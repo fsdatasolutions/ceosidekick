@@ -13,11 +13,15 @@ import {
     Settings,
     Star,
     CreditCard,
+    Shield,
+    Eye,
+    FileText,
 } from "lucide-react";
 
 const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
+    { icon: FileText, label: "Documents", href: "/documents" },
     { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
     { icon: Settings, label: "Settings", href: "/settings" },
@@ -27,11 +31,21 @@ interface MobileNavProps {
     userName: string;
     userEmail: string;
     userImage?: string | null;
+    isAdmin?: boolean;
 }
 
-export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
+export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: MobileNavProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isAdminView, setIsAdminView] = useState(true);
     const pathname = usePathname();
+
+    // Load saved preference on mount
+    useEffect(() => {
+        if (isAdmin) {
+            const saved = localStorage.getItem("adminViewMode");
+            setIsAdminView(saved !== "user");
+        }
+    }, [isAdmin]);
 
     // Close menu when route changes
     useEffect(() => {
@@ -49,6 +63,15 @@ export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
             document.body.style.overflow = "";
         };
     }, [isOpen]);
+
+    function toggleView() {
+        const newMode = !isAdminView;
+        setIsAdminView(newMode);
+        localStorage.setItem("adminViewMode", newMode ? "admin" : "user");
+    }
+
+    // Show admin features only if user is admin AND in admin view mode
+    const showAdminFeatures = isAdmin && isAdminView;
 
     return (
         <>
@@ -68,17 +91,30 @@ export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
             </span>
                     </Link>
 
-                    <button
-                        onClick={() => setIsOpen(!isOpen)}
-                        className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
-                        aria-label={isOpen ? "Close menu" : "Open menu"}
-                    >
-                        {isOpen ? (
-                            <X className="w-6 h-6 text-neutral-700" />
-                        ) : (
-                            <Menu className="w-6 h-6 text-neutral-700" />
+                    <div className="flex items-center gap-2">
+                        {/* Admin view indicator */}
+                        {isAdmin && (
+                            <span className={`p-1.5 rounded ${
+                                isAdminView
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-neutral-100 text-neutral-600"
+                            }`}>
+                {isAdminView ? <Shield className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </span>
                         )}
-                    </button>
+
+                        <button
+                            onClick={() => setIsOpen(!isOpen)}
+                            className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                            aria-label={isOpen ? "Close menu" : "Open menu"}
+                        >
+                            {isOpen ? (
+                                <X className="w-6 h-6 text-neutral-700" />
+                            ) : (
+                                <Menu className="w-6 h-6 text-neutral-700" />
+                            )}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -92,7 +128,7 @@ export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
 
             {/* Slide-out Sidebar */}
             <aside
-                className={`md:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
+                className={`md:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
@@ -113,7 +149,7 @@ export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+                <nav className="flex-1 p-4 overflow-y-auto">
                     <ul className="space-y-1">
                         {navItems.map((item) => {
                             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -147,11 +183,58 @@ export function MobileNav({ userName, userEmail, userImage }: MobileNavProps) {
                                 Feedback
                             </Link>
                         </li>
+
+                        {/* Admin - Only shown when in admin view mode */}
+                        {showAdminFeatures && (
+                            <li className="pt-4 mt-4 border-t border-neutral-200">
+                                <Link
+                                    href="/admin"
+                                    onClick={() => setIsOpen(false)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                                        pathname === "/admin"
+                                            ? "bg-primary-red/10 text-primary-red font-medium"
+                                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                    }`}
+                                >
+                                    <Shield className="w-5 h-5" />
+                                    Admin
+                                </Link>
+                            </li>
+                        )}
                     </ul>
                 </nav>
 
+                {/* Admin View Toggle */}
+                {isAdmin && (
+                    <div className="px-4 py-3 border-t border-neutral-200">
+                        <button
+                            onClick={toggleView}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                                isAdminView
+                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                            }`}
+                        >
+                            {isAdminView ? (
+                                <>
+                                    <Shield className="w-5 h-5" />
+                                    Admin View
+                                </>
+                            ) : (
+                                <>
+                                    <Eye className="w-5 h-5" />
+                                    User View
+                                </>
+                            )}
+                        </button>
+                        <p className="text-xs text-neutral-400 mt-1 text-center">
+                            {isAdminView ? "Viewing as admin" : "Viewing as regular user"}
+                        </p>
+                    </div>
+                )}
+
                 {/* User Section */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-200 bg-white">
+                <div className="p-4 border-t border-neutral-200">
                     <div className="flex items-center gap-3">
                         {userImage ? (
                             <img
