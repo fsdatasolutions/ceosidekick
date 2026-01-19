@@ -2,172 +2,125 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
     FileText,
     Presentation,
-    FileSpreadsheet,
+    Sheet,
     File,
     Download,
     Loader2,
-    Lock,
+    Crown,
     Sparkles,
-    FileCheck,
-    ClipboardList,
-    Receipt,
-    Users,
-    Target,
-    TrendingUp,
-    Briefcase,
+    ArrowRight,
+    Database,
+    Eye,
 } from "lucide-react";
-import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { DocumentPreviewModal } from "@/components/document-preview-modal";
 
-interface UsageInfo {
-    tier: string;
-    canSendMessage: boolean;
-}
-
-interface DocumentTemplate {
-    id: string;
-    name: string;
-    description: string;
-    icon: React.ElementType;
-    type: "docx" | "pptx" | "pdf" | "xlsx";
-    category: "business" | "finance" | "hr" | "marketing";
-    color: string;
-}
-
-const templates: DocumentTemplate[] = [
-    // Business Documents
+// Template definitions
+const templates = [
+    // Business
     {
         id: "business-plan",
         name: "Business Plan",
-        description: "Professional business plan with executive summary, market analysis, and financial projections",
-        icon: Briefcase,
-        type: "docx",
-        category: "business",
-        color: "blue",
+        description: "Comprehensive business plan with executive summary, market analysis, and financial projections",
+        category: "Business",
+        format: "docx",
+        icon: FileText,
     },
     {
         id: "pitch-deck",
         name: "Pitch Deck",
-        description: "Investor-ready presentation with problem, solution, market, and traction slides",
+        description: "Investor-ready presentation with problem, solution, market, and financials slides",
+        category: "Business",
+        format: "pptx",
         icon: Presentation,
-        type: "pptx",
-        category: "business",
-        color: "purple",
+    },
+    {
+        id: "project-proposal",
+        name: "Project Proposal",
+        description: "Detailed project proposal with scope, timeline, budget, and success metrics",
+        category: "Business",
+        format: "docx",
+        icon: FileText,
     },
     {
         id: "meeting-notes",
         name: "Meeting Notes",
         description: "Structured meeting notes template with attendees, agenda, and action items",
-        icon: ClipboardList,
-        type: "docx",
-        category: "business",
-        color: "green",
+        category: "Business",
+        format: "docx",
+        icon: FileText,
     },
-    {
-        id: "project-proposal",
-        name: "Project Proposal",
-        description: "Detailed project proposal with scope, timeline, budget, and deliverables",
-        icon: Target,
-        type: "docx",
-        category: "business",
-        color: "amber",
-    },
-    // Finance Documents
+    // Finance
     {
         id: "invoice",
         name: "Invoice",
-        description: "Professional invoice template for billing clients",
-        icon: Receipt,
-        type: "pdf",
-        category: "finance",
-        color: "emerald",
+        description: "Professional invoice template with itemized billing and payment terms",
+        category: "Finance",
+        format: "pdf",
+        icon: File,
     },
     {
         id: "expense-report",
         name: "Expense Report",
-        description: "Track and categorize business expenses with totals",
-        icon: FileSpreadsheet,
-        type: "xlsx",
-        category: "finance",
-        color: "teal",
+        description: "Detailed expense tracking spreadsheet with categories and totals",
+        category: "Finance",
+        format: "xlsx",
+        icon: Sheet,
     },
-    // HR Documents
+    // HR
     {
         id: "employee-handbook",
         name: "Employee Handbook",
-        description: "Company policies, procedures, and employee guidelines",
-        icon: Users,
-        type: "docx",
-        category: "hr",
-        color: "rose",
+        description: "Complete employee handbook with policies, benefits, and workplace guidelines",
+        category: "HR",
+        format: "docx",
+        icon: FileText,
     },
     {
         id: "job-description",
         name: "Job Description",
-        description: "Professional job posting with responsibilities and requirements",
-        icon: FileCheck,
-        type: "docx",
-        category: "hr",
-        color: "pink",
+        description: "Professional job posting with responsibilities, requirements, and benefits",
+        category: "HR",
+        format: "docx",
+        icon: FileText,
     },
-    // Marketing Documents
+    // Marketing
     {
         id: "marketing-plan",
         name: "Marketing Plan",
-        description: "Comprehensive marketing strategy with channels, budget, and KPIs",
-        icon: TrendingUp,
-        type: "docx",
-        category: "marketing",
-        color: "orange",
+        description: "Strategic marketing plan with target audience, channels, and budget",
+        category: "Marketing",
+        format: "docx",
+        icon: FileText,
     },
     {
         id: "brand-guidelines",
         name: "Brand Guidelines",
-        description: "Brand identity document with logo usage, colors, and typography",
-        icon: Sparkles,
-        type: "pdf",
-        category: "marketing",
-        color: "indigo",
+        description: "Complete brand style guide with logo usage, colors, typography, and voice",
+        category: "Marketing",
+        format: "pdf",
+        icon: File,
     },
 ];
 
-const categoryLabels: Record<string, string> = {
-    business: "Business",
-    finance: "Finance",
-    hr: "Human Resources",
-    marketing: "Marketing",
-};
+const categories = ["All", "Business", "Finance", "HR", "Marketing"];
 
-const typeLabels: Record<string, { label: string; color: string }> = {
-    docx: { label: "Word", color: "bg-blue-100 text-blue-700" },
-    pptx: { label: "PowerPoint", color: "bg-orange-100 text-orange-700" },
-    pdf: { label: "PDF", color: "bg-red-100 text-red-700" },
-    xlsx: { label: "Excel", color: "bg-green-100 text-green-700" },
-};
-
-const colorClasses: Record<string, string> = {
-    blue: "bg-blue-100 text-blue-600",
-    purple: "bg-purple-100 text-purple-600",
-    green: "bg-green-100 text-green-600",
-    amber: "bg-amber-100 text-amber-600",
-    emerald: "bg-emerald-100 text-emerald-600",
-    teal: "bg-teal-100 text-teal-600",
-    rose: "bg-rose-100 text-rose-600",
-    pink: "bg-pink-100 text-pink-600",
-    orange: "bg-orange-100 text-orange-600",
-    indigo: "bg-indigo-100 text-indigo-600",
-};
+interface UsageData {
+    tier: string;
+    messagesUsed: number;
+    messageLimit: number;
+}
 
 export default function DocumentsPage() {
-    const [usage, setUsage] = useState<UsageInfo | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState("All");
+    const [usage, setUsage] = useState<UsageData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [generating, setGenerating] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    // More explicit check - only paid if we have usage data AND tier is not free
-    const isPaidUser = usage !== null && usage.tier !== "free";
+    const [selectedTemplate, setSelectedTemplate] = useState<typeof templates[0] | null>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
     useEffect(() => {
         fetchUsage();
@@ -178,199 +131,210 @@ export default function DocumentsPage() {
             const res = await fetch("/api/usage");
             if (res.ok) {
                 const data = await res.json();
-                console.log("[Documents] Usage data:", data);
-                // API returns { usage: { tier: "free", ... } } - extract the nested object
+                // Handle nested response structure
                 const usageData = data.usage || data;
                 setUsage(usageData);
-            } else {
-                console.log("[Documents] Usage fetch failed:", res.status);
-                setUsage({ tier: "free", canSendMessage: true });
             }
         } catch (err) {
             console.error("Failed to fetch usage:", err);
-            setUsage({ tier: "free", canSendMessage: true });
         } finally {
             setLoading(false);
         }
     }
 
-    async function handleGenerate(template: DocumentTemplate) {
+    const isPaidUser = usage?.tier && usage.tier !== "free";
+
+    const filteredTemplates =
+        selectedCategory === "All"
+            ? templates
+            : templates.filter((t) => t.category === selectedCategory);
+
+    function handleTemplateClick(template: typeof templates[0]) {
         if (!isPaidUser) return;
-
-        setGenerating(template.id);
-        setError(null);
-
-        try {
-            const res = await fetch("/api/templates/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ templateId: template.id }),
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || "Failed to generate document");
-            }
-
-            // Get the blob and trigger download
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${template.id}.${template.type}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } catch (err) {
-            console.error("Failed to generate document:", err);
-            setError(err instanceof Error ? err.message : "Failed to generate document");
-        } finally {
-            setGenerating(null);
-        }
+        setSelectedTemplate(template);
+        setIsPreviewOpen(true);
     }
 
-    // Group templates by category
-    const groupedTemplates = templates.reduce((acc, template) => {
-        if (!acc[template.category]) {
-            acc[template.category] = [];
+    function getFormatColor(format: string) {
+        switch (format) {
+            case "docx":
+                return "bg-blue-100 text-blue-700";
+            case "pptx":
+                return "bg-orange-100 text-orange-700";
+            case "xlsx":
+                return "bg-green-100 text-green-700";
+            case "pdf":
+                return "bg-red-100 text-red-700";
+            default:
+                return "bg-neutral-100 text-neutral-700";
         }
-        acc[template.category].push(template);
-        return acc;
-    }, {} as Record<string, DocumentTemplate[]>);
-
-    if (loading) {
-        return (
-            <div className="p-8 flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
-            </div>
-        );
     }
 
     return (
-        <div className="p-4 md:p-8 max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="font-display text-2xl md:text-3xl font-bold text-neutral-900 mb-2">
+                <h1 className="text-3xl font-bold text-neutral-900 mb-2">
                     Document Templates
                 </h1>
                 <p className="text-neutral-600">
-                    Generate professional business documents with AI assistance
+                    Generate professional documents pre-filled with your company information
                 </p>
             </div>
 
             {/* Upgrade Banner for Free Users */}
             {!isPaidUser && !loading && (
-                <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                                <Lock className="w-5 h-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-neutral-900">
-                                    Paid Feature
-                                </h3>
-                                <p className="text-sm text-neutral-600 mt-1">
-                                    Document templates are available for paid subscribers only. Upgrade to generate professional documents, pitch decks, invoices, and more.
-                                </p>
+                <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200">
+                    <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Crown className="w-6 h-6 text-amber-600" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-amber-900 mb-1">
+                                Unlock Document Generation
+                            </h3>
+                            <p className="text-amber-700 mb-4">
+                                Upgrade to a paid plan to generate professional documents pre-filled with your company information.
+                                All documents are automatically personalized based on your settings.
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                                <Link href="/pricing">
+                                    <Button className="bg-amber-600 hover:bg-amber-700">
+                                        <Sparkles className="w-4 h-4" />
+                                        Upgrade Now
+                                    </Button>
+                                </Link>
+                                <Link href="/settings">
+                                    <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+                                        Complete Profile First
+                                        <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                </Link>
                             </div>
                         </div>
-                        <Link
-                            href="/pricing"
-                            className="inline-flex items-center justify-center px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors whitespace-nowrap"
-                        >
-                            Upgrade Now
-                        </Link>
                     </div>
                 </div>
             )}
 
-            {/* Error Message */}
-            {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                    {error}
+            {/* Feature Highlight */}
+            {isPaidUser && (
+                <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <div className="flex items-center gap-3">
+                        <Database className="w-5 h-5 text-blue-600" />
+                        <p className="text-sm text-blue-800">
+                            <strong>New!</strong> Generated documents can now be saved directly to your Knowledge Base for AI-powered search and retrieval.
+                        </p>
+                    </div>
                 </div>
             )}
 
-            {/* Templates by Category */}
-            {Object.entries(groupedTemplates).map(([category, categoryTemplates]) => (
-                <div key={category} className="mb-8">
-                    <h2 className="text-lg font-semibold text-neutral-900 mb-4">
-                        {categoryLabels[category]}
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {categoryTemplates.map((template) => (
-                            <div
-                                key={template.id}
-                                className={`bg-white rounded-xl border border-neutral-200 p-5 transition-all ${
-                                    isPaidUser
-                                        ? "hover:border-neutral-300 hover:shadow-md cursor-pointer"
-                                        : "opacity-75"
-                                }`}
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClasses[template.color]}`}>
-                                        <template.icon className="w-6 h-6" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-medium text-neutral-900">
-                                                {template.name}
-                                            </h3>
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeLabels[template.type].color}`}>
-                        {typeLabels[template.type].label}
-                      </span>
-                                        </div>
-                                        <p className="text-sm text-neutral-500 line-clamp-2">
-                                            {template.description}
-                                        </p>
+            {/* Category Filter */}
+            <div className="flex flex-wrap gap-2 mb-6">
+                {categories.map((category) => (
+                    <button
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                            selectedCategory === category
+                                ? "bg-primary-red text-white"
+                                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                        }`}
+                    >
+                        {category}
+                    </button>
+                ))}
+            </div>
+
+            {/* Templates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTemplates.map((template) => {
+                    const Icon = template.icon;
+                    const isDisabled = !isPaidUser;
+
+                    return (
+                        <div
+                            key={template.id}
+                            onClick={() => handleTemplateClick(template)}
+                            className={`group relative p-6 bg-white rounded-xl border transition-all ${
+                                isDisabled
+                                    ? "border-neutral-200 opacity-60 cursor-not-allowed"
+                                    : "border-neutral-200 hover:border-primary-red hover:shadow-lg cursor-pointer"
+                            }`}
+                        >
+                            {/* Lock overlay for free users */}
+                            {isDisabled && (
+                                <div className="absolute inset-0 bg-white/50 rounded-xl flex items-center justify-center z-10">
+                                    <div className="bg-neutral-900/80 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5">
+                                        <Crown className="w-3.5 h-3.5" />
+                                        Paid Feature
                                     </div>
                                 </div>
-                                <div className="mt-4">
-                                    <button
-                                        onClick={() => handleGenerate(template)}
-                                        disabled={!isPaidUser || generating === template.id}
-                                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                                            isPaidUser
-                                                ? "bg-primary-red text-white hover:bg-primary-red/90 disabled:bg-primary-red/50"
-                                                : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+                            )}
+
+                            <div className="flex items-start gap-4">
+                                <div
+                                    className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                                        isDisabled
+                                            ? "bg-neutral-100"
+                                            : "bg-primary-red/10 group-hover:bg-primary-red/20"
+                                    }`}
+                                >
+                                    <Icon
+                                        className={`w-6 h-6 ${
+                                            isDisabled ? "text-neutral-400" : "text-primary-red"
                                         }`}
-                                    >
-                                        {generating === template.id ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Generating...
-                                            </>
-                                        ) : !isPaidUser ? (
-                                            <>
-                                                <Lock className="w-4 h-4" />
-                                                Upgrade to Generate
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Download className="w-4 h-4" />
-                                                Generate Document
-                                            </>
-                                        )}
-                                    </button>
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-semibold text-neutral-900 truncate">
+                                            {template.name}
+                                        </h3>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-xs font-medium uppercase ${getFormatColor(
+                                                template.format
+                                            )}`}
+                                        >
+                      {template.format}
+                    </span>
+                                    </div>
+                                    <p className="text-sm text-neutral-500 line-clamp-2">
+                                        {template.description}
+                                    </p>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
 
-            {/* Coming Soon Note */}
-            <div className="mt-8 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-                <p className="text-sm text-neutral-600 text-center">
-                    <Sparkles className="w-4 h-4 inline mr-1" />
-                    More templates coming soon! Have a suggestion?{" "}
-                    <Link href="/feedback" className="text-primary-red hover:underline">
-                        Let us know
-                    </Link>
-                </p>
+                            {/* Hover action hint */}
+                            {!isDisabled && (
+                                <div className="mt-4 flex items-center gap-2 text-sm text-primary-red opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Eye className="w-4 h-4" />
+                                    Click to preview & download
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
+
+            {/* Empty State */}
+            {filteredTemplates.length === 0 && (
+                <div className="text-center py-12">
+                    <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                    <p className="text-neutral-500">
+                        No templates found in this category
+                    </p>
+                </div>
+            )}
+
+            {/* Preview Modal */}
+            <DocumentPreviewModal
+                template={selectedTemplate}
+                isOpen={isPreviewOpen}
+                onClose={() => {
+                    setIsPreviewOpen(false);
+                    setSelectedTemplate(null);
+                }}
+            />
         </div>
     );
 }
