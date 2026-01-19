@@ -14,15 +14,30 @@ import {
     Shield,
     Eye,
     FileText,
+    AlertCircle,
 } from "lucide-react";
 
-const navItems = [
+// Fields that should be populated for a complete profile
+const REQUIRED_SETTINGS_FIELDS = [
+    "companyName",
+    "industry",
+    "productsServices",
+    "targetMarket",
+    "userRole",
+];
+
+interface NavItem {
+    icon: React.ElementType;
+    label: string;
+    href: string;
+}
+
+const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: FileText, label: "Documents", href: "/documents" },
     { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
-    { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 interface SidebarNavProps {
@@ -32,6 +47,8 @@ interface SidebarNavProps {
 export function SidebarNav({ isAdmin }: SidebarNavProps) {
     const pathname = usePathname();
     const [isAdminView, setIsAdminView] = useState(true);
+    const [settingsIncomplete, setSettingsIncomplete] = useState(false);
+    const [isCheckingSettings, setIsCheckingSettings] = useState(true);
 
     // Load saved preference on mount
     useEffect(() => {
@@ -41,6 +58,42 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
         }
     }, [isAdmin]);
 
+    // Check settings completion on mount and listen for updates
+    useEffect(() => {
+        checkSettingsCompletion();
+
+        // Listen for settings updates from the settings page
+        const handleSettingsUpdate = () => {
+            checkSettingsCompletion();
+        };
+
+        window.addEventListener("settings-updated", handleSettingsUpdate);
+        return () => {
+            window.removeEventListener("settings-updated", handleSettingsUpdate);
+        };
+    }, []);
+
+    async function checkSettingsCompletion() {
+        try {
+            const res = await fetch("/api/settings");
+            if (res.ok) {
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                // Check if required fields are populated
+                const missingFields = REQUIRED_SETTINGS_FIELDS.filter(
+                    (field) => !settings[field] || settings[field].trim() === ""
+                );
+
+                setSettingsIncomplete(missingFields.length > 0);
+            }
+        } catch (err) {
+            console.error("Failed to check settings:", err);
+        } finally {
+            setIsCheckingSettings(false);
+        }
+    }
+
     function toggleView() {
         const newMode = !isAdminView;
         setIsAdminView(newMode);
@@ -49,6 +102,7 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
 
     // Show admin features only if user is admin AND in admin view mode
     const showAdminFeatures = isAdmin && isAdminView;
+    const isSettingsActive = pathname === "/settings";
 
     return (
         <nav className="flex-1 p-4 flex flex-col">
@@ -72,6 +126,33 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
                         </li>
                     );
                 })}
+
+                {/* Settings - with completion indicator */}
+                <li>
+                    <Link
+                        href="/settings"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative ${
+                            isSettingsActive
+                                ? "bg-primary-red/10 text-primary-red font-medium"
+                                : settingsIncomplete && !isCheckingSettings
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                        }`}
+                    >
+                        <div className="relative">
+                            <Settings className="w-5 h-5" />
+                            {settingsIncomplete && !isCheckingSettings && !isSettingsActive && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+                            )}
+                        </div>
+                        <span className="flex-1">Settings</span>
+                        {settingsIncomplete && !isCheckingSettings && !isSettingsActive && (
+                            <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+                                !
+                            </span>
+                        )}
+                    </Link>
+                </li>
 
                 {/* Feedback - Bold Red */}
                 <li>
@@ -103,6 +184,29 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
                     </li>
                 )}
             </ul>
+
+            {/* Settings Completion Reminder */}
+            {settingsIncomplete && !isCheckingSettings && pathname !== "/settings" && (
+                <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                    <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-xs font-semibold text-amber-800">
+                                Complete Your Profile
+                            </p>
+                            <p className="text-xs text-amber-600 mt-0.5">
+                                Add company info for personalized documents & AI advice.
+                            </p>
+                            <Link
+                                href="/settings"
+                                className="inline-block mt-2 text-xs font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+                            >
+                                Complete Setup →
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Admin View Toggle - Always visible to admins */}
             {isAdmin && (

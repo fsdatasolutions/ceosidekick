@@ -16,15 +16,30 @@ import {
     Shield,
     Eye,
     FileText,
+    AlertCircle,
 } from "lucide-react";
 
-const navItems = [
+// Fields that should be populated for a complete profile
+const REQUIRED_SETTINGS_FIELDS = [
+    "companyName",
+    "industry",
+    "productsServices",
+    "targetMarket",
+    "userRole",
+];
+
+interface NavItem {
+    icon: React.ElementType;
+    label: string;
+    href: string;
+}
+
+const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: FileText, label: "Documents", href: "/documents" },
     { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
-    { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 interface MobileNavProps {
@@ -37,6 +52,8 @@ interface MobileNavProps {
 export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: MobileNavProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isAdminView, setIsAdminView] = useState(true);
+    const [settingsIncomplete, setSettingsIncomplete] = useState(false);
+    const [isCheckingSettings, setIsCheckingSettings] = useState(true);
     const pathname = usePathname();
 
     // Load saved preference on mount
@@ -46,6 +63,21 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
             setIsAdminView(saved !== "user");
         }
     }, [isAdmin]);
+
+    // Check settings completion on mount and listen for updates
+    useEffect(() => {
+        checkSettingsCompletion();
+
+        // Listen for settings updates from the settings page
+        const handleSettingsUpdate = () => {
+            checkSettingsCompletion();
+        };
+
+        window.addEventListener("settings-updated", handleSettingsUpdate);
+        return () => {
+            window.removeEventListener("settings-updated", handleSettingsUpdate);
+        };
+    }, []);
 
     // Close menu when route changes
     useEffect(() => {
@@ -64,6 +96,27 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
         };
     }, [isOpen]);
 
+    async function checkSettingsCompletion() {
+        try {
+            const res = await fetch("/api/settings");
+            if (res.ok) {
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                // Check if required fields are populated
+                const missingFields = REQUIRED_SETTINGS_FIELDS.filter(
+                    (field) => !settings[field] || settings[field].trim() === ""
+                );
+
+                setSettingsIncomplete(missingFields.length > 0);
+            }
+        } catch (err) {
+            console.error("Failed to check settings:", err);
+        } finally {
+            setIsCheckingSettings(false);
+        }
+    }
+
     function toggleView() {
         const newMode = !isAdminView;
         setIsAdminView(newMode);
@@ -72,6 +125,7 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
 
     // Show admin features only if user is admin AND in admin view mode
     const showAdminFeatures = isAdmin && isAdminView;
+    const isSettingsActive = pathname === "/settings";
 
     return (
         <>
@@ -87,11 +141,22 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             />
                         </div>
                         <span className="font-display font-bold text-neutral-900">
-              CEO Sidekick
-            </span>
+                            CEO Sidekick
+                        </span>
                     </Link>
 
                     <div className="flex items-center gap-2">
+                        {/* Settings incomplete indicator in header */}
+                        {settingsIncomplete && !isCheckingSettings && (
+                            <Link
+                                href="/settings"
+                                className="p-1.5 rounded-lg bg-amber-100 text-amber-600"
+                                title="Complete your profile"
+                            >
+                                <AlertCircle className="w-4 h-4" />
+                            </Link>
+                        )}
+
                         {/* Admin view indicator */}
                         {isAdmin && (
                             <span className={`p-1.5 rounded ${
@@ -99,19 +164,23 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                                     ? "bg-amber-100 text-amber-700"
                                     : "bg-neutral-100 text-neutral-600"
                             }`}>
-                {isAdminView ? <Shield className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </span>
+                                {isAdminView ? <Shield className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </span>
                         )}
 
                         <button
                             onClick={() => setIsOpen(!isOpen)}
-                            className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                            className="relative p-2 rounded-lg hover:bg-neutral-100 transition-colors"
                             aria-label={isOpen ? "Close menu" : "Open menu"}
                         >
                             {isOpen ? (
                                 <X className="w-6 h-6 text-neutral-700" />
                             ) : (
                                 <Menu className="w-6 h-6 text-neutral-700" />
+                            )}
+                            {/* Indicator dot on hamburger menu */}
+                            {settingsIncomplete && !isCheckingSettings && !isOpen && (
+                                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
                             )}
                         </button>
                     </div>
@@ -143,10 +212,34 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             />
                         </div>
                         <span className="font-display font-bold text-lg text-neutral-900">
-              CEO Sidekick
-            </span>
+                            CEO Sidekick
+                        </span>
                     </Link>
                 </div>
+
+                {/* Settings Completion Banner - At top of nav */}
+                {settingsIncomplete && !isCheckingSettings && (
+                    <div className="mx-4 mt-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-semibold text-amber-800">
+                                    Complete Your Profile
+                                </p>
+                                <p className="text-xs text-amber-600 mt-0.5">
+                                    Add company info for personalized documents.
+                                </p>
+                                <Link
+                                    href="/settings"
+                                    onClick={() => setIsOpen(false)}
+                                    className="inline-flex items-center justify-center w-full mt-2 px-3 py-2 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 transition-colors"
+                                >
+                                    Complete Setup
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Navigation */}
                 <nav className="flex-1 p-4 overflow-y-auto">
@@ -171,6 +264,34 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                                 </li>
                             );
                         })}
+
+                        {/* Settings - with completion indicator */}
+                        <li>
+                            <Link
+                                href="/settings"
+                                onClick={() => setIsOpen(false)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                                    isSettingsActive
+                                        ? "bg-primary-red/10 text-primary-red font-medium"
+                                        : settingsIncomplete && !isCheckingSettings
+                                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                }`}
+                            >
+                                <div className="relative">
+                                    <Settings className="w-5 h-5" />
+                                    {settingsIncomplete && !isCheckingSettings && !isSettingsActive && (
+                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+                                    )}
+                                </div>
+                                <span className="flex-1">Settings</span>
+                                {settingsIncomplete && !isCheckingSettings && !isSettingsActive && (
+                                    <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-medium">
+                                        Incomplete
+                                    </span>
+                                )}
+                            </Link>
+                        </li>
 
                         {/* Feedback */}
                         <li>
@@ -244,9 +365,9 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             />
                         ) : (
                             <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center">
-                <span className="text-neutral-600 font-medium">
-                  {userName.charAt(0).toUpperCase()}
-                </span>
+                                <span className="text-neutral-600 font-medium">
+                                    {userName.charAt(0).toUpperCase()}
+                                </span>
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
