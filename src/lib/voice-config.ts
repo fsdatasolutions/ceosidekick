@@ -11,46 +11,47 @@ export interface AgentVoiceConfig {
 }
 
 // Map each agent to a distinct voice personality
+// OpenAI voices: alloy (neutral), echo (male), fable (British male), onyx (deep male), nova (female), shimmer (female)
 export const AGENT_VOICES: Record<string, AgentVoiceConfig> = {
     technology: {
-        voice: "onyx",
+        voice: "nova",
         speed: 1.0,
-        description: "Deep and authoritative - your technical advisor",
+        description: "Professional female voice - your technical advisor",
     },
     coach: {
-        voice: "fable",
+        voice: "shimmer",
         speed: 0.95,
-        description: "Warm and encouraging - your leadership mentor",
+        description: "Warm female voice - your leadership mentor",
     },
     legal: {
-        voice: "echo",
+        voice: "onyx",
         speed: 0.9,
-        description: "Professional and measured - your legal counsel",
+        description: "Professional male voice - your legal counsel",
     },
     hr: {
         voice: "nova",
         speed: 1.0,
-        description: "Friendly and approachable - your people partner",
+        description: "Friendly female voice - your people partner",
     },
     marketing: {
         voice: "shimmer",
         speed: 1.05,
-        description: "Energetic and creative - your marketing strategist",
+        description: "Energetic female voice - your marketing strategist",
     },
     sales: {
-        voice: "alloy",
+        voice: "echo",
         speed: 1.0,
-        description: "Confident and persuasive - your sales advisor",
+        description: "Confident male voice - your sales advisor",
     },
     knowledge: {
         voice: "alloy",
         speed: 1.0,
-        description: "Clear and informative - your knowledge assistant",
+        description: "Clear neutral voice - your knowledge assistant",
     },
     content: {
-        voice: "nova",
+        voice: "shimmer",
         speed: 1.0,
-        description: "Creative and expressive - your content creator",
+        description: "Creative female voice - your content creator",
     },
 };
 

@@ -1,5 +1,5 @@
 // src/app/api/chat/route.ts
-// Updated with RAG support and paywall enforcement
+// Updated with RAG support, paywall enforcement, and voice mode
 
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
@@ -8,6 +8,7 @@ import { AgentType } from "@/agents/types";
 import { eq, desc } from "drizzle-orm";
 import { RAG_CONFIG } from "@/lib/rag-config";
 import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
+import { VOICE_CONFIG } from "@/lib/voice-config";
 
 // Lazy database imports
 async function getDb() {
@@ -135,13 +136,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const body = await request.json();
+    const {
+      message,
+      conversationId,
+      agent = "technology",
+      voiceMode = false,
+    } = body as {
+      message: string;
+      conversationId?: string;
+      agent?: AgentType;
+      voiceMode?: boolean;
+    };
+
+    // Calculate message cost (voice messages cost more)
+    const messageCost = voiceMode ? VOICE_CONFIG.MESSAGE_COST_MULTIPLIER : 1;
+
+    if (!message || typeof message !== "string") {
+      return new Response(JSON.stringify({ error: "Message is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     // ============================================
-    // PAYWALL: Check message allowance
+    // PAYWALL: Check message allowance (with voice cost)
     // ============================================
-    const usageCheck = await checkMessageAllowance(session.user.id);
+    const usageCheck = await checkMessageAllowance(session.user.id, messageCost);
 
     if (!usageCheck.allowed) {
-      console.log("[API] User hit message limit:", session.user.id);
+      console.log("[API] User hit message limit:", session.user.id, "voiceMode:", voiceMode);
       return new Response(
           JSON.stringify({
             error: "MESSAGE_LIMIT_REACHED",
@@ -153,24 +177,6 @@ export async function POST(request: NextRequest) {
             headers: { "Content-Type": "application/json" },
           }
       );
-    }
-
-    const body = await request.json();
-    const {
-      message,
-      conversationId,
-      agent = "technology",
-    } = body as {
-      message: string;
-      conversationId?: string;
-      agent?: AgentType;
-    };
-
-    if (!message || typeof message !== "string") {
-      return new Response(JSON.stringify({ error: "Message is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
     }
 
     const db = await getDb();
@@ -315,13 +321,13 @@ export async function POST(request: NextRequest) {
           // PAYWALL: Increment usage after successful response
           // ============================================
           try {
-            const updatedUsage = await incrementMessageUsage(session.user.id);
-            console.log("[API] Usage incremented:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+            const updatedUsage = await incrementMessageUsage(session.user.id, messageCost);
+            console.log("[API] Usage incremented by", messageCost, ":", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable, voiceMode ? "(voice)" : "");
 
             // Send updated usage info to client
             controller.enqueue(
                 encoder.encode(
-                    `data: ${JSON.stringify({ type: "usage", usage: updatedUsage })}\n\n`
+                    `data: ${JSON.stringify({ type: "usage", usage: updatedUsage, voiceMode, messageCost })}\n\n`
                 )
             );
           } catch (usageError) {

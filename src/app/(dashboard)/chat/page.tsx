@@ -993,28 +993,30 @@ function ChatContent() {
                   {/* Agent Dropdown */}
                   {showAgentSelector && (
                       <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl border border-neutral-200 shadow-lg z-50 py-2 max-h-[70vh] overflow-y-auto">
-                        {(Object.entries(agents) as [AgentType, typeof agents.technology][]).map(([agentKey, agentInfo]) => {
-                          const isSelected = agentKey === agent;
+                        {(Object.entries(agents) as [AgentType, typeof agents.technology][])
+                            .filter(([agentKey]) => agentKey !== "knowledge") // Knowledge Base is now a feature, not a separate agent
+                            .map(([agentKey, agentInfo]) => {
+                              const isSelected = agentKey === agent;
 
-                          return (
-                              <button
-                                  key={agentKey}
-                                  onClick={() => switchAgent(agentKey)}
-                                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors ${
-                                      isSelected ? "bg-neutral-50" : ""
-                                  }`}
-                              >
-                                <AgentAvatar agentId={agentKey} size="md" />
-                                <div className="flex-1 text-left">
-                                  <div className="font-medium text-neutral-900">{agentInfo.name}</div>
-                                  <div className="text-xs text-neutral-500">{agentInfo.description}</div>
-                                </div>
-                                {isSelected && (
-                                    <Check className="w-5 h-5 text-primary-red flex-shrink-0" />
-                                )}
-                              </button>
-                          );
-                        })}
+                              return (
+                                  <button
+                                      key={agentKey}
+                                      onClick={() => switchAgent(agentKey)}
+                                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors ${
+                                          isSelected ? "bg-neutral-50" : ""
+                                      }`}
+                                  >
+                                    <AgentAvatar agentId={agentKey} size="md" />
+                                    <div className="flex-1 text-left">
+                                      <div className="font-medium text-neutral-900">{agentInfo.name}</div>
+                                      <div className="text-xs text-neutral-500">{agentInfo.description}</div>
+                                    </div>
+                                    {isSelected && (
+                                        <Check className="w-5 h-5 text-primary-red flex-shrink-0" />
+                                    )}
+                                  </button>
+                              );
+                            })}
                       </div>
                   )}
                 </div>
