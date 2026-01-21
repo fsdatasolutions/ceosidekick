@@ -232,23 +232,24 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // RAG: Fetch document context for Knowledge Base
+    // RAG: Fetch document context for ALL agents
     // ============================================
     let ragContext: string | undefined;
-    if (agent === "knowledge") {
-      console.log("[API] Knowledge Base agent - fetching RAG context");
 
-      // Safely get organizationId if it exists on the user object
-      const organizationId = (session.user as { organizationId?: string }).organizationId;
+    // Safely get organizationId if it exists on the user object
+    const organizationId = (session.user as { organizationId?: string }).organizationId;
 
-      ragContext = await getRAGContext(
-          message,
-          session.user.id,
-          organizationId
-      );
-      if (ragContext) {
-        console.log("[API] RAG context retrieved, length:", ragContext.length);
-      }
+    // Fetch RAG context for all agents (gives them access to user's knowledge base)
+    console.log("[API] Fetching RAG context for agent:", agent);
+    ragContext = await getRAGContext(
+        message,
+        session.user.id,
+        organizationId
+    );
+    if (ragContext) {
+      console.log("[API] RAG context retrieved, length:", ragContext.length);
+    } else {
+      console.log("[API] No relevant documents found in knowledge base");
     }
 
     // Create streaming response

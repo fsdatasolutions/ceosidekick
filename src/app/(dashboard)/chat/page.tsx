@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AgentAvatar } from "@/components/ui/agent-avatar";
@@ -20,6 +20,13 @@ import {
   ChevronDown,
   Check,
   Zap,
+  BookmarkPlus,
+  BookmarkCheck,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio,
 } from "lucide-react";
 
 type AgentType = "technology" | "coach" | "legal" | "hr" | "marketing" | "sales" | "knowledge" | "content";
@@ -50,6 +57,13 @@ interface UsageInfo {
   percentage: number;
   status: "ok" | "warning" | "critical" | "exceeded";
   canSendMessage: boolean;
+}
+
+interface SaveStatus {
+  savedToKnowledgeBaseAt: string | null;
+  hasUnsavedMessages: boolean;
+  unsavedMessageCount: number;
+  neverSaved: boolean;
 }
 
 const agents = {
@@ -194,6 +208,21 @@ function ChatContent() {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  // Save to Knowledge Base state
+  const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
+  const [savingToKB, setSavingToKB] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Voice mode state
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const agentSelectorRef = useRef<HTMLDivElement>(null);
@@ -216,6 +245,338 @@ function ChatContent() {
       console.error("Failed to fetch usage:", err);
     }
   };
+
+  // Check if conversation has unsaved messages
+  const checkSaveStatus = async (convId: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${convId}/save-to-knowledge-base`);
+      if (res.ok) {
+        const data = await res.json();
+        setSaveStatus(data);
+      }
+    } catch (err) {
+      console.error("Failed to check save status:", err);
+      setSaveStatus(null);
+    }
+  };
+
+  // Save conversation to Knowledge Base
+  const saveToKnowledgeBase = async () => {
+    if (!conversationId || savingToKB) return;
+
+    setSavingToKB(true);
+    setSaveSuccess(false);
+
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/save-to-knowledge-base`, {
+        method: "POST",
+      });
+
+      if (res.status === 403) {
+        setShowUpgradeModal(true);
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to save to Knowledge Base");
+        return;
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+
+      // Refresh save status
+      checkSaveStatus(conversationId);
+    } catch (err) {
+      console.error("Failed to save to KB:", err);
+      setError("Failed to save conversation to Knowledge Base");
+    } finally {
+      setSavingToKB(false);
+    }
+  };
+
+  // ============================================
+  // VOICE MODE FUNCTIONS
+  // ============================================
+
+  // Start voice recording
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        // Create audio blob
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType
+        });
+
+        // Transcribe the audio
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      console.log("[Voice] Recording started");
+    } catch (err) {
+      console.error("[Voice] Failed to start recording:", err);
+      setError("Could not access microphone. Please check permissions.");
+    }
+  }, []);
+
+  // Stop voice recording
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      console.log("[Voice] Recording stopped");
+    }
+  }, [isRecording]);
+
+  // Toggle recording
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
+  // Transcribe audio using Whisper API
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+
+      const res = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Transcription failed');
+      }
+
+      const data = await res.json();
+
+      if (data.text) {
+        // Set the transcribed text as input and submit
+        setInput(data.text);
+        // Auto-submit the transcribed text
+        setTimeout(() => {
+          submitVoiceMessage(data.text);
+        }, 100);
+      }
+    } catch (err) {
+      console.error("[Voice] Transcription error:", err);
+      setError("Failed to transcribe audio. Please try again.");
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  // Submit voice message (with voice mode flag)
+  const submitVoiceMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return;
+
+    // Check usage
+    if (usage && !usage.canSendMessage) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    const userMessage = text.trim();
+    setInput("");
+    setError(null);
+
+    const userMsgId = Date.now().toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: "user",
+        content: userMessage,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const assistantMsgId = (Date.now() + 1).toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date(),
+      },
+    ]);
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage,
+          agent,
+          conversationId,
+          voiceMode: true, // Flag for voice mode pricing
+        }),
+      });
+
+      if (res.status === 403) {
+        const errorData = await res.json();
+        if (errorData.error === "MESSAGE_LIMIT_REACHED") {
+          if (errorData.usage) setUsage(errorData.usage);
+          setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
+          setShowUpgradeModal(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      if (!res.ok) throw new Error("Failed to send message");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error("No response body");
+
+      let fullContent = "";
+      let newConversationId: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === "conversation_id" && data.id) {
+                newConversationId = data.id;
+              }
+
+              if (data.type === "content" && data.content) {
+                fullContent += data.content;
+                setMessages((prev) =>
+                    prev.map((msg) =>
+                        msg.id === assistantMsgId
+                            ? { ...msg, content: fullContent }
+                            : msg
+                    )
+                );
+              }
+
+              if (data.type === "usage" && data.usage) {
+                setUsage(data.usage);
+              }
+
+              if (data.type === "done") {
+                // Synthesize speech for the response if audio is enabled
+                if (audioEnabled && fullContent) {
+                  synthesizeAndPlay(fullContent);
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (newConversationId && !conversationId) {
+        setConversationId(newConversationId);
+      }
+    } catch (err) {
+      console.error("Voice message error:", err);
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
+      setError("Failed to send voice message. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Synthesize text to speech and play it
+  const synthesizeAndPlay = async (text: string) => {
+    if (!text.trim()) return;
+
+    setIsSpeaking(true);
+
+    try {
+      const res = await fetch('/api/voice/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, agent }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Speech synthesis failed');
+      }
+
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      // Create and play audio
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        console.error("[Voice] Audio playback error");
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error("[Voice] Synthesis error:", err);
+      setIsSpeaking(false);
+    }
+  };
+
+  // Stop audio playback
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Toggle voice mode
+  const toggleVoiceMode = useCallback(() => {
+    setVoiceMode(prev => !prev);
+    // Stop any ongoing recording when disabling voice mode
+    if (voiceMode && isRecording) {
+      stopRecording();
+    }
+  }, [voiceMode, isRecording, stopRecording]);
 
   // Close agent selector when clicking outside
   useEffect(() => {
@@ -267,6 +628,15 @@ function ChatContent() {
       fetchConversations();
     }
   }, [showHistory]);
+
+  // Check save status when conversation changes or messages update
+  useEffect(() => {
+    if (conversationId && messages.length > 0) {
+      checkSaveStatus(conversationId);
+    } else {
+      setSaveStatus(null);
+    }
+  }, [conversationId, messages.length]);
 
   const fetchConversations = async () => {
     setLoadingHistory(true);
@@ -327,6 +697,8 @@ function ChatContent() {
     setConversationId(null);
     setError(null);
     setShowHistory(false);
+    setSaveStatus(null);
+    setSaveSuccess(false);
 
     const url = new URL(window.location.href);
     url.searchParams.delete("id");
@@ -673,6 +1045,78 @@ function ChatContent() {
                     </div>
                 )}
 
+                {/* Save to Knowledge Base Button */}
+                {conversationId && messages.length > 0 && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={saveToKnowledgeBase}
+                        disabled={savingToKB || (saveStatus !== null && !saveStatus.hasUnsavedMessages)}
+                        className={`${
+                            saveSuccess
+                                ? "border-green-500 text-green-600"
+                                : saveStatus && !saveStatus.hasUnsavedMessages
+                                    ? "border-green-500 text-green-600"
+                                    : ""
+                        }`}
+                        title={
+                          saveStatus?.neverSaved
+                              ? "Save conversation to Knowledge Base"
+                              : saveStatus?.hasUnsavedMessages
+                                  ? `${saveStatus.unsavedMessageCount} new messages to save`
+                                  : "Conversation saved to Knowledge Base"
+                        }
+                    >
+                      {savingToKB ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                      ) : saveSuccess ? (
+                          <>
+                            <BookmarkCheck className="w-4 h-4" />
+                            Saved!
+                          </>
+                      ) : saveStatus && !saveStatus.hasUnsavedMessages ? (
+                          <>
+                            <BookmarkCheck className="w-4 h-4" />
+                            Saved
+                          </>
+                      ) : saveStatus?.hasUnsavedMessages && !saveStatus?.neverSaved ? (
+                          <>
+                            <BookmarkPlus className="w-4 h-4" />
+                            Update ({saveStatus.unsavedMessageCount})
+                          </>
+                      ) : (
+                          <>
+                            <BookmarkPlus className="w-4 h-4" />
+                            Save to KB
+                          </>
+                      )}
+                    </Button>
+                )}
+
+                {/* Voice Mode Toggle */}
+                <Button
+                    variant={voiceMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleVoiceMode}
+                    className={voiceMode ? "bg-primary-red hover:bg-primary-red/90" : ""}
+                    title={voiceMode ? "Voice mode ON (3x message cost)" : "Enable voice mode"}
+                >
+                  {voiceMode ? (
+                      <>
+                        <Volume2 className="w-4 h-4" />
+                        Voice ON
+                      </>
+                  ) : (
+                      <>
+                        <VolumeX className="w-4 h-4" />
+                        Voice
+                      </>
+                  )}
+                </Button>
+
                 <Button variant="outline" size="sm" onClick={startNewConversation}>
                   <Plus className="w-4 h-4" />
                   New Chat
@@ -785,6 +1229,45 @@ function ChatContent() {
           {/* Input */}
           <div className="flex-shrink-0 border-t border-neutral-200 bg-white p-4">
             <div className="max-w-3xl mx-auto">
+              {/* Voice Mode Indicator */}
+              {voiceMode && (
+                  <div className="flex items-center justify-center gap-2 mb-3 text-sm">
+                    {isRecording ? (
+                        <div className="flex items-center gap-2 text-red-600 animate-pulse">
+                          <Radio className="w-4 h-4" />
+                          <span>Recording... Click mic to stop</span>
+                        </div>
+                    ) : isTranscribing ? (
+                        <div className="flex items-center gap-2 text-amber-600">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Transcribing...</span>
+                        </div>
+                    ) : isSpeaking ? (
+                        <div className="flex items-center gap-2 text-primary-red">
+                          <Volume2 className="w-4 h-4 animate-pulse" />
+                          <span>Speaking...</span>
+                          <button
+                              onClick={stopAudio}
+                              className="text-xs underline hover:no-underline"
+                          >
+                            Stop
+                          </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-neutral-500">
+                          <Mic className="w-4 h-4" />
+                          <span>Voice mode active (3x message cost)</span>
+                          <button
+                              onClick={() => setAudioEnabled(!audioEnabled)}
+                              className="text-xs underline hover:no-underline"
+                          >
+                            {audioEnabled ? "Mute responses" : "Unmute responses"}
+                          </button>
+                        </div>
+                    )}
+                  </div>
+              )}
+
               <form onSubmit={handleSubmit} className="relative">
                 <textarea
                     ref={inputRef}
@@ -794,16 +1277,49 @@ function ChatContent() {
                     placeholder={
                       usage && !usage.canSendMessage
                           ? "Message limit reached — upgrade to continue"
-                          : `Message ${currentAgent.name}...`
+                          : isRecording
+                              ? "Recording..."
+                              : isTranscribing
+                                  ? "Transcribing..."
+                                  : voiceMode
+                                      ? `Click mic to speak, or type a message...`
+                                      : `Message ${currentAgent.name}...`
                     }
                     rows={1}
-                    disabled={isInputDisabled}
-                    className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isInputDisabled || isRecording || isTranscribing}
+                    className={`w-full resize-none rounded-xl border border-neutral-200 pl-4 py-3 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red disabled:opacity-50 disabled:cursor-not-allowed ${
+                        voiceMode ? "pr-24" : "pr-14"
+                    }`}
                 />
+
+                {/* Voice Recording Button (only in voice mode) */}
+                {voiceMode && (
+                    <Button
+                        type="button"
+                        size="icon"
+                        variant={isRecording ? "default" : "outline"}
+                        onClick={toggleRecording}
+                        disabled={isLoading || isTranscribing || (usage !== null && !usage.canSendMessage)}
+                        className={`absolute right-12 bottom-2 h-9 w-9 ${
+                            isRecording
+                                ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                                : ""
+                        }`}
+                        title={isRecording ? "Stop recording" : "Start recording"}
+                    >
+                      {isRecording ? (
+                          <MicOff className="w-4 h-4" />
+                      ) : (
+                          <Mic className="w-4 h-4" />
+                      )}
+                    </Button>
+                )}
+
+                {/* Send Button */}
                 <Button
                     type="submit"
                     size="icon"
-                    disabled={!input.trim() || isInputDisabled}
+                    disabled={!input.trim() || isInputDisabled || isRecording || isTranscribing}
                     className="absolute right-2 bottom-2 h-9 w-9"
                 >
                   {isLoading ? (
@@ -814,7 +1330,10 @@ function ChatContent() {
                 </Button>
               </form>
               <p className="text-xs text-neutral-400 text-center mt-2">
-                {currentAgent.name} may make mistakes. Verify important information.
+                {voiceMode
+                    ? `Voice messages cost 3x. ${currentAgent.name} will speak responses.`
+                    : `${currentAgent.name} may make mistakes. Verify important information.`
+                }
               </p>
             </div>
           </div>

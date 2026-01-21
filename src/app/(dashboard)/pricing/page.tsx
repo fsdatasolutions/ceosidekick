@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Zap, TrendingUp, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,17 @@ export default function PricingPage() {
     const { usage, loading: usageLoading } = useUsage();
     const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-    const currentTier = (usage?.tier || "free") as TierType;
+    // Safely get current tier - fallback to "free" if not found
+    const rawTier = usage?.tier || "free";
+    const currentTier = (rawTier in TIERS ? rawTier : "free") as TierType;
+    const currentTierConfig = TIERS[currentTier];
+
+    // Debug: log if tier doesn't match (in useEffect to avoid render side effects)
+    useEffect(() => {
+        if (rawTier && !(rawTier in TIERS)) {
+            console.warn(`[Pricing] Unknown tier "${rawTier}" from database. Valid tiers: ${Object.keys(TIERS).join(", ")}`);
+        }
+    }, [rawTier]);
 
     async function handleUpgrade(tierId: string) {
         setCheckoutLoading(tierId);
@@ -28,7 +38,7 @@ export default function PricingPage() {
             const data = await res.json();
 
             if (data.url) {
-                window.location.href = data.url;
+                window.location.assign(data.url);
             } else {
                 console.error("Checkout failed:", data.error);
                 alert("Failed to start checkout. Please try again.");
@@ -53,7 +63,7 @@ export default function PricingPage() {
             const data = await res.json();
 
             if (data.url) {
-                window.location.href = data.url;
+                window.location.assign(data.url);
             } else {
                 console.error("Pack checkout failed:", data.error);
                 alert("Failed to start checkout. Please try again.");
@@ -76,7 +86,7 @@ export default function PricingPage() {
             const data = await res.json();
 
             if (data.url) {
-                window.location.href = data.url;
+                window.location.assign(data.url);
             } else {
                 console.error("Portal failed:", data.error);
                 setCheckoutLoading(null);
@@ -104,7 +114,7 @@ export default function PricingPage() {
                 <p className="text-neutral-600">
                     {currentTier === "free"
                         ? "Upgrade to unlock more messages and features."
-                        : `You're currently on the ${TIERS[currentTier].name} plan.`
+                        : `You're currently on the ${currentTierConfig.name} plan.`
                     }
                 </p>
             </div>

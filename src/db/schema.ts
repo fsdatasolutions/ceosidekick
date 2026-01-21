@@ -284,6 +284,7 @@ export const conversations = pgTable(
         lastMessageAt: timestamp("last_message_at"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),
+        savedToKnowledgeBaseAt: timestamp("saved_to_knowledge_base_at"),
     },
     (table) => [
         index("conversations_user_id_idx").on(table.userId),

@@ -62,6 +62,11 @@ export async function getUserSubscription(userId: string) {
 export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof monthlyUsage.$inferSelect> {
     const period = getCurrentPeriod();
 
+    // Get user's subscription to determine limit
+    const subscription = await getUserSubscription(userId);
+    const tier = getTier(subscription?.tier || "free");
+    const currentTierLimit = tier.messagesPerMonth;
+
     // Try to get existing record
     const existing = await db
         .select()
@@ -73,12 +78,24 @@ export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof mo
         .limit(1);
 
     if (existing[0]) {
+        // Sync the limit if tier has changed (e.g., user upgraded)
+        if (existing[0].messagesLimit !== currentTierLimit) {
+            console.log(`[Usage] Syncing message limit: ${existing[0].messagesLimit} -> ${currentTierLimit} for user ${userId}`);
+            const [updated] = await db
+                .update(monthlyUsage)
+                .set({
+                    messagesLimit: currentTierLimit,
+                    updatedAt: new Date(),
+                })
+                .where(and(
+                    eq(monthlyUsage.userId, userId),
+                    eq(monthlyUsage.period, period)
+                ))
+                .returning();
+            return updated;
+        }
         return existing[0];
     }
-
-    // Get user's subscription to determine limit
-    const subscription = await getUserSubscription(userId);
-    const tier = getTier(subscription?.tier || "free");
 
     // Create new monthly usage record
     const [newUsage] = await db
@@ -87,7 +104,7 @@ export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof mo
             userId,
             period,
             messagesUsed: 0,
-            messagesLimit: tier.messagesPerMonth,
+            messagesLimit: currentTierLimit,
             bonusMessages: 0,
         })
         .returning();
@@ -130,13 +147,16 @@ export async function getUserUsage(userId: string): Promise<UsageInfo> {
 // CHECK IF USER CAN SEND MESSAGE
 // ===========================================
 
-export async function checkMessageAllowance(userId: string): Promise<UsageCheckResult> {
+export async function checkMessageAllowance(userId: string, messageCost: number = 1): Promise<UsageCheckResult> {
     const usage = await getUserUsage(userId);
 
-    if (!usage.canSendMessage) {
+    // Check if user has enough messages for this cost
+    if (usage.remaining < messageCost) {
         return {
             allowed: false,
-            reason: "You've reached your monthly message limit. Upgrade your plan or purchase a message pack to continue.",
+            reason: messageCost > 1
+                ? `Voice messages cost ${messageCost} credits. You have ${usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`
+                : "You've reached your monthly message limit. Upgrade your plan or purchase a message pack to continue.",
             usage,
         };
     }
@@ -151,17 +171,17 @@ export async function checkMessageAllowance(userId: string): Promise<UsageCheckR
 // INCREMENT MESSAGE USAGE
 // ===========================================
 
-export async function incrementMessageUsage(userId: string): Promise<UsageInfo> {
+export async function incrementMessageUsage(userId: string, amount: number = 1): Promise<UsageInfo> {
     const period = getCurrentPeriod();
 
     // Ensure usage record exists
     await getOrCreateMonthlyUsage(userId);
 
-    // Increment the counter
+    // Increment the counter by the specified amount
     await db
         .update(monthlyUsage)
         .set({
-            messagesUsed: sql`${monthlyUsage.messagesUsed} + 1`,
+            messagesUsed: sql`${monthlyUsage.messagesUsed} + ${amount}`,
             updatedAt: new Date(),
         })
         .where(and(
