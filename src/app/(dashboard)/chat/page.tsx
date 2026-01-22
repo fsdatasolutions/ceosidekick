@@ -424,7 +424,7 @@ function ChatContent() {
     setIsSpeaking(false);
   };
 
-  // Process the audio queue - plays sentences in order
+  // Process the audio queue - plays sentences in order with prefetching
   const processAudioQueue = async () => {
     console.log("[Voice] processAudioQueue called:", {
       isProcessing: isProcessingQueueRef.current,
@@ -440,52 +440,72 @@ function ChatContent() {
     setIsSpeaking(true);
     console.log("[Voice] Starting audio queue processing");
 
-    while (audioQueueRef.current.length > 0) {
-      const sentence = audioQueueRef.current.shift();
-      if (!sentence) continue;
+    let nextAudioPromise: Promise<{ blob: Blob; sentence: string } | null> | null = null;
 
-      console.log("[Voice] Synthesizing:", sentence.slice(0, 50));
-
+    // Helper to fetch audio for a sentence
+    const fetchAudio = async (sentence: string): Promise<{ blob: Blob; sentence: string } | null> => {
       try {
         const res = await fetch('/api/voice/synthesize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: sentence, agent: agentRef.current }),
         });
-
-        if (!res.ok) {
-          console.error('[Voice] Synthesis failed for sentence');
-          continue;
-        }
-
-        const audioBlob = await res.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        console.log("[Voice] Playing audio");
-
-        // Play and wait for completion
-        await new Promise<void>((resolve) => {
-          const audio = new Audio(audioUrl);
-          audio.playbackRate = playbackSpeedRef.current; // Apply speed setting from ref
-          audioRef.current = audio;
-
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            console.log("[Voice] Audio segment finished");
-            resolve();
-          };
-
-          audio.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            console.error("[Voice] Audio playback error");
-            resolve();
-          };
-
-          audio.play().catch(() => resolve());
-        });
-      } catch (err) {
-        console.error("[Voice] Queue processing error:", err);
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return { blob, sentence };
+      } catch {
+        return null;
       }
+    };
+
+    while (audioQueueRef.current.length > 0 || nextAudioPromise) {
+      let audioData: { blob: Blob; sentence: string } | null = null;
+
+      // Use prefetched audio if available, otherwise fetch now
+      if (nextAudioPromise) {
+        audioData = await nextAudioPromise;
+        nextAudioPromise = null;
+      } else {
+        const sentence = audioQueueRef.current.shift();
+        if (!sentence) continue;
+        console.log("[Voice] Synthesizing:", sentence.slice(0, 50));
+        audioData = await fetchAudio(sentence);
+      }
+
+      if (!audioData) continue;
+
+      // Start prefetching next audio while this one plays
+      if (audioQueueRef.current.length > 0) {
+        const nextSentence = audioQueueRef.current.shift();
+        if (nextSentence) {
+          console.log("[Voice] Prefetching next:", nextSentence.slice(0, 50));
+          nextAudioPromise = fetchAudio(nextSentence);
+        }
+      }
+
+      const audioUrl = URL.createObjectURL(audioData.blob);
+      console.log("[Voice] Playing audio");
+
+      // Play and wait for completion
+      await new Promise<void>((resolve) => {
+        const audio = new Audio(audioUrl);
+        audio.playbackRate = playbackSpeedRef.current;
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          console.log("[Voice] Audio segment finished");
+          resolve();
+        };
+
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          console.error("[Voice] Audio playback error");
+          resolve();
+        };
+
+        audio.play().catch(() => resolve());
+      });
     }
 
     isProcessingQueueRef.current = false;
