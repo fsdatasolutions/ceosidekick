@@ -9,7 +9,6 @@ import {
     X,
     LayoutDashboard,
     MessageSquare,
-    BookOpen,
     Settings,
     Star,
     CreditCard,
@@ -17,6 +16,7 @@ import {
     Eye,
     FileText,
     AlertCircle,
+    FolderOpen,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -37,8 +37,8 @@ interface NavItem {
 const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
-    { icon: FileText, label: "Documents", href: "/documents" },
-    { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
+    { icon: FileText, label: "Templates", href: "/documents" },
+    { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
 ];
 
@@ -178,10 +178,6 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             ) : (
                                 <Menu className="w-6 h-6 text-neutral-700" />
                             )}
-                            {/* Indicator dot on hamburger menu */}
-                            {settingsIncomplete && !isCheckingSettings && !isOpen && (
-                                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
-                            )}
                         </button>
                     </div>
                 </div>
@@ -190,19 +186,19 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
             {/* Backdrop */}
             {isOpen && (
                 <div
-                    className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                    className="md:hidden fixed inset-0 bg-black/20 z-40"
                     onClick={() => setIsOpen(false)}
                 />
             )}
 
-            {/* Slide-out Sidebar */}
+            {/* Slide-out Menu */}
             <aside
-                className={`md:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col ${
-                    isOpen ? "translate-x-0" : "-translate-x-full"
+                className={`md:hidden fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+                    isOpen ? "translate-x-0" : "translate-x-full"
                 }`}
             >
-                {/* Logo */}
-                <div className="p-6 border-b border-neutral-200">
+                {/* Menu Header */}
+                <div className="p-4 border-b border-neutral-200">
                     <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
                         <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20">
                             <img

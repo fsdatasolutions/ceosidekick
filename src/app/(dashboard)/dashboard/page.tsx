@@ -33,6 +33,7 @@ async function getSchema() {
   return { conversations, messages, documents, userSettings };
 }
 
+// Agents list WITHOUT Knowledge Base (it's now a feature, not a separate agent)
 const agents = [
   {
     id: "technology",
@@ -75,13 +76,6 @@ const agents = [
     subtitle: "Revenue & Deals",
     description: "Sales strategy and pipeline management",
     href: "/chat?agent=sales",
-  },
-  {
-    id: "knowledge",
-    name: "Knowledge Base",
-    subtitle: "Company AI",
-    description: "Ask questions about your uploaded documents",
-    href: "/chat?agent=knowledge",
   },
   {
     id: "content",
@@ -422,7 +416,7 @@ export default async function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-neutral-900">{documentCount}</p>
-              <p className="text-sm text-neutral-500">Documents Indexed</p>
+              <p className="text-sm text-neutral-500">Documents in Library</p>
             </div>
           </div>
         </div>

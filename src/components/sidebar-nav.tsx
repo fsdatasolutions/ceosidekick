@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     MessageSquare,
-    BookOpen,
     Settings,
     Star,
     CreditCard,
@@ -15,6 +14,7 @@ import {
     Eye,
     FileText,
     AlertCircle,
+    FolderOpen,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -35,8 +35,8 @@ interface NavItem {
 const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
-    { icon: FileText, label: "Documents", href: "/documents" },
-    { icon: BookOpen, label: "Knowledge Base", href: "/knowledge-base" },
+    { icon: FileText, label: "Templates", href: "/documents" },
+    { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
 ];
 

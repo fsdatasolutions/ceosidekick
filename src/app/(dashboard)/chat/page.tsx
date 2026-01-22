@@ -29,6 +29,53 @@ import {
   Radio,
 } from "lucide-react";
 
+// Web Speech API type declarations
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionConstructor {
+  new(): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 type AgentType = "technology" | "coach" | "legal" | "hr" | "marketing" | "sales" | "knowledge" | "content";
 
 interface Message {
@@ -221,6 +268,8 @@ function ChatContent() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // 0.5x to 2x
+  const [liveTranscript, setLiveTranscript] = useState(""); // Real-time transcription
+  const liveTranscriptRef = useRef(""); // Ref for closure access
   const playbackSpeedRef = useRef(1.0); // Ref to track current speed for closures
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -228,6 +277,7 @@ function ChatContent() {
   const audioQueueRef = useRef<string[]>([]); // Queue of sentences to speak
   const isProcessingQueueRef = useRef(false);
   const sentenceBufferRef = useRef(""); // Buffer for incomplete sentences
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null); // Web Speech API
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -316,7 +366,7 @@ function ChatContent() {
   // VOICE MODE FUNCTIONS
   // ============================================
 
-  // Start voice recording
+  // Start voice recording with live transcription
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -326,6 +376,46 @@ function ChatContent() {
 
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      setLiveTranscript(""); // Clear previous transcript
+      liveTranscriptRef.current = "";
+
+      // Start Web Speech API for live transcription
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Update live transcript (combines final + interim)
+          const fullTranscript = finalTranscript + interimTranscript;
+          setLiveTranscript(fullTranscript);
+          liveTranscriptRef.current = fullTranscript;
+          setInput(fullTranscript);
+        };
+
+        recognition.onerror = (event) => {
+          console.log("[Voice] Speech recognition error:", event.error);
+          // Don't show error to user - we'll fall back to Whisper
+        };
+
+        recognition.start();
+        speechRecognitionRef.current = recognition;
+        console.log("[Voice] Live transcription started");
+      }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -334,16 +424,30 @@ function ChatContent() {
       };
 
       mediaRecorder.onstop = async () => {
+        // Stop speech recognition
+        if (speechRecognitionRef.current) {
+          speechRecognitionRef.current.stop();
+          speechRecognitionRef.current = null;
+        }
+
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
 
-        // Create audio blob
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: mediaRecorder.mimeType
-        });
-
-        // Transcribe the audio
-        await transcribeAudio(audioBlob);
+        // If we have live transcript, use it; otherwise fall back to Whisper
+        const currentTranscript = liveTranscriptRef.current.trim();
+        if (currentTranscript && currentTranscript.length > 2) {
+          console.log("[Voice] Using live transcript:", currentTranscript.slice(0, 50));
+          setInput(currentTranscript);
+          submitVoiceMessage(currentTranscript);
+          setLiveTranscript("");
+          liveTranscriptRef.current = "";
+        } else {
+          // Fall back to Whisper for better accuracy
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: mediaRecorder.mimeType
+          });
+          await transcribeAudio(audioBlob);
+        }
       };
 
       mediaRecorder.start();
@@ -373,10 +477,11 @@ function ChatContent() {
     }
   }, [isRecording, startRecording, stopRecording]);
 
-  // Transcribe audio using Whisper API
+  // Transcribe audio using Whisper API (fallback for better accuracy)
   const transcribeAudio = async (audioBlob: Blob) => {
-    console.log("[Voice] Starting transcription, blob size:", audioBlob.size);
+    console.log("[Voice] Starting Whisper transcription, blob size:", audioBlob.size);
     setIsTranscribing(true);
+    setLiveTranscript(""); // Clear live transcript
 
     try {
       const formData = new FormData();
@@ -424,106 +529,169 @@ function ChatContent() {
     setIsSpeaking(false);
   };
 
-  // Process the audio queue - plays sentences in order with prefetching
+  // Process the audio queue - plays sentences in order with aggressive prefetching
   const processAudioQueue = async () => {
-    console.log("[Voice] processAudioQueue called:", {
-      isProcessing: isProcessingQueueRef.current,
-      queueLength: audioQueueRef.current.length
-    });
+    // Don't start if already processing
+    if (isProcessingQueueRef.current) {
+      return;
+    }
 
-    // Don't start if already processing or queue is empty
-    if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) {
+    // Start even with just 1 sentence - don't wait for queue to fill
+    if (audioQueueRef.current.length === 0) {
       return;
     }
 
     isProcessingQueueRef.current = true;
     setIsSpeaking(true);
-    console.log("[Voice] Starting audio queue processing");
+    console.log("[Voice] Starting audio queue processing immediately");
 
-    let nextAudioPromise: Promise<{ blob: Blob; sentence: string } | null> | null = null;
+    // Prefetch map to store promises for upcoming sentences
+    const prefetchCache = new Map<string, Promise<Blob | null>>();
 
     // Helper to fetch audio for a sentence
-    const fetchAudio = async (sentence: string): Promise<{ blob: Blob; sentence: string } | null> => {
-      try {
-        const res = await fetch('/api/voice/synthesize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: sentence, agent: agentRef.current }),
-        });
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return { blob, sentence };
-      } catch {
-        return null;
+    const fetchAudio = async (sentence: string): Promise<Blob | null> => {
+      // Check cache first
+      if (prefetchCache.has(sentence)) {
+        return prefetchCache.get(sentence)!;
       }
+
+      const promise = (async () => {
+        try {
+          const res = await fetch('/api/voice/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: sentence, agent: agentRef.current }),
+          });
+          if (!res.ok) return null;
+          return await res.blob();
+        } catch {
+          return null;
+        }
+      })();
+
+      prefetchCache.set(sentence, promise);
+      return promise;
     };
 
-    while (audioQueueRef.current.length > 0 || nextAudioPromise) {
-      let audioData: { blob: Blob; sentence: string } | null = null;
-
-      // Use prefetched audio if available, otherwise fetch now
-      if (nextAudioPromise) {
-        audioData = await nextAudioPromise;
-        nextAudioPromise = null;
-      } else {
-        const sentence = audioQueueRef.current.shift();
-        if (!sentence) continue;
-        console.log("[Voice] Synthesizing:", sentence.slice(0, 50));
-        audioData = await fetchAudio(sentence);
-      }
-
-      if (!audioData) continue;
-
-      // Start prefetching next audio while this one plays
-      if (audioQueueRef.current.length > 0) {
-        const nextSentence = audioQueueRef.current.shift();
-        if (nextSentence) {
-          console.log("[Voice] Prefetching next:", nextSentence.slice(0, 50));
-          nextAudioPromise = fetchAudio(nextSentence);
-        }
-      }
-
-      const audioUrl = URL.createObjectURL(audioData.blob);
-      console.log("[Voice] Playing audio");
-
-      // Play and wait for completion
-      await new Promise<void>((resolve) => {
-        const audio = new Audio(audioUrl);
-        audio.playbackRate = playbackSpeedRef.current;
-        audioRef.current = audio;
-
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          console.log("[Voice] Audio segment finished");
-          resolve();
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          console.error("[Voice] Audio playback error");
-          resolve();
-        };
-
-        audio.play().catch(() => resolve());
-      });
+    // Start fetching first sentence immediately
+    let currentSentence = audioQueueRef.current.shift();
+    if (!currentSentence) {
+      isProcessingQueueRef.current = false;
+      setIsSpeaking(false);
+      return;
     }
 
+    console.log("[Voice] Fetching first sentence immediately:", currentSentence.slice(0, 50));
+    let currentAudioPromise = fetchAudio(currentSentence);
+
+    while (currentSentence || audioQueueRef.current.length > 0) {
+      // If we don't have a current sentence, get the next one
+      if (!currentSentence) {
+        currentSentence = audioQueueRef.current.shift();
+        if (!currentSentence) break;
+        currentAudioPromise = fetchAudio(currentSentence);
+      }
+
+      // Start prefetching next 2 sentences while waiting
+      const prefetchSentences = audioQueueRef.current.slice(0, 2);
+      prefetchSentences.forEach(s => {
+        if (!prefetchCache.has(s)) {
+          console.log("[Voice] Prefetching:", s.slice(0, 40));
+          fetchAudio(s);
+        }
+      });
+
+      // Wait for current audio
+      const audioBlob = await currentAudioPromise;
+
+      if (audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        console.log("[Voice] Playing:", currentSentence.slice(0, 50));
+
+        // Play and wait for completion
+        await new Promise<void>((resolve) => {
+          const audio = new Audio(audioUrl);
+          audio.playbackRate = playbackSpeedRef.current;
+          audioRef.current = audio;
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            resolve();
+          };
+
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            console.error("[Voice] Audio playback error");
+            resolve();
+          };
+
+          audio.play().catch(() => resolve());
+        });
+      }
+
+      // Move to next sentence
+      currentSentence = audioQueueRef.current.shift();
+      if (currentSentence) {
+        // Use prefetched version if available
+        currentAudioPromise = fetchAudio(currentSentence);
+      }
+    }
+
+    prefetchCache.clear();
     isProcessingQueueRef.current = false;
     setIsSpeaking(false);
     console.log("[Voice] Queue processing complete");
   };
 
+  // Clean text for natural speech (remove markdown formatting)
+  const cleanTextForSpeech = (text: string): string => {
+    return text
+        // Remove markdown headers (## Header -> Header)
+        .replace(/^#{1,6}\s+/gm, '')
+        // Remove bold/italic markers (**text** or *text* -> text)
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        // Remove bullet points and list markers
+        .replace(/^[\s]*[-*•]\s+/gm, '')
+        .replace(/^[\s]*\d+\.\s+/gm, '')
+        // Remove code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/`([^`]+)`/g, '$1')
+        // Remove links [text](url) -> text
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        // Remove extra newlines and whitespace
+        .replace(/\n{2,}/g, '. ')
+        .replace(/\n/g, ' ')
+        // Remove multiple spaces
+        .replace(/\s{2,}/g, ' ')
+        // Clean up any leftover markdown artifacts
+        .replace(/[_~]/g, '')
+        .trim();
+  };
+
   // Queue a sentence for TTS and playback
   const queueSentenceForAudio = (sentence: string) => {
+    if (!audioEnabled) return;
+
+    // Clean the sentence for natural speech
+    const cleanedSentence = cleanTextForSpeech(sentence);
+
     console.log("[Voice] Queueing sentence:", {
-      sentence: sentence.slice(0, 50),
-      audioEnabled,
+      original: sentence.slice(0, 50),
+      cleaned: cleanedSentence.slice(0, 50),
       queueLength: audioQueueRef.current.length
     });
-    if (!sentence.trim() || !audioEnabled) return;
-    audioQueueRef.current.push(sentence.trim());
-    // Use setTimeout to break the sync execution and allow state updates
-    setTimeout(() => processAudioQueue(), 0);
+
+    // Skip if cleaned sentence is too short or just punctuation
+    if (!cleanedSentence || cleanedSentence.length < 3 || !/[a-zA-Z]{2,}/.test(cleanedSentence)) {
+      console.log("[Voice] Skipping empty/short sentence");
+      return;
+    }
+
+    audioQueueRef.current.push(cleanedSentence);
+
+    // Start processing immediately - don't wait!
+    processAudioQueue();
   };
 
   // Extract complete sentences from buffer and queue them
@@ -536,9 +704,11 @@ function ChatContent() {
       isFinal
     });
 
-    // Match sentence endings: period, exclamation, question mark, OR newlines (for bullet points)
-    // Also match colons followed by newline (for headers like "## Executive Summary:")
-    const sentenceEndings = /([.!?:])(\s|$|\n)|(\n\n)/g;
+    // Match natural sentence endings for speech:
+    // - Period, exclamation, question mark followed by space/newline/end
+    // - Double newlines (paragraph breaks)
+    // But NOT colons (they usually continue into a list)
+    const sentenceEndings = /([.!?])(?:\s|$|\n)|(\n\n)/g;
     let lastIndex = 0;
     let match;
     const sentences: string[] = [];
