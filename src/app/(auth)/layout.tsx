@@ -39,11 +39,11 @@ export default function AuthLayout({
           </blockquote>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold">
-              SC
+              SM
             </div>
             <div>
-              <p className="text-white font-medium">Sarah Chen</p>
-              <p className="text-neutral-400 text-sm">Founder, TechStart Solutions</p>
+              <p className="text-white font-medium">Shannon McGill</p>
+              <p className="text-neutral-400 text-sm">Founder, Full Stack Data Solutions Solutions</p>
             </div>
           </div>
         </div>
