@@ -192,6 +192,7 @@ function ChatContent() {
   const conversationIdParam = searchParams.get("id");
 
   const [agent, setAgent] = useState<AgentType>(agentParam || "technology");
+  const agentRef = useRef<AgentType>(agent); // Ref to track current agent for closures
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -219,9 +220,14 @@ function ChatContent() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // 0.5x to 2x
+  const playbackSpeedRef = useRef(1.0); // Ref to track current speed for closures
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<string[]>([]); // Queue of sentences to speak
+  const isProcessingQueueRef = useRef(false);
+  const sentenceBufferRef = useRef(""); // Buffer for incomplete sentences
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -233,6 +239,16 @@ function ChatContent() {
   useEffect(() => {
     fetchUsage();
   }, []);
+
+  // Keep agentRef in sync with agent state (for closures)
+  useEffect(() => {
+    agentRef.current = agent;
+  }, [agent]);
+
+  // Keep playbackSpeedRef in sync with playbackSpeed state (for closures)
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
 
   const fetchUsage = async () => {
     try {
@@ -359,6 +375,7 @@ function ChatContent() {
 
   // Transcribe audio using Whisper API
   const transcribeAudio = async (audioBlob: Blob) => {
+    console.log("[Voice] Starting transcription, blob size:", audioBlob.size);
     setIsTranscribing(true);
 
     try {
@@ -370,20 +387,22 @@ function ChatContent() {
         body: formData,
       });
 
+      console.log("[Voice] Transcription response status:", res.status);
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Transcription failed');
       }
 
       const data = await res.json();
+      console.log("[Voice] Transcription result:", data.text?.slice(0, 50));
 
       if (data.text) {
         // Set the transcribed text as input and submit
         setInput(data.text);
         // Auto-submit the transcribed text
-        setTimeout(() => {
-          submitVoiceMessage(data.text);
-        }, 100);
+        console.log("[Voice] About to call submitVoiceMessage");
+        submitVoiceMessage(data.text);
       }
     } catch (err) {
       console.error("[Voice] Transcription error:", err);
@@ -393,8 +412,151 @@ function ChatContent() {
     }
   };
 
+  // Clear audio queue (when stopping or switching)
+  const clearAudioQueue = () => {
+    audioQueueRef.current = [];
+    sentenceBufferRef.current = "";
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    isProcessingQueueRef.current = false;
+    setIsSpeaking(false);
+  };
+
+  // Process the audio queue - plays sentences in order
+  const processAudioQueue = async () => {
+    console.log("[Voice] processAudioQueue called:", {
+      isProcessing: isProcessingQueueRef.current,
+      queueLength: audioQueueRef.current.length
+    });
+
+    // Don't start if already processing or queue is empty
+    if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+    setIsSpeaking(true);
+    console.log("[Voice] Starting audio queue processing");
+
+    while (audioQueueRef.current.length > 0) {
+      const sentence = audioQueueRef.current.shift();
+      if (!sentence) continue;
+
+      console.log("[Voice] Synthesizing:", sentence.slice(0, 50));
+
+      try {
+        const res = await fetch('/api/voice/synthesize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: sentence, agent: agentRef.current }),
+        });
+
+        if (!res.ok) {
+          console.error('[Voice] Synthesis failed for sentence');
+          continue;
+        }
+
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        console.log("[Voice] Playing audio");
+
+        // Play and wait for completion
+        await new Promise<void>((resolve) => {
+          const audio = new Audio(audioUrl);
+          audio.playbackRate = playbackSpeedRef.current; // Apply speed setting from ref
+          audioRef.current = audio;
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            console.log("[Voice] Audio segment finished");
+            resolve();
+          };
+
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            console.error("[Voice] Audio playback error");
+            resolve();
+          };
+
+          audio.play().catch(() => resolve());
+        });
+      } catch (err) {
+        console.error("[Voice] Queue processing error:", err);
+      }
+    }
+
+    isProcessingQueueRef.current = false;
+    setIsSpeaking(false);
+    console.log("[Voice] Queue processing complete");
+  };
+
+  // Queue a sentence for TTS and playback
+  const queueSentenceForAudio = (sentence: string) => {
+    console.log("[Voice] Queueing sentence:", {
+      sentence: sentence.slice(0, 50),
+      audioEnabled,
+      queueLength: audioQueueRef.current.length
+    });
+    if (!sentence.trim() || !audioEnabled) return;
+    audioQueueRef.current.push(sentence.trim());
+    // Use setTimeout to break the sync execution and allow state updates
+    setTimeout(() => processAudioQueue(), 0);
+  };
+
+  // Extract complete sentences from buffer and queue them
+  const processSentenceBuffer = (newContent: string, isFinal: boolean = false) => {
+    sentenceBufferRef.current += newContent;
+
+    console.log("[Voice] Buffer update:", {
+      newContent: newContent.slice(0, 50),
+      bufferLength: sentenceBufferRef.current.length,
+      isFinal
+    });
+
+    // Match sentence endings: period, exclamation, question mark, OR newlines (for bullet points)
+    // Also match colons followed by newline (for headers like "## Executive Summary:")
+    const sentenceEndings = /([.!?:])(\s|$|\n)|(\n\n)/g;
+    let lastIndex = 0;
+    let match;
+    const sentences: string[] = [];
+
+    while ((match = sentenceEndings.exec(sentenceBufferRef.current)) !== null) {
+      const sentenceEnd = match.index + (match[1] ? 1 : match[0].length);
+      const sentence = sentenceBufferRef.current.slice(lastIndex, sentenceEnd).trim();
+
+      // Only queue sentences with actual words (not just punctuation/formatting)
+      // and at least 5 characters to avoid tiny fragments
+      if (sentence.length > 5 && /[a-zA-Z]{2,}/.test(sentence)) {
+        console.log("[Voice] Sentence detected:", sentence.slice(0, 80));
+        sentences.push(sentence);
+      }
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Queue all detected sentences
+    sentences.forEach(s => queueSentenceForAudio(s));
+
+    // Keep the incomplete part in the buffer
+    sentenceBufferRef.current = sentenceBufferRef.current.slice(lastIndex);
+
+    // If final, flush any remaining content
+    if (isFinal && sentenceBufferRef.current.trim().length > 5) {
+      const remaining = sentenceBufferRef.current.trim();
+      if (/[a-zA-Z]{2,}/.test(remaining)) {
+        console.log("[Voice] Final flush:", remaining.slice(0, 80));
+        queueSentenceForAudio(remaining);
+      }
+      sentenceBufferRef.current = "";
+    }
+  };
+
   // Submit voice message (with voice mode flag)
   const submitVoiceMessage = async (text: string) => {
+    console.log("[Voice] submitVoiceMessage called:", { text: text.slice(0, 50), audioEnabled, voiceMode });
     if (!text.trim() || isLoading) return;
 
     // Check usage
@@ -437,7 +599,7 @@ function ChatContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
-          agent,
+          agent: agentRef.current,
           conversationId,
           voiceMode: true, // Flag for voice mode pricing
         }),
@@ -464,6 +626,14 @@ function ChatContent() {
       let fullContent = "";
       let newConversationId: string | null = null;
 
+      // Clear any existing audio queue and reset buffer for new response
+      if (audioEnabled) {
+        console.log("[Voice] Clearing audio queue before streaming");
+        clearAudioQueue();
+      }
+
+      console.log("[Voice] Starting to read response stream");
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -489,6 +659,12 @@ function ChatContent() {
                             : msg
                     )
                 );
+
+                // Stream sentences to audio as they complete
+                console.log("[Voice] Content received, audioEnabled:", audioEnabled);
+                if (audioEnabled) {
+                  processSentenceBuffer(data.content, false);
+                }
               }
 
               if (data.type === "usage" && data.usage) {
@@ -496,9 +672,9 @@ function ChatContent() {
               }
 
               if (data.type === "done") {
-                // Synthesize speech for the response if audio is enabled
-                if (audioEnabled && fullContent) {
-                  synthesizeAndPlay(fullContent);
+                // Flush any remaining content in the sentence buffer
+                if (audioEnabled) {
+                  processSentenceBuffer("", true);
                 }
               }
             } catch {}
@@ -518,65 +694,23 @@ function ChatContent() {
     }
   };
 
-  // Synthesize text to speech and play it
-  const synthesizeAndPlay = async (text: string) => {
-    if (!text.trim()) return;
-
-    setIsSpeaking(true);
-
-    try {
-      const res = await fetch('/api/voice/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, agent }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Speech synthesis failed');
-      }
-
-      const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      // Create and play audio
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        console.error("[Voice] Audio playback error");
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.error("[Voice] Synthesis error:", err);
-      setIsSpeaking(false);
-    }
+  // Stop audio playback and clear queue
+  const stopAudio = () => {
+    clearAudioQueue();
   };
 
-  // Stop audio playback
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsSpeaking(false);
-    }
-  }, []);
-
   // Toggle voice mode
-  const toggleVoiceMode = useCallback(() => {
+  const toggleVoiceMode = () => {
     setVoiceMode(prev => !prev);
     // Stop any ongoing recording when disabling voice mode
     if (voiceMode && isRecording) {
       stopRecording();
     }
-  }, [voiceMode, isRecording, stopRecording]);
+    // Clear audio queue when toggling off
+    if (voiceMode) {
+      clearAudioQueue();
+    }
+  };
 
   // Close agent selector when clicking outside
   useEffect(() => {
@@ -753,14 +887,23 @@ function ChatContent() {
 
     setIsLoading(true);
 
+    // Clear audio queue if voice mode is on
+    if (voiceMode && audioEnabled) {
+      console.log("[Voice] Voice mode active, clearing queue");
+      clearAudioQueue();
+    } else {
+      console.log("[Voice] Voice mode check:", { voiceMode, audioEnabled });
+    }
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
-          agent,
+          agent: agentRef.current,
           conversationId,
+          voiceMode, // Send voice mode flag for pricing
         }),
       });
 
@@ -820,11 +963,24 @@ function ChatContent() {
                             : msg
                     )
                 );
+
+                // Stream sentences to audio as they complete (when voice mode is on)
+                if (voiceMode && audioEnabled) {
+                  console.log("[Voice] Processing content chunk for audio");
+                  processSentenceBuffer(data.content, false);
+                }
               }
 
               // Handle usage update from stream
               if (data.type === "usage" && data.usage) {
                 setUsage(data.usage);
+              }
+
+              // Handle completion - flush remaining audio
+              if (data.type === "done") {
+                if (voiceMode && audioEnabled) {
+                  processSentenceBuffer("", true);
+                }
               }
 
               // Handle errors
@@ -1265,6 +1421,20 @@ function ChatContent() {
                           >
                             {audioEnabled ? "Mute responses" : "Unmute responses"}
                           </button>
+                          <span className="text-neutral-300">|</span>
+                          <select
+                              value={playbackSpeed}
+                              onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
+                              className="text-xs bg-transparent border border-neutral-300 rounded px-1 py-0.5 cursor-pointer hover:border-neutral-400"
+                              title="Playback speed"
+                          >
+                            <option value="0.75">0.75x</option>
+                            <option value="1">1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2">2x</option>
+                          </select>
                         </div>
                     )}
                   </div>
