@@ -11,6 +11,7 @@ export interface TierConfig {
   messagesPerMonth: number;
   documentStorageMB: number;
   features: string[];
+  description?: string; // For marketing/landing pages
   isPopular?: boolean;
   isComingSoon?: boolean;
   stripePriceId?: string; // Set in env vars for production
@@ -36,10 +37,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Free",
     price: 0,
     priceDisplay: "$0",
-    messagesPerMonth: 50,
+    messagesPerMonth: 30,
     documentStorageMB: 10,
+    description: "Perfect for trying out CEO Sidekick",
     features: [
-      "50 messages/month",
+      "30 messages/month",
       "All 8 AI advisors",
       "10MB document storage",
       "Email support",
@@ -50,10 +52,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "PowerUser",
     price: 2900, // $29.00
     priceDisplay: "$29",
-    messagesPerMonth: 1000,
+    messagesPerMonth: 250,
     documentStorageMB: 100,
+    description: "For solo entrepreneurs getting serious",
     features: [
-      "1,000 messages/month",
+      "250 messages/month",
       "All 8 AI advisors",
       "100MB document storage",
       "Priority email support",
@@ -66,10 +69,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Pro",
     price: 19900, // $199.00
     priceDisplay: "$199",
-    messagesPerMonth: 10000,
+    messagesPerMonth: 2500,
     documentStorageMB: 500,
+    description: "For growing businesses that need more",
     features: [
-      "10,000 messages/month",
+      "2,500 messages/month",
       "All 8 AI advisors",
       "500MB document storage",
       "Priority support",
@@ -85,6 +89,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     priceDisplay: "$500",
     messagesPerMonth: 15000,
     documentStorageMB: 2048, // 2GB
+    description: "Custom solutions for teams",
     features: [
       "15,000 messages/month",
       "All 8 AI advisors",
@@ -170,4 +175,45 @@ export function getAvailableTiers(includeComingSoon = false): TierConfig[] {
   return Object.values(TIERS).filter(
       (tier) => includeComingSoon || !tier.isComingSoon
   );
+}
+
+// ===========================================
+// LANDING PAGE HELPERS
+// ===========================================
+
+// Convert tier config to landing page plan format
+export interface LandingPagePlan {
+  name: string;
+  description: string;
+  price: string;
+  period: string;
+  features: string[];
+  cta: string;
+  ctaVariant: "default" | "outline" | "secondary";
+  popular: boolean;
+  comingSoon: boolean;
+  tierId: TierType;
+}
+
+export function getTiersForLandingPage(): LandingPagePlan[] {
+  return Object.values(TIERS).map((tier) => ({
+    name: tier.name,
+    description: tier.description || "",
+    price: tier.priceDisplay,
+    period: tier.price === 0 ? "forever" : "/month",
+    features: tier.features,
+    cta: tier.isComingSoon
+        ? "Coming Soon"
+        : tier.price === 0
+            ? "Get Started"
+            : "Start Free Trial",
+    ctaVariant: tier.isPopular
+        ? "default"
+        : tier.isComingSoon
+            ? "secondary"
+            : "outline",
+    popular: tier.isPopular || false,
+    comingSoon: tier.isComingSoon || false,
+    tierId: tier.id,
+  }));
 }
