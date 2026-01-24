@@ -147,13 +147,14 @@ export default function ProductDemo() {
 // ============ Individual Screen Components ============
 
 function DashboardScreen() {
+  // Updated: Removed Knowledge Base, now showing 6 agents without it
   const agents = [
     { id: "technology", name: "Technology Partner", subtitle: "Virtual CTO/CIO" },
     { id: "coach", name: "Executive Coach", subtitle: "Leadership Partner" },
     { id: "legal", name: "Legal Advisor", subtitle: "Contract & Compliance" },
     { id: "hr", name: "HR Partner", subtitle: "People Operations" },
-    { id: "knowledge", name: "Knowledge Base", subtitle: "Company AI" },
-    { id: "content", name: "Content Engine", subtitle: "Thought Leadership" },
+    { id: "marketing", name: "Marketing Partner", subtitle: "Growth & Brand" },
+    { id: "sales", name: "Sales Partner", subtitle: "Revenue & Deals" },
   ];
 
   return (
@@ -198,32 +199,39 @@ function SettingsIntroScreen() {
           <h1 className="text-xl font-bold text-neutral-900">Settings</h1>
         </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-xl border border-neutral-200 p-6 max-w-lg">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-primary-red-light flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-primary-red" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-neutral-900 mb-1">Personalize Your Experience</h2>
-              <p className="text-sm text-neutral-500">
-                Tell us about your business so we can provide more relevant advice
-              </p>
+        {/* Settings Cards */}
+        <div className="space-y-4">
+          {/* Personalization Card - Highlighted */}
+          <div className="bg-white rounded-xl p-5 border-2 border-primary-red shadow-lg animate-pulse-border">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary-red/10 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-primary-red" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-neutral-900 mb-1">Personalize Your AI Advisors</h3>
+                <p className="text-sm text-neutral-600 mb-3">
+                  Add your business context so all advisors can provide tailored guidance.
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-neutral-100 rounded-full h-2 max-w-[200px]">
+                    <div className="bg-primary-red h-2 rounded-full w-0" />
+                  </div>
+                  <span className="text-sm text-neutral-500">0/4 sections</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4 animate-fade-up" style={{ animationDelay: "200ms" }}>
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
-              <Building2 className="w-5 h-5 text-neutral-400" />
-              <span className="text-neutral-600">Company Information</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
-              <User className="w-5 h-5 text-neutral-400" />
-              <span className="text-neutral-600">Your Role & Goals</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
-              <MessageSquare className="w-5 h-5 text-neutral-400" />
-              <span className="text-neutral-600">Communication Preferences</span>
+          {/* Other Settings */}
+          <div className="bg-white rounded-xl p-4 border border-neutral-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
+                <User className="w-5 h-5 text-neutral-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-neutral-900">Account Settings</h3>
+                <p className="text-sm text-neutral-500">Profile, billing, and preferences</p>
+              </div>
             </div>
           </div>
         </div>
@@ -237,38 +245,49 @@ function SettingsFormScreen() {
         {/* Header */}
         <div className="flex items-center gap-2 mb-6">
           <Settings className="w-5 h-5 text-neutral-600" />
-          <h1 className="text-xl font-bold text-neutral-900">Business Profile</h1>
+          <h1 className="text-xl font-bold text-neutral-900">Business Context</h1>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-xl border border-neutral-200 p-6 max-w-lg">
-          <div className="space-y-4">
-            <div className="animate-fade-up">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Company Name</label>
-              <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-neutral-900">
-                Full Stack Data Solutions
-              </div>
+        <div className="bg-white rounded-xl p-5 border border-neutral-200 space-y-4">
+          {/* Company Info */}
+          <div className="animate-fade-up">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Company Name</label>
+            <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-sm text-neutral-900 animate-typing overflow-hidden whitespace-nowrap">
+              Full Stack Data Solutions
             </div>
+          </div>
 
-            <div className="animate-fade-up" style={{ animationDelay: "100ms" }}>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Industry</label>
-              <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-neutral-900">
-                Data Engineering & Analytics Consulting
-              </div>
+          <div className="animate-fade-up" style={{ animationDelay: "100ms" }}>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Industry</label>
+            <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-sm text-neutral-900">
+              Data Engineering & Analytics Consulting
             </div>
+          </div>
 
-            <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Target Customers</label>
-              <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-neutral-900">
-                Higher Education, Construction, Mid-Market Enterprises
-              </div>
+          <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Target Markets</label>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-primary-red/10 text-primary-red rounded-full text-sm">Higher Education</span>
+              <span className="px-3 py-1 bg-primary-red/10 text-primary-red rounded-full text-sm">Construction</span>
             </div>
+          </div>
 
-            <div className="animate-fade-up" style={{ animationDelay: "300ms" }}>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Average Deal Size</label>
-              <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-neutral-900">
-                $500,000+
-              </div>
+          <div className="animate-fade-up" style={{ animationDelay: "300ms" }}>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Deal Size</label>
+            <div className="px-3 py-2 border border-neutral-200 rounded-lg bg-neutral-50 text-sm text-neutral-900">
+              $500K+ enterprise contracts
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="pt-3 border-t border-neutral-100 animate-fade-up" style={{ animationDelay: "400ms" }}>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-neutral-500">Personalization Progress</span>
+              <span className="font-medium text-primary-red">2/4 sections complete</span>
+            </div>
+            <div className="mt-2 bg-neutral-100 rounded-full h-2">
+              <div className="bg-primary-red h-2 rounded-full w-1/2 transition-all" />
             </div>
           </div>
         </div>
@@ -291,14 +310,14 @@ function ChatStartScreen() {
         </div>
 
         {/* Empty State */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center animate-fade-up">
-            <AgentAvatar agentId="technology" size="lg" className="mx-auto mb-4 w-16 h-16" />
-            <h2 className="font-semibold text-neutral-900 mb-2">How can I help you today?</h2>
-            <p className="text-sm text-neutral-500 max-w-xs">
-              I can help with technology strategy, vendor selection, and digital transformation
-            </p>
-          </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <AgentAvatar agentId="technology" size="xl" className="mb-4 shadow-lg animate-fade-up" />
+          <h2 className="text-xl font-bold text-neutral-900 mb-2 animate-fade-up" style={{ animationDelay: "100ms" }}>
+            How can I help you today?
+          </h2>
+          <p className="text-neutral-500 text-center max-w-sm animate-fade-up" style={{ animationDelay: "200ms" }}>
+            I&apos;m your virtual CTO/CIO, ready to help with technology strategy and digital transformation.
+          </p>
         </div>
 
         {/* Input */}
@@ -382,6 +401,7 @@ function ChatResponseScreen() {
 }
 
 function AgentSwitchScreen() {
+  // Updated: Removed Knowledge Base from agent switcher
   const agents = [
     { id: "technology", name: "Technology Partner", subtitle: "Virtual CTO/CIO", selected: true },
     { id: "coach", name: "Executive Coach", subtitle: "Leadership Partner" },
