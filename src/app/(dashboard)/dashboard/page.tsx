@@ -1,5 +1,6 @@
 // src/app/(dashboard)/dashboard/page.tsx
 // Dashboard with subscription tier and usage tracking
+// Updated to use centralized agent configuration
 
 import Link from "next/link";
 import { auth } from "@/lib/auth";
@@ -19,6 +20,11 @@ import { UsageMeter } from "@/components/ui/usage-meter";
 import { getUserUsage, UsageInfo } from "@/lib/usage";
 import { getTier } from "@/lib/tiers";
 
+// ============================================
+// IMPORT FROM CENTRALIZED CONFIG
+// ============================================
+import { AGENTS, type AgentType } from "@/config/agent-config";
+
 // Lazy load database to avoid build-time errors
 async function getDb() {
   if (!process.env.DATABASE_URL) {
@@ -33,70 +39,28 @@ async function getSchema() {
   return { conversations, messages, documents, userSettings };
 }
 
-// Agents list WITHOUT Knowledge Base (it's now a feature, not a separate agent)
-const agents = [
-  {
-    id: "technology",
-    name: "Technology Partner",
-    subtitle: "Virtual CTO/CIO",
-    description: "Technology strategy and digital transformation",
-    href: "/chat?agent=technology",
-  },
-  {
-    id: "coach",
-    name: "Executive Coach",
-    subtitle: "Leadership Partner",
-    description: "Leadership development and strategic thinking",
-    href: "/chat?agent=coach",
-  },
-  {
-    id: "legal",
-    name: "Legal Advisor",
-    subtitle: "Contract & Compliance",
-    description: "Contract review and compliance guidance",
-    href: "/chat?agent=legal",
-  },
-  {
-    id: "hr",
-    name: "HR Partner",
-    subtitle: "People Operations",
-    description: "Job descriptions and HR policy development",
-    href: "/chat?agent=hr",
-  },
-  {
-    id: "marketing",
-    name: "Marketing Partner",
-    subtitle: "Growth & Brand",
-    description: "Marketing strategy and brand development",
-    href: "/chat?agent=marketing",
-  },
-  {
-    id: "sales",
-    name: "Sales Partner",
-    subtitle: "Revenue & Deals",
-    description: "Sales strategy and pipeline management",
-    href: "/chat?agent=sales",
-  },
-  {
-    id: "content",
-    name: "Content Engine",
-    subtitle: "Thought Leadership",
-    description: "AI-powered content generation",
-    href: "https://ce.ceosidekick.biz",
-    external: true,
-  },
-];
+// ============================================
+// DASHBOARD AGENTS LIST
+// Derived from centralized config
+// ============================================
+const dashboardAgents = Object.values(AGENTS).map((agent) => ({
+  id: agent.id,
+  name: agent.name,
+  subtitle: agent.subtitle,
+  description: agent.description,
+  href: agent.id === "content"
+      ? "https://ce.ceosidekick.biz"  // Content Engine external link
+      : `/chat?agent=${agent.id}`,
+  external: agent.id === "content",
+}));
 
-const agentNames: Record<string, string> = {
-  technology: "Technology Partner",
-  coach: "Executive Coach",
-  legal: "Legal Advisor",
-  hr: "HR Partner",
-  marketing: "Marketing Partner",
-  sales: "Sales Partner",
-  knowledge: "Knowledge Base",
-  content: "Content Engine",
-};
+// ============================================
+// AGENT NAMES LOOKUP
+// Derived from centralized config for conversation display
+// ============================================
+const agentNames: Record<string, string> = Object.fromEntries(
+    Object.values(AGENTS).map((agent) => [agent.id, agent.name])
+);
 
 async function getDashboardData(userId: string) {
   const db = await getDb();
@@ -421,13 +385,13 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* AI Advisors */}
+        {/* AI Advisors - Now using dashboardAgents derived from centralized config */}
         <div className="mb-8">
           <h2 className="font-display text-xl font-semibold text-neutral-900 mb-4">
             AI Advisors
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {agents.map((agent) => (
+            {dashboardAgents.map((agent) => (
                 <Link
                     key={agent.id}
                     href={agent.href}
