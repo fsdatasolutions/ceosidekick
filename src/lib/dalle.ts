@@ -60,11 +60,11 @@ export const GENERATION_CREDITS: Record<DalleModel, Record<string, number>> = {
  */
 export function getGenerationCredits(options: GenerationOptions): number {
     const { model, size, quality = "standard" } = options;
-    
+
     if (model === "dall-e-2") {
         return GENERATION_CREDITS["dall-e-2"][size] || 1;
     }
-    
+
     const key = `${size}-${quality}`;
     return GENERATION_CREDITS["dall-e-3"][key] || 2;
 }
@@ -74,15 +74,15 @@ export function getGenerationCredits(options: GenerationOptions): number {
  */
 export function validateGenerationOptions(options: GenerationOptions): string | null {
     const { model, size, prompt } = options;
-    
+
     if (!prompt || prompt.trim().length === 0) {
         return "Prompt is required";
     }
-    
+
     if (prompt.length > 4000) {
         return "Prompt must be 4000 characters or less";
     }
-    
+
     // Validate size for model
     if (model === "dall-e-2") {
         const validSizes: DallE2Size[] = ["256x256", "512x512", "1024x1024"];
@@ -97,7 +97,7 @@ export function validateGenerationOptions(options: GenerationOptions): string | 
     } else {
         return "Invalid model. Choose dall-e-2 or dall-e-3";
     }
-    
+
     return null;
 }
 
@@ -106,13 +106,13 @@ export function validateGenerationOptions(options: GenerationOptions): string | 
  */
 export async function generateImage(options: GenerationOptions): Promise<GenerationResult> {
     const { prompt, model, size, quality = "standard", style = "vivid" } = options;
-    
+
     // Validate options
     const validationError = validateGenerationOptions(options);
     if (validationError) {
         throw new Error(validationError);
     }
-    
+
     try {
         if (model === "dall-e-2") {
             const response = await openai.images.generate({
@@ -122,13 +122,17 @@ export async function generateImage(options: GenerationOptions): Promise<Generat
                 size: size as DallE2Size,
                 response_format: "url",
             });
-            
+
+            if (!response.data || response.data.length === 0) {
+                throw new Error("No image data returned from DALL-E");
+            }
+
             const imageData = response.data[0];
-            
+
             if (!imageData.url) {
                 throw new Error("No image URL returned from DALL-E");
             }
-            
+
             return {
                 imageUrl: imageData.url,
                 model,
@@ -145,13 +149,17 @@ export async function generateImage(options: GenerationOptions): Promise<Generat
                 style,
                 response_format: "url",
             });
-            
+
+            if (!response.data || response.data.length === 0) {
+                throw new Error("No image data returned from DALL-E");
+            }
+
             const imageData = response.data[0];
-            
+
             if (!imageData.url) {
                 throw new Error("No image URL returned from DALL-E");
             }
-            
+
             return {
                 imageUrl: imageData.url,
                 revisedPrompt: imageData.revised_prompt,
@@ -161,17 +169,23 @@ export async function generateImage(options: GenerationOptions): Promise<Generat
                 style,
             };
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Handle OpenAI API errors
-        if (error.code === "content_policy_violation") {
-            throw new Error("Your prompt was rejected due to content policy. Please revise and try again.");
+        if (error instanceof Error) {
+            const apiError = error as Error & { code?: string };
+
+            if (apiError.code === "content_policy_violation") {
+                throw new Error("Your prompt was rejected due to content policy. Please revise and try again.");
+            }
+
+            if (apiError.code === "rate_limit_exceeded") {
+                throw new Error("Rate limit exceeded. Please try again in a moment.");
+            }
+
+            throw new Error(`Image generation failed: ${apiError.message}`);
         }
-        
-        if (error.code === "rate_limit_exceeded") {
-            throw new Error("Rate limit exceeded. Please try again in a moment.");
-        }
-        
-        throw new Error(`Image generation failed: ${error.message}`);
+
+        throw new Error("Image generation failed: Unknown error");
     }
 }
 
