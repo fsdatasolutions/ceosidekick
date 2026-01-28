@@ -724,3 +724,403 @@ Copyright © 2024-2025 Full Stack Data Solutions. All rights reserved.
   <a href="https://ceosidekick.biz">Website</a> · 
   <a href="https://ce.ceosidekick.biz">Content Engine</a>
 </p>
+
+
+# Content Engine API - Image Endpoints
+
+## Overview
+
+The Content Engine Image API allows users to upload images and generate AI images using DALL-E. All endpoints require authentication and deduct message credits from the user's subscription.
+
+## Base URL
+
+```
+/api/content/images
+```
+
+## Authentication
+
+All endpoints require a valid session. The API uses NextAuth.js for authentication.
+
+## Credit Costs
+
+| Action | Credits |
+|--------|---------|
+| Upload image | 1 |
+| Generate DALL-E 2 (any size) | 1 |
+| Generate DALL-E 3 (1024×1024, standard) | 2 |
+| Generate DALL-E 3 (1024×1024, HD) | 3 |
+| Generate DALL-E 3 (portrait/landscape, standard) | 3 |
+| Generate DALL-E 3 (portrait/landscape, HD) | 4 |
+
+---
+
+## Endpoints
+
+### 1. Upload Image
+
+Upload an image file to Google Cloud Storage.
+
+**Endpoint:** `POST /api/content/images/upload`
+
+**Content-Type:** `multipart/form-data`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `file` | File | Yes | Image file (JPEG, PNG, GIF, WebP) |
+| `name` | string | No | Custom display name |
+| `altText` | string | No | Alt text for accessibility |
+
+**Constraints:**
+- Max file size: 10MB
+- Allowed types: image/jpeg, image/png, image/gif, image/webp
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "image": {
+    "id": "uuid",
+    "name": "My Image",
+    "url": "https://storage.googleapis.com/...",
+    "mimeType": "image/png",
+    "size": 123456,
+    "width": 1024,
+    "height": 768,
+    "source": "upload",
+    "createdAt": "2025-01-24T12:00:00Z"
+  }
+}
+```
+
+**Example (cURL):**
+
+```bash
+curl -X POST /api/content/images/upload \
+  -H "Cookie: session=..." \
+  -F "file=@my-image.png" \
+  -F "name=Hero Banner" \
+  -F "altText=A beautiful sunset over mountains"
+```
+
+---
+
+### 2. Generate Image (DALL-E)
+
+Generate an AI image using DALL-E 2 or DALL-E 3.
+
+**Endpoint:** `POST /api/content/images/generate`
+
+**Content-Type:** `application/json`
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `prompt` | string | Yes | - | Image generation prompt (max 4000 chars) |
+| `model` | string | No | "dall-e-3" | "dall-e-2" or "dall-e-3" |
+| `size` | string | No | "1024x1024" | See size options below |
+| `quality` | string | No | "standard" | "standard" or "hd" (DALL-E 3 only) |
+| `style` | string | No | "vivid" | "vivid" or "natural" (DALL-E 3 only) |
+| `name` | string | No | Auto-generated | Custom display name |
+| `altText` | string | No | Prompt/revised prompt | Alt text |
+
+**Size Options:**
+
+DALL-E 2:
+- `256x256`
+- `512x512`
+- `1024x1024`
+
+DALL-E 3:
+- `1024x1024` (Square)
+- `1024x1792` (Portrait)
+- `1792x1024` (Landscape)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "image": {
+    "id": "uuid",
+    "name": "AI Image - 2025-01-24",
+    "url": "https://storage.googleapis.com/...",
+    "mimeType": "image/png",
+    "size": 234567,
+    "width": 1024,
+    "height": 1024,
+    "source": "dalle",
+    "prompt": "A futuristic city at sunset",
+    "revisedPrompt": "A stunning futuristic metropolis...",
+    "generationSettings": {
+      "size": "1024x1024",
+      "quality": "standard",
+      "style": "vivid"
+    },
+    "createdAt": "2025-01-24T12:00:00Z"
+  },
+  "creditsUsed": 2
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST /api/content/images/generate \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session=..." \
+  -d '{
+    "prompt": "A professional business meeting in a modern office",
+    "model": "dall-e-3",
+    "size": "1792x1024",
+    "quality": "hd",
+    "style": "natural"
+  }'
+```
+
+---
+
+### 3. Get Generation Options
+
+Retrieve available DALL-E models and their options for building UI.
+
+**Endpoint:** `GET /api/content/images/generate`
+
+**Response:**
+
+```json
+{
+  "models": [
+    {
+      "id": "dall-e-2",
+      "name": "DALL-E 2",
+      "description": "Faster generation, lower cost",
+      "sizes": [
+        { "value": "256x256", "label": "256×256 (Small)", "credits": 1 },
+        { "value": "512x512", "label": "512×512 (Medium)", "credits": 1 },
+        { "value": "1024x1024", "label": "1024×1024 (Large)", "credits": 1 }
+      ],
+      "supportsQuality": false,
+      "supportsStyle": false
+    },
+    {
+      "id": "dall-e-3",
+      "name": "DALL-E 3",
+      "description": "Higher quality, better prompt understanding",
+      "sizes": [
+        { "value": "1024x1024", "label": "1024×1024 (Square)", "credits": { "standard": 2, "hd": 3 } },
+        { "value": "1024x1792", "label": "1024×1792 (Portrait)", "credits": { "standard": 3, "hd": 4 } },
+        { "value": "1792x1024", "label": "1792×1024 (Landscape)", "credits": { "standard": 3, "hd": 4 } }
+      ],
+      "supportsQuality": true,
+      "supportsStyle": true,
+      "qualityOptions": [
+        { "value": "standard", "label": "Standard" },
+        { "value": "hd", "label": "HD (Higher detail)" }
+      ],
+      "styleOptions": [
+        { "value": "vivid", "label": "Vivid (Dramatic, hyper-real)" },
+        { "value": "natural", "label": "Natural (More realistic)" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 4. List Images
+
+Retrieve a paginated list of user's images.
+
+**Endpoint:** `GET /api/content/images`
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source` | string | - | Filter by source: "upload", "dalle", "other" |
+| `limit` | number | 20 | Items per page (max 100) |
+| `offset` | number | 0 | Pagination offset |
+
+**Response:**
+
+```json
+{
+  "images": [
+    {
+      "id": "uuid",
+      "name": "My Image",
+      "url": "https://storage.googleapis.com/...",
+      "mimeType": "image/png",
+      "size": 123456,
+      "width": 1024,
+      "height": 768,
+      "source": "upload",
+      "altText": "Description",
+      "usageCount": 3,
+      "createdAt": "2025-01-24T12:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 45,
+    "limit": 20,
+    "offset": 0,
+    "hasMore": true
+  }
+}
+```
+
+**Example:**
+
+```bash
+# Get all images
+curl /api/content/images
+
+# Get only DALL-E generated images
+curl "/api/content/images?source=dalle"
+
+# Paginate
+curl "/api/content/images?limit=10&offset=20"
+```
+
+---
+
+### 5. Get Single Image
+
+Retrieve details for a specific image.
+
+**Endpoint:** `GET /api/content/images/[id]`
+
+**Response:**
+
+```json
+{
+  "image": {
+    "id": "uuid",
+    "name": "My Image",
+    "originalName": "original-filename.png",
+    "url": "https://storage.googleapis.com/...",
+    "mimeType": "image/png",
+    "size": 123456,
+    "width": 1024,
+    "height": 768,
+    "source": "dalle",
+    "prompt": "A futuristic city",
+    "aiModel": "dall-e-3",
+    "generationSettings": {
+      "size": "1024x1024",
+      "quality": "standard",
+      "style": "vivid"
+    },
+    "altText": "A futuristic city at sunset",
+    "usageCount": 5,
+    "createdAt": "2025-01-24T12:00:00Z",
+    "updatedAt": "2025-01-24T14:00:00Z"
+  }
+}
+```
+
+---
+
+### 6. Update Image
+
+Update image metadata (name, alt text).
+
+**Endpoint:** `PATCH /api/content/images/[id]`
+
+**Content-Type:** `application/json`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | New display name |
+| `altText` | string | No | New alt text |
+
+At least one field must be provided.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "image": {
+    "id": "uuid",
+    "name": "Updated Name",
+    "altText": "Updated alt text",
+    "updatedAt": "2025-01-24T15:00:00Z"
+  }
+}
+```
+
+---
+
+### 7. Delete Image
+
+Delete an image from both database and Google Cloud Storage.
+
+**Endpoint:** `DELETE /api/content/images/[id]`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Image deleted successfully",
+  "deletedId": "uuid"
+}
+```
+
+---
+
+## Error Responses
+
+All endpoints return errors in this format:
+
+```json
+{
+  "error": "Error message describing what went wrong"
+}
+```
+
+**Common Error Codes:**
+
+| Status | Description |
+|--------|-------------|
+| 400 | Bad request (validation error) |
+| 401 | Unauthorized (not logged in) |
+| 402 | Payment required (insufficient credits) |
+| 404 | Image not found |
+| 500 | Server error |
+
+**Credit Error Example:**
+
+```json
+{
+  "error": "Insufficient message credits",
+  "required": 3
+}
+```
+
+---
+
+## Dependencies
+
+The image API requires these npm packages:
+
+```bash
+npm install @google-cloud/storage openai sharp
+```
+
+## Environment Variables
+
+```env
+GCS_BUCKET_NAME=ceosidekick-documents
+GCS_CREDENTIALS={"type":"service_account",...}
+OPENAI_API_KEY=sk-...
+```

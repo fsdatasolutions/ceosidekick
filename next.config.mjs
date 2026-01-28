@@ -17,6 +17,10 @@ const nextConfig = {
                 protocol: "https",
                 hostname: "avatars.githubusercontent.com", // GitHub profile images
             },
+            {
+                protocol: "https",
+                hostname: "storage.googleapis.com", // Google Cloud Storage images
+            },
         ],
     },
 };
