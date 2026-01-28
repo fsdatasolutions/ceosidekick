@@ -1,291 +1,189 @@
-// src/lib/usage.ts
-// Usage tracking utilities for message limits
+// src/lib/services/usage.ts
+// Usage tracking and credit deduction service
+// NOTE: Merge these functions with your existing usage service if you have one
 
 import { db } from "@/db";
+import { monthlyUsage, usageLogs } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { subscriptions, monthlyUsage } from "@/db/schema";
-import { getTier, TierType, getUsageStatus, getUsagePercentage } from "./tiers";
 
-// ===========================================
-// TYPES
-// ===========================================
-
-export interface UsageInfo {
-    tier: TierType;
-    tierName: string;
-    period: string;
-    messagesUsed: number;
-    messagesLimit: number;
-    bonusMessages: number;
-    totalAvailable: number;
-    remaining: number;
-    percentage: number;
-    status: "ok" | "warning" | "critical" | "exceeded";
-    canSendMessage: boolean;
-}
-
-export interface UsageCheckResult {
-    allowed: boolean;
-    reason?: string;
-    usage: UsageInfo;
-}
-
-// ===========================================
-// HELPERS
-// ===========================================
-
+/**
+ * Get current billing period in YYYY-MM format
+ */
 export function getCurrentPeriod(): string {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// ===========================================
-// GET USER SUBSCRIPTION
-// ===========================================
-
-export async function getUserSubscription(userId: string) {
-    const sub = await db
-        .select()
-        .from(subscriptions)
-        .where(eq(subscriptions.userId, userId))
-        .limit(1);
-
-    return sub[0] || null;
+/**
+ * Check if user has at least 1 message credit available
+ */
+export async function checkMessageCredits(userId: string): Promise<boolean> {
+    return checkMessageCreditsAmount(userId, 1);
 }
 
-// ===========================================
-// GET OR CREATE MONTHLY USAGE
-// ===========================================
-
-export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof monthlyUsage.$inferSelect> {
+/**
+ * Check if user has a specific amount of credits available
+ */
+export async function checkMessageCreditsAmount(
+    userId: string,
+    amount: number
+): Promise<boolean> {
     const period = getCurrentPeriod();
 
-    // Get user's subscription to determine limit
-    const subscription = await getUserSubscription(userId);
-    const tier = getTier(subscription?.tier || "free");
-    const currentTierLimit = tier.messagesPerMonth;
-
-    // Try to get existing record
-    const existing = await db
+    const [usage] = await db
         .select()
         .from(monthlyUsage)
-        .where(and(
-            eq(monthlyUsage.userId, userId),
-            eq(monthlyUsage.period, period)
-        ))
+        .where(
+            and(
+                eq(monthlyUsage.userId, userId),
+                eq(monthlyUsage.period, period)
+            )
+        )
         .limit(1);
 
-    if (existing[0]) {
-        // Sync the limit if tier has changed (e.g., user upgraded)
-        if (existing[0].messagesLimit !== currentTierLimit) {
-            console.log(`[Usage] Syncing message limit: ${existing[0].messagesLimit} -> ${currentTierLimit} for user ${userId}`);
-            const [updated] = await db
-                .update(monthlyUsage)
-                .set({
-                    messagesLimit: currentTierLimit,
-                    updatedAt: new Date(),
-                })
-                .where(and(
-                    eq(monthlyUsage.userId, userId),
-                    eq(monthlyUsage.period, period)
-                ))
-                .returning();
-            return updated;
-        }
-        return existing[0];
+    if (!usage) {
+        // No usage record means user hasn't used anything yet this period
+        // They should have credits if they have a subscription
+        return true;
     }
 
-    // Create new monthly usage record
-    const [newUsage] = await db
-        .insert(monthlyUsage)
-        .values({
-            userId,
-            period,
-            messagesUsed: 0,
-            messagesLimit: currentTierLimit,
-            bonusMessages: 0,
-        })
-        .returning();
-
-    return newUsage;
-}
-
-// ===========================================
-// GET USER USAGE INFO
-// ===========================================
-
-export async function getUserUsage(userId: string): Promise<UsageInfo> {
-    const subscription = await getUserSubscription(userId);
-    const tierType = (subscription?.tier || "free") as TierType;
-    const tier = getTier(tierType);
-
-    const usage = await getOrCreateMonthlyUsage(userId);
-
     const totalAvailable = usage.messagesLimit + usage.bonusMessages;
-    const remaining = Math.max(0, totalAvailable - usage.messagesUsed);
-    const percentage = getUsagePercentage(usage.messagesUsed, totalAvailable);
-    const status = getUsageStatus(usage.messagesUsed, totalAvailable);
+    const remaining = totalAvailable - usage.messagesUsed;
 
-    return {
-        tier: tierType,
-        tierName: tier.name,
-        period: usage.period,
-        messagesUsed: usage.messagesUsed,
-        messagesLimit: usage.messagesLimit,
-        bonusMessages: usage.bonusMessages,
-        totalAvailable,
-        remaining,
-        percentage,
-        status,
-        canSendMessage: remaining > 0,
-    };
+    return remaining >= amount;
 }
 
-// ===========================================
-// CHECK IF USER CAN SEND MESSAGE
-// ===========================================
+/**
+ * Get remaining credits for a user
+ */
+export async function getRemainingCredits(userId: string): Promise<{
+    used: number;
+    limit: number;
+    bonus: number;
+    remaining: number;
+}> {
+    const period = getCurrentPeriod();
 
-export async function checkMessageAllowance(userId: string, messageCost: number = 1): Promise<UsageCheckResult> {
-    const usage = await getUserUsage(userId);
+    const [usage] = await db
+        .select()
+        .from(monthlyUsage)
+        .where(
+            and(
+                eq(monthlyUsage.userId, userId),
+                eq(monthlyUsage.period, period)
+            )
+        )
+        .limit(1);
 
-    // Check if user has enough messages for this cost
-    if (usage.remaining < messageCost) {
+    if (!usage) {
         return {
-            allowed: false,
-            reason: messageCost > 1
-                ? `Voice messages cost ${messageCost} credits. You have ${usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`
-                : "You've reached your monthly message limit. Upgrade your plan or purchase a message pack to continue.",
-            usage,
+            used: 0,
+            limit: 0,
+            bonus: 0,
+            remaining: 0,
         };
     }
 
+    const totalAvailable = usage.messagesLimit + usage.bonusMessages;
+
     return {
-        allowed: true,
-        usage,
+        used: usage.messagesUsed,
+        limit: usage.messagesLimit,
+        bonus: usage.bonusMessages,
+        remaining: totalAvailable - usage.messagesUsed,
     };
 }
 
-// ===========================================
-// INCREMENT MESSAGE USAGE
-// ===========================================
+export interface UsageLogData {
+    type: string;
+    agent?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    model?: string;
+    metadata?: Record<string, unknown>;
+}
 
-export async function incrementMessageUsage(userId: string, amount: number = 1): Promise<UsageInfo> {
+/**
+ * Deduct a single message credit
+ */
+export async function deductMessageCredit(
+    userId: string,
+    logData?: UsageLogData
+): Promise<void> {
+    return deductMessageCredits(userId, 1, logData);
+}
+
+/**
+ * Deduct multiple message credits
+ */
+export async function deductMessageCredits(
+    userId: string,
+    amount: number,
+    logData?: UsageLogData
+): Promise<void> {
     const period = getCurrentPeriod();
 
-    // Ensure usage record exists
-    await getOrCreateMonthlyUsage(userId);
-
-    // Increment the counter by the specified amount
+    // Update monthly usage using sql template for increment
     await db
         .update(monthlyUsage)
         .set({
             messagesUsed: sql`${monthlyUsage.messagesUsed} + ${amount}`,
             updatedAt: new Date(),
         })
-        .where(and(
-            eq(monthlyUsage.userId, userId),
-            eq(monthlyUsage.period, period)
-        ));
+        .where(
+            and(
+                eq(monthlyUsage.userId, userId),
+                eq(monthlyUsage.period, period)
+            )
+        );
 
-    // Return updated usage
-    return getUserUsage(userId);
-}
-
-// ===========================================
-// ADD BONUS MESSAGES (from pack purchases)
-// ===========================================
-
-export async function addBonusMessages(userId: string, amount: number): Promise<UsageInfo> {
-    const period = getCurrentPeriod();
-
-    // Ensure usage record exists
-    await getOrCreateMonthlyUsage(userId);
-
-    // Add bonus messages
-    await db
-        .update(monthlyUsage)
-        .set({
-            bonusMessages: sql`${monthlyUsage.bonusMessages} + ${amount}`,
-            updatedAt: new Date(),
-        })
-        .where(and(
-            eq(monthlyUsage.userId, userId),
-            eq(monthlyUsage.period, period)
-        ));
-
-    return getUserUsage(userId);
-}
-
-// ===========================================
-// CREATE OR UPDATE SUBSCRIPTION
-// ===========================================
-
-export async function createOrUpdateSubscription(
-    userId: string,
-    data: {
-        tier?: TierType;
-        status?: string;
-        stripeCustomerId?: string;
-        stripeSubscriptionId?: string;
-        stripePriceId?: string;
-        currentPeriodStart?: Date;
-        currentPeriodEnd?: Date;
-    }
-) {
-    const existing = await getUserSubscription(userId);
-
-    if (existing) {
-        const [updated] = await db
-            .update(subscriptions)
-            .set({
-                ...data,
-                updatedAt: new Date(),
-            })
-            .where(eq(subscriptions.userId, userId))
-            .returning();
-
-        return updated;
-    }
-
-    const [created] = await db
-        .insert(subscriptions)
-        .values({
+    // Log usage if data provided
+    if (logData) {
+        await db.insert(usageLogs).values({
             userId,
-            tier: data.tier || "free",
-            status: data.status || "active",
-            stripeCustomerId: data.stripeCustomerId,
-            stripeSubscriptionId: data.stripeSubscriptionId,
-            stripePriceId: data.stripePriceId,
-            currentPeriodStart: data.currentPeriodStart,
-            currentPeriodEnd: data.currentPeriodEnd,
-        })
-        .returning();
-
-    return created;
+            type: logData.type,
+            agent: logData.agent,
+            inputTokens: logData.inputTokens,
+            outputTokens: logData.outputTokens,
+            model: logData.model,
+            metadata: {
+                ...logData.metadata,
+                creditsDeducted: amount,
+            },
+        });
+    }
 }
 
-// ===========================================
-// UPGRADE TIER (updates limit for current period)
-// ===========================================
-
-export async function upgradeTier(userId: string, newTier: TierType): Promise<void> {
-    const tier = getTier(newTier);
+/**
+ * Ensure user has a monthly usage record for the current period
+ * Call this when a user starts a new billing cycle
+ */
+export async function ensureMonthlyUsageRecord(
+    userId: string,
+    messagesLimit: number
+): Promise<void> {
     const period = getCurrentPeriod();
 
-    // Update subscription
-    await createOrUpdateSubscription(userId, { tier: newTier });
+    // Check if record exists
+    const [existing] = await db
+        .select()
+        .from(monthlyUsage)
+        .where(
+            and(
+                eq(monthlyUsage.userId, userId),
+                eq(monthlyUsage.period, period)
+            )
+        )
+        .limit(1);
 
-    // Update current period's limit (pro-rated upgrade benefit)
-    await db
-        .update(monthlyUsage)
-        .set({
-            messagesLimit: tier.messagesPerMonth,
-            updatedAt: new Date(),
-        })
-        .where(and(
-            eq(monthlyUsage.userId, userId),
-            eq(monthlyUsage.period, period)
-        ));
+    if (!existing) {
+        // Create new record for this period
+        await db.insert(monthlyUsage).values({
+            userId,
+            period,
+            messagesUsed: 0,
+            messagesLimit,
+            bonusMessages: 0,
+        });
+    }
 }
