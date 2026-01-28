@@ -4,7 +4,7 @@
 
 import { db } from "@/db";
 import { monthlyUsage, usageLogs } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 /**
  * Get current billing period in YYYY-MM format
@@ -100,7 +100,7 @@ export interface UsageLogData {
     inputTokens?: number;
     outputTokens?: number;
     model?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 /**
@@ -123,11 +123,11 @@ export async function deductMessageCredits(
 ): Promise<void> {
     const period = getCurrentPeriod();
 
-    // Update monthly usage
+    // Update monthly usage using sql template for increment
     await db
         .update(monthlyUsage)
         .set({
-            messagesUsed: db.raw`messages_used + ${amount}`,
+            messagesUsed: sql`${monthlyUsage.messagesUsed} + ${amount}`,
             updatedAt: new Date(),
         })
         .where(
