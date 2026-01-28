@@ -20,6 +20,13 @@ interface RouteParams {
     params: Promise<{ id: string }>;
 }
 
+interface ContentBrief {
+    topic: string;
+    targetAudience?: string;
+    keyPoints?: string[];
+    tone?: string;
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
     try {
         const session = await auth();
@@ -30,7 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const { id } = await params;
         const userId = session.user.id;
         const body = await request.json();
-        
+
         const { contentType, customPrompt } = body as {
             contentType: 'image' | 'linkedinArticle' | 'linkedinPost' | 'webBlog';
             customPrompt?: string;
@@ -42,7 +49,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
         }
 
-        const brief = campaign.brief;
+        const brief = campaign.brief as ContentBrief;
         const briefContext = buildBriefContext(brief);
         const articleContent = campaign.generated.linkedinArticle?.content || '';
 
@@ -54,12 +61,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 case 'linkedinArticle': {
                     const prompt = customPrompt || `Create a LinkedIn article based on this brief:\n\n${briefContext}`;
                     const result = await generateWithClaude(SYSTEM_PROMPTS.linkedinArticle, prompt);
-                    
+
                     const titleMatch = result.match(/^#\s+(.+)$/m);
                     const title = titleMatch ? titleMatch[1] : brief.topic;
-                    const descMatch = result.match(/^(?!#)(.+?)(?:\n\n|\n#)/s);
-                    const description = descMatch ? descMatch[1].trim().substring(0, 300) : '';
-                    
+
+                    // ES2017-compatible: Use line-by-line parsing instead of /s flag
+                    const lines = result.split('\n');
+                    let description = '';
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (trimmedLine && !trimmedLine.startsWith('#')) {
+                            description = trimmedLine.substring(0, 300);
+                            break;
+                        }
+                    }
+
                     updateCampaignContent(id, 'linkedinArticle', {
                         status: 'completed',
                         title,
@@ -74,9 +90,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         ? `Create a LinkedIn post that promotes/summarizes this article:\n\n${articleContent.substring(0, 2000)}\n\nOriginal brief: ${briefContext}`
                         : `Create a LinkedIn post based on this brief:\n\n${briefContext}`;
                     const prompt = customPrompt || basePrompt;
-                    
+
                     const result = await generateWithClaude(SYSTEM_PROMPTS.linkedinPost, prompt);
-                    
+
                     updateCampaignContent(id, 'linkedinPost', {
                         status: 'completed',
                         content: result,
@@ -89,29 +105,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         ? `Adapt this LinkedIn article into an SEO-optimized blog post:\n\n${articleContent}\n\nOriginal brief: ${briefContext}`
                         : `Create a blog post based on this brief:\n\n${briefContext}`;
                     const prompt = customPrompt || basePrompt;
-                    
+
                     const result = await generateWithClaude(SYSTEM_PROMPTS.webBlog, prompt);
-                    
+
                     // Parse frontmatter
                     const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---/);
                     let title = brief.topic;
                     let description = '';
                     let category = '';
                     let tags: string[] = [];
-                    
+
                     if (frontmatterMatch) {
                         const fm = frontmatterMatch[1];
-                        const titleMatch = fm.match(/title:\s*"(.+?)"/);
-                        const descMatch = fm.match(/description:\s*"(.+?)"/);
+                        const fmTitleMatch = fm.match(/title:\s*"(.+?)"/);
+                        const fmDescMatch = fm.match(/description:\s*"(.+?)"/);
                         const catMatch = fm.match(/category:\s*"(.+?)"/);
                         const tagsMatch = fm.match(/tags:\s*\[(.+?)\]/);
-                        
-                        if (titleMatch) title = titleMatch[1];
-                        if (descMatch) description = descMatch[1];
+
+                        if (fmTitleMatch) title = fmTitleMatch[1];
+                        if (fmDescMatch) description = fmDescMatch[1];
                         if (catMatch) category = catMatch[1];
                         if (tagsMatch) tags = tagsMatch[1].split(',').map(t => t.trim().replace(/"/g, ''));
                     }
-                    
+
                     updateCampaignContent(id, 'webBlog', {
                         status: 'completed',
                         title,
@@ -124,15 +140,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 }
 
                 case 'image': {
-                    const contextForImage = articleContent 
+                    const contextForImage = articleContent
                         ? `Article:\n${articleContent.substring(0, 1000)}\n\nBrief: ${briefContext}`
                         : briefContext;
-                    
+
                     const imagePrompt = customPrompt || await generateWithClaude(
                         SYSTEM_PROMPTS.imagePrompt,
                         `Create an image prompt for:\n\n${contextForImage}`
                     );
-                    
+
                     const imageResult = await generateImage({
                         prompt: imagePrompt,
                         model: 'dall-e-3',
@@ -140,13 +156,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         quality: 'standard',
                         style: 'vivid',
                     });
-                    
+
                     const uploadResult = await uploadImageFromUrl(imageResult.imageUrl, {
                         userId,
                         fileName: `campaign-hero-${Date.now()}.png`,
                         mimeType: 'image/png',
                     });
-                    
+
                     const image = await createContentImage({
                         userId,
                         name: `Hero: ${brief.topic.substring(0, 50)}`,
@@ -162,7 +178,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         generatedFromPrompt: imagePrompt,
                         aiModel: 'dall-e-3',
                     });
-                    
+
                     updateCampaignContent(id, 'image', {
                         status: 'completed',
                         id: image.id,
@@ -178,27 +194,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 success: true,
                 campaign: updatedCampaign,
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             updateCampaignContent(id, contentType, {
                 status: 'error',
-                error: error.message,
+                error: errorMessage,
             });
             throw error;
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Regenerate error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to regenerate content";
         return NextResponse.json(
-            { error: error.message || "Failed to regenerate content" },
+            { error: errorMessage },
             { status: 500 }
         );
     }
 }
 
-// Helper functions (same as in generate route)
-function buildBriefContext(brief: any): string {
+// Helper functions
+function buildBriefContext(brief: ContentBrief): string {
     let context = `Topic: ${brief.topic}\n`;
     if (brief.targetAudience) context += `Target Audience: ${brief.targetAudience}\n`;
-    if (brief.keyPoints?.length > 0) context += `Key Points:\n${brief.keyPoints.map((p: string) => `- ${p}`).join('\n')}\n`;
+    if (brief.keyPoints && brief.keyPoints.length > 0) {
+        context += `Key Points:\n${brief.keyPoints.map((p: string) => `- ${p}`).join('\n')}\n`;
+    }
     if (brief.tone) context += `Tone: ${brief.tone}\n`;
     return context;
 }
