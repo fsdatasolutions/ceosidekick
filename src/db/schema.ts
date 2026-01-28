@@ -474,6 +474,56 @@ export const feedback = pgTable(
 );
 
 // ============================================
+// CONTENT CAMPAIGNS TABLE
+// Groups related content pieces from a single brief
+// ============================================
+export const contentCampaigns = pgTable(
+    "content_campaigns",
+    {
+        id: uuid("id").defaultRandom().primaryKey(),
+        userId: varchar("user_id", { length: 255 }).notNull(),
+        organizationId: uuid("organization_id"),
+
+        // Campaign name/identifier
+        name: varchar("name", { length: 500 }),
+
+        // The content brief (single source of truth)
+        topic: text("topic").notNull(),
+        targetAudience: text("target_audience"),
+        keyPoints: jsonb("key_points").$type<string[]>(),
+        tone: varchar("tone", { length: 100 }).default("professional"),
+        brandId: uuid("brand_id"), // Link to workspace brand if applicable
+
+        // Selected output types
+        generateImage: boolean("generate_image").default(false),
+        generateLinkedinArticle: boolean("generate_linkedin_article").default(false),
+        generateLinkedinPost: boolean("generate_linkedin_post").default(false),
+        generateWebBlog: boolean("generate_web_blog").default(false),
+
+        // Generated content references (null until generated)
+        heroImageId: uuid("hero_image_id"),
+        linkedinArticleId: uuid("linkedin_article_id"),
+        linkedinPostId: uuid("linkedin_post_id"),
+        webBlogId: uuid("web_blog_id"),
+
+        // Campaign status
+        status: varchar("status", { length: 50 }).default("draft").notNull(),
+        // draft -> generating -> review -> published -> archived
+
+        // Metadata
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("content_campaigns_user_id_idx").on(table.userId),
+        index("content_campaigns_status_idx").on(table.status),
+        index("content_campaigns_created_at_idx").on(table.createdAt),
+    ]
+);
+
+
+
+// ============================================
 // RELATIONS
 // ============================================
 
@@ -489,6 +539,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     usageLogs: many(usageLogs),
     settings: one(userSettings),
     feedback: many(feedback),
+    contentItems: many(contentItems),
+    contentImages: many(contentImages),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -538,6 +590,8 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
     conversations: many(conversations),
     documents: many(documents),
     usageLogs: many(usageLogs),
+    contentItems: many(contentItems),
+    contentImages: many(contentImages),
 }));
 
 export const orgMembersRelations = relations(orgMembers, ({ one }) => ({
@@ -613,3 +667,262 @@ export const feedbackRelations = relations(feedback, ({ one }) => ({
         references: [users.id],
     }),
 }));
+
+// ============================================
+// CONTENT ENGINE SCHEMA
+// Add this to src/db/schema.ts
+// ============================================
+
+// Content Types for the Content Engine
+export type ContentType = "linkedin_article" | "linkedin_post" | "web_blog" | "image";
+export type ContentStatus = "draft" | "published" | "archived";
+
+// ============================================
+// CONTENT ITEMS
+// ============================================
+
+export const contentItems = pgTable(
+    "content_items",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        organizationId: uuid("organization_id").references(() => organizations.id, {
+            onDelete: "cascade",
+        }),
+
+        // Content type: 'linkedin_article' | 'linkedin_post' | 'web_blog'
+        type: varchar("type", { length: 50 }).notNull(),
+
+        // Status: 'draft' | 'published' | 'archived'
+        status: varchar("status", { length: 50 }).default("draft").notNull(),
+
+        // Basic info
+        title: varchar("title", { length: 500 }),
+        content: text("content"), // Main content body (markdown/HTML)
+
+        // Web blog specific fields (Astro frontmatter compatible)
+        description: text("description"),
+        heroImageId: uuid("hero_image_id").references(() => contentImages.id, {
+            onDelete: "set null",
+        }),
+        category: varchar("category", { length: 100 }),
+        tags: jsonb("tags").$type<string[]>(), // Array of tag strings
+        featured: boolean("featured").default(false).notNull(),
+
+        // LinkedIn specific fields
+        linkedinPostType: varchar("linkedin_post_type", { length: 50 }), // 'text' | 'image' | 'article'
+
+        // Author info (for blog attribution)
+        authorName: varchar("author_name", { length: 255 }),
+        authorRole: varchar("author_role", { length: 255 }),
+        authorImageUrl: varchar("author_image_url", { length: 500 }),
+
+        // Publishing info
+        publishedAt: timestamp("published_at"),
+        scheduledFor: timestamp("scheduled_for"),
+
+        // AI generation metadata
+        generatedFromPrompt: text("generated_from_prompt"),
+        aiModel: varchar("ai_model", { length: 100 }),
+
+        // Current version reference (for quick access)
+        currentVersionId: uuid("current_version_id"),
+
+        // Timestamps
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("content_items_user_id_idx").on(table.userId),
+        index("content_items_org_id_idx").on(table.organizationId),
+        index("content_items_type_idx").on(table.type),
+        index("content_items_status_idx").on(table.status),
+        index("content_items_created_at_idx").on(table.createdAt),
+        index("content_items_hero_image_idx").on(table.heroImageId),
+    ]
+);
+
+// ============================================
+// CONTENT VERSIONS (Milestone-based)
+// ============================================
+
+export const contentVersions = pgTable(
+    "content_versions",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        contentItemId: uuid("content_item_id")
+            .notNull()
+            .references(() => contentItems.id, { onDelete: "cascade" }),
+
+        // Version info
+        versionNumber: integer("version_number").notNull(),
+        versionLabel: varchar("version_label", { length: 255 }), // User-defined label like "Final Draft", "Client Review"
+
+        // Snapshot of content at this version
+        title: varchar("title", { length: 500 }),
+        content: text("content"),
+        description: text("description"),
+        category: varchar("category", { length: 100 }),
+        tags: jsonb("tags").$type<string[]>(),
+        heroImageId: uuid("hero_image_id").references(() => contentImages.id, {
+            onDelete: "set null",
+        }),
+
+        // Metadata
+        changeNotes: text("change_notes"), // User notes about what changed
+        createdBy: uuid("created_by").references(() => users.id, {
+            onDelete: "set null",
+        }),
+
+        // Timestamps
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("content_versions_item_id_idx").on(table.contentItemId),
+        index("content_versions_number_idx").on(table.versionNumber),
+        uniqueIndex("content_versions_item_number_idx").on(
+            table.contentItemId,
+            table.versionNumber
+        ),
+    ]
+);
+
+// ============================================
+// CONTENT IMAGES
+// ============================================
+
+export const contentImages = pgTable(
+    "content_images",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        organizationId: uuid("organization_id").references(() => organizations.id, {
+            onDelete: "cascade",
+        }),
+
+        // Image info
+        name: varchar("name", { length: 255 }).notNull(),
+        originalName: varchar("original_name", { length: 255 }),
+
+        // Storage info (Google Cloud Storage)
+        gcsUrl: varchar("gcs_url", { length: 1000 }).notNull(),
+        gcsBucket: varchar("gcs_bucket", { length: 255 }).notNull(),
+        gcsPath: varchar("gcs_path", { length: 500 }).notNull(),
+
+        // Image metadata
+        mimeType: varchar("mime_type", { length: 100 }).notNull(),
+        size: integer("size").notNull(), // File size in bytes
+        width: integer("width"),
+        height: integer("height"),
+
+        // Source: 'upload' | 'dalle' | 'other'
+        source: varchar("source", { length: 50 }).notNull(),
+
+        // AI generation metadata (for DALL-E images)
+        generatedFromPrompt: text("generated_from_prompt"),
+        aiModel: varchar("ai_model", { length: 100 }),
+        generationSettings: jsonb("generation_settings"), // Store DALL-E params like size, quality, style
+
+        // Alt text for accessibility
+        altText: varchar("alt_text", { length: 500 }),
+
+        // Usage tracking
+        usageCount: integer("usage_count").default(0).notNull(),
+
+        // Timestamps
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("content_images_user_id_idx").on(table.userId),
+        index("content_images_org_id_idx").on(table.organizationId),
+        index("content_images_source_idx").on(table.source),
+        index("content_images_created_at_idx").on(table.createdAt),
+    ]
+);
+
+// ============================================
+// CONTENT ENGINE RELATIONS
+// ============================================
+
+export const contentItemsRelations = relations(contentItems, ({ one, many }) => ({
+    user: one(users, {
+        fields: [contentItems.userId],
+        references: [users.id],
+    }),
+    organization: one(organizations, {
+        fields: [contentItems.organizationId],
+        references: [organizations.id],
+    }),
+    heroImage: one(contentImages, {
+        fields: [contentItems.heroImageId],
+        references: [contentImages.id],
+    }),
+    versions: many(contentVersions),
+}));
+
+export const contentVersionsRelations = relations(contentVersions, ({ one }) => ({
+    contentItem: one(contentItems, {
+        fields: [contentVersions.contentItemId],
+        references: [contentItems.id],
+    }),
+    heroImage: one(contentImages, {
+        fields: [contentVersions.heroImageId],
+        references: [contentImages.id],
+    }),
+    createdByUser: one(users, {
+        fields: [contentVersions.createdBy],
+        references: [users.id],
+    }),
+}));
+
+export const contentImagesRelations = relations(contentImages, ({ one, many }) => ({
+    user: one(users, {
+        fields: [contentImages.userId],
+        references: [users.id],
+    }),
+    organization: one(organizations, {
+        fields: [contentImages.organizationId],
+        references: [organizations.id],
+    }),
+    // Content items using this as hero image
+    contentItemsAsHero: many(contentItems),
+    contentVersionsAsHero: many(contentVersions),
+}));
+
+// ============================================
+// UPDATE EXISTING RELATIONS
+// Add these to the existing usersRelations:
+// ============================================
+
+/*
+Add to usersRelations ({ one, many }) => ({
+    ...existing relations,
+    contentItems: many(contentItems),
+    contentImages: many(contentImages),
+}));
+
+Add to organizationsRelations ({ many }) => ({
+    ...existing relations,
+    contentItems: many(contentItems),
+    contentImages: many(contentImages),
+}));
+*/
+
+// ============================================
+// TYPE EXPORTS
+// ============================================
+
+export type ContentItem = typeof contentItems.$inferSelect;
+export type NewContentItem = typeof contentItems.$inferInsert;
+
+export type ContentVersion = typeof contentVersions.$inferSelect;
+export type NewContentVersion = typeof contentVersions.$inferInsert;
+
+export type ContentImage = typeof contentImages.$inferSelect;
+export type NewContentImage = typeof contentImages.$inferInsert;
+

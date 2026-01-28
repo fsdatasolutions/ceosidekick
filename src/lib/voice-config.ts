@@ -14,23 +14,23 @@ export interface AgentVoiceConfig {
 // OpenAI voices: alloy (neutral), echo (male), fable (British male), onyx (deep male), nova (female), shimmer (female)
 export const AGENT_VOICES: Record<string, AgentVoiceConfig> = {
     technology: {
-        voice: "nova",
+        voice: "alloy",
         speed: 1.0,
-        description: "Professional female voice - your technical advisor",
+        description: "Professional male voice - your technical advisor",
     },
     coach: {
-        voice: "shimmer",
+        voice: "onyx",
         speed: 0.95,
         description: "Warm female voice - your leadership mentor",
     },
     legal: {
-        voice: "onyx",
+        voice: "shimmer",
         speed: 0.9,
-        description: "Professional male voice - your legal counsel",
+        description: "Professional female voice - your legal counsel",
     },
     hr: {
         voice: "nova",
-        speed: 1.0,
+        speed: 1.1,
         description: "Friendly female voice - your people partner",
     },
     marketing: {

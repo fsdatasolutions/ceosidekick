@@ -1,6 +1,7 @@
 // src/app/(dashboard)/dashboard/page.tsx
 // Dashboard with subscription tier and usage tracking
 // Updated to use centralized agent configuration
+// UPDATED: Content Engine now points to internal /content-engine route
 
 import Link from "next/link";
 import { auth } from "@/lib/auth";
@@ -42,16 +43,18 @@ async function getSchema() {
 // ============================================
 // DASHBOARD AGENTS LIST
 // Derived from centralized config
+// UPDATED: Content Engine now uses internal route
 // ============================================
 const dashboardAgents = Object.values(AGENTS).map((agent) => ({
   id: agent.id,
   name: agent.name,
   subtitle: agent.subtitle,
   description: agent.description,
+  // Content Engine is now internal at /content-engine
   href: agent.id === "content"
-      ? "https://ce.ceosidekick.biz"  // Content Engine external link
+      ? "/content-engine"
       : `/chat?agent=${agent.id}`,
-  external: agent.id === "content",
+  external: false, // No longer external
 }));
 
 // ============================================
