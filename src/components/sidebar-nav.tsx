@@ -15,6 +15,7 @@ import {
     FileText,
     AlertCircle,
     FolderOpen,
+    Sparkles,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: FileText, label: "Templates", href: "/documents" },
     { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
+    { icon: Sparkles, label: "Content Engine", href: "/content-engine" },
     { icon: CreditCard, label: "Pricing", href: "/pricing" },
 ];
 

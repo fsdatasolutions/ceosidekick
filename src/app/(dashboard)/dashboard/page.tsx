@@ -1,7 +1,6 @@
 // src/app/(dashboard)/dashboard/page.tsx
 // Dashboard with subscription tier and usage tracking
 // Updated to use centralized agent configuration
-// UPDATED: Content Engine now points to internal /content-engine route
 
 import Link from "next/link";
 import { auth } from "@/lib/auth";
@@ -43,19 +42,18 @@ async function getSchema() {
 // ============================================
 // DASHBOARD AGENTS LIST
 // Derived from centralized config
-// UPDATED: Content Engine now uses internal route
+// Content Engine excluded — it has its own nav entry at /content-engine
 // ============================================
-const dashboardAgents = Object.values(AGENTS).map((agent) => ({
-  id: agent.id,
-  name: agent.name,
-  subtitle: agent.subtitle,
-  description: agent.description,
-  // Content Engine is now internal at /content-engine
-  href: agent.id === "content"
-      ? "/content-engine"
-      : `/chat?agent=${agent.id}`,
-  external: false, // No longer external
-}));
+const dashboardAgents = Object.values(AGENTS)
+    .filter((agent) => agent.id !== "content")
+    .map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      subtitle: agent.subtitle,
+      description: agent.description,
+      href: `/chat?agent=${agent.id}`,
+      external: false,
+    }));
 
 // ============================================
 // AGENT NAMES LOOKUP
@@ -388,7 +386,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* AI Advisors - Now using dashboardAgents derived from centralized config */}
+        {/* AI Advisors - Derived from centralized config, Content Engine excluded */}
         <div className="mb-8">
           <h2 className="font-display text-xl font-semibold text-neutral-900 mb-4">
             AI Advisors
@@ -398,22 +396,14 @@ export default async function DashboardPage() {
                 <Link
                     key={agent.id}
                     href={agent.href}
-                    target={agent.external ? "_blank" : undefined}
                     className="group bg-white rounded-xl border border-neutral-200 p-5 hover:border-neutral-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start gap-4">
                     <AgentAvatar agentId={agent.id} size="lg" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-neutral-900 group-hover:text-primary-red transition-colors">
-                          {agent.name}
-                        </h3>
-                        {agent.external && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500">
-                        External
-                      </span>
-                        )}
-                      </div>
+                      <h3 className="font-semibold text-neutral-900 group-hover:text-primary-red transition-colors">
+                        {agent.name}
+                      </h3>
                       <p className="text-xs text-neutral-500 mb-1">{agent.subtitle}</p>
                       <p className="text-sm text-neutral-600 line-clamp-2">
                         {agent.description}
