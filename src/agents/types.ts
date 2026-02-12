@@ -1,6 +1,6 @@
 // src/agents/types.ts
 // Agent type definitions for CEO Sidekick
-// Updated with RAG support for Knowledge Base
+// Updated with RAG support for Knowledge Base and Round Table support
 
 import { BaseMessage } from "@langchain/core/messages";
 import { LucideIcon } from "lucide-react";
@@ -17,10 +17,11 @@ export type AgentType =
     | "marketing"
     | "sales"
     | "knowledge"
-    | "content";
+    | "content"
+    | "roundtable";
 
 // ============================================
-// RAG CONFIGURATION (NEW)
+// RAG CONFIGURATION
 // ============================================
 
 export interface RAGOptions {
@@ -64,6 +65,37 @@ export interface AgentUIConfig {
   disclaimer?: string;
   href: string;
   external?: boolean;
+  paidOnly?: boolean; // NEW: Indicates feature is for paid tiers only
+}
+
+// ============================================
+// ROUND TABLE TYPES
+// ============================================
+
+export interface RoundTableAdvisorResponse {
+  advisorId: AgentType;
+  advisorName: string;
+  response: string;
+  tokensUsed: number;
+  relevanceScore: number;
+}
+
+export interface RoundTableResponse {
+  synthesis: string;
+  advisorResponses: RoundTableAdvisorResponse[];
+  selectedAdvisors: AgentType[];
+  totalTokensUsed: number;
+  messagesCharged: number; // How many messages this counted as
+}
+
+export interface RoundTableStreamEvent {
+  type: "advisor_start" | "advisor_chunk" | "advisor_complete" | "synthesis_start" | "synthesis_chunk" | "synthesis_complete" | "error";
+  advisorId?: AgentType;
+  advisorName?: string;
+  content?: string;
+  tokensUsed?: number;
+  relevanceScore?: number;
+  error?: string;
 }
 
 // ============================================
@@ -86,6 +118,8 @@ export interface ChatRequest {
   message: string;
   conversationId?: string;
   agent: AgentType;
+  // Round Table specific
+  selectedAdvisors?: AgentType[]; // User can force-select advisors
 }
 
 export interface ChatResponse {
@@ -95,7 +129,7 @@ export interface ChatResponse {
 }
 
 // ============================================
-// DOCUMENT TYPES (NEW - for Knowledge Base)
+// DOCUMENT TYPES (for Knowledge Base)
 // ============================================
 
 export interface DocumentMetadata {
