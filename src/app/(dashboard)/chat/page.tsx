@@ -933,11 +933,6 @@ function ChatContent() {
     }
   }, [conversationIdParam]);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Auto-resize textarea
   useEffect(() => {
     if (inputRef.current) {

@@ -307,11 +307,6 @@ function RoundTableContent() {
         } catch { /* silent */ }
     }, []);
 
-    // Auto-scroll
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, loadingPhase]);
-
     // Auto-resize textarea
     useEffect(() => {
         if (inputRef.current) {
