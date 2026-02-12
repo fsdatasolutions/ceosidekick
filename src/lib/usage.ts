@@ -289,3 +289,12 @@ export async function upgradeTier(userId: string, newTier: TierType): Promise<vo
             eq(monthlyUsage.period, period)
         ));
 }
+
+// ===========================================
+// GET USER TIER (for server-side layout usage)
+// ===========================================
+
+export async function getUserTier(userId: string): Promise<string> {
+    const subscription = await getUserSubscription(userId);
+    return subscription?.tier || "free";
+}

@@ -1,4 +1,6 @@
+// src/agents/index.ts
 // Agent Configuration Exports
+
 export { technologyPartnerConfig } from "./technology-partner";
 export { executiveCoachConfig } from "./executive-coach";
 export { legalAdvisorConfig } from "./legal-advisor";
@@ -7,12 +9,26 @@ export { marketingPartnerConfig } from "./marketing-partner";
 export { salesPartnerConfig } from "./sales-partner";
 export { knowledgeBaseConfig } from "./knowledge-base";
 export { contentEngineConfig } from "./content-engine";
+export { roundTableConfig } from "./round-table";
+
+// Round Table specific exports
+export {
+    ROUND_TABLE_ELIGIBLE_ADVISORS,
+    ADVISOR_DISPLAY_NAMES,
+    RELEVANCE_CLASSIFIER_PROMPT,
+    SYNTHESIS_PROMPT,
+} from "./round-table";
 
 // Types
 export * from "./types";
 
 // Graph
-export { runConversation, streamConversation, agentConfigs } from "./graph";
+export {
+    runConversation,
+    streamConversation,
+    streamRoundTableConversation,
+    agentConfigs,
+} from "./graph";
 
 // Agent UI Configuration
 import { AgentType, AgentUIConfig } from "./types";
@@ -25,6 +41,7 @@ import {
     PenTool,
     TrendingUp,
     DollarSign,
+    MessagesSquare,
 } from "lucide-react";
 
 export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
@@ -32,7 +49,8 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
         id: "technology",
         name: "Technology Partner",
         subtitle: "Virtual CTO/CIO",
-        description: "Technology strategy, digital transformation, and build vs. buy decisions",
+        description:
+            "Technology strategy, digital transformation, and build vs. buy decisions",
         color: "bg-accent-teal",
         lightColor: "bg-accent-teal-light",
         textColor: "text-accent-teal",
@@ -43,14 +61,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "IT budget optimization",
             "Security & compliance guidance",
         ],
-        example: '"Should I build a custom app or use off-the-shelf software?"',
+        example:
+            '"Should I build a custom app or use off-the-shelf software?"',
         href: "/chat?agent=technology",
     },
     coach: {
         id: "coach",
         name: "Executive Coach",
         subtitle: "Leadership Partner",
-        description: "Leadership development, decision-making frameworks, and strategic thinking",
+        description:
+            "Leadership development, decision-making frameworks, and strategic thinking",
         color: "bg-agent-coach",
         lightColor: "bg-purple-100",
         textColor: "text-agent-coach",
@@ -61,14 +81,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Goal setting (OKRs/KPIs)",
             "Work-life balance coaching",
         ],
-        example: '"Help me prepare for a difficult conversation with an underperforming employee"',
+        example:
+            '"Help me prepare for a difficult conversation with an underperforming employee"',
         href: "/chat?agent=coach",
     },
     legal: {
         id: "legal",
         name: "Legal Advisor",
         subtitle: "Contract & Compliance",
-        description: "Contract review, terms of service, and business compliance guidance",
+        description:
+            "Contract review, terms of service, and business compliance guidance",
         color: "bg-agent-legal",
         lightColor: "bg-blue-100",
         textColor: "text-agent-legal",
@@ -87,7 +109,8 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
         id: "hr",
         name: "HR Partner",
         subtitle: "People Operations",
-        description: "Job descriptions, hiring processes, and HR policy development",
+        description:
+            "Job descriptions, hiring processes, and HR policy development",
         color: "bg-agent-hr",
         lightColor: "bg-green-100",
         textColor: "text-agent-hr",
@@ -98,14 +121,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Onboarding checklists",
             "Employee handbook guidance",
         ],
-        example: '"Help me write a job description for a marketing manager"',
+        example:
+            '"Help me write a job description for a marketing manager"',
         href: "/chat?agent=hr",
     },
     marketing: {
         id: "marketing",
         name: "Marketing Partner",
         subtitle: "Growth & Brand Strategy",
-        description: "Marketing strategy, brand development, and campaign planning",
+        description:
+            "Marketing strategy, brand development, and campaign planning",
         color: "bg-pink-600",
         lightColor: "bg-pink-100",
         textColor: "text-pink-600",
@@ -116,14 +141,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Content marketing planning",
             "Marketing analytics & ROI",
         ],
-        example: '"What marketing channels should I focus on with a $5K monthly budget?"',
+        example:
+            '"What marketing channels should I focus on with a $5K monthly budget?"',
         href: "/chat?agent=marketing",
     },
     sales: {
         id: "sales",
         name: "Sales Partner",
         subtitle: "Revenue & Deals",
-        description: "Sales strategy, pipeline management, and closing techniques",
+        description:
+            "Sales strategy, pipeline management, and closing techniques",
         color: "bg-orange-600",
         lightColor: "bg-orange-100",
         textColor: "text-orange-600",
@@ -134,14 +161,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Proposal & pricing strategy",
             "Sales team coaching",
         ],
-        example: '"How do I handle when prospects say we\'re too expensive?"',
+        example:
+            '"How do I handle when prospects say we\'re too expensive?"',
         href: "/chat?agent=sales",
     },
     knowledge: {
         id: "knowledge",
         name: "Knowledge Base",
         subtitle: "Company AI",
-        description: "Q&A powered by your uploaded documents and company knowledge",
+        description:
+            "Q&A powered by your uploaded documents and company knowledge",
         color: "bg-agent-knowledge",
         lightColor: "bg-indigo-100",
         textColor: "text-agent-knowledge",
@@ -152,14 +181,16 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Meeting notes summarization",
             "New employee onboarding",
         ],
-        example: '"What was decided in last month\'s strategy meeting?"',
+        example:
+            '"What was decided in last month\'s strategy meeting?"',
         href: "/chat?agent=knowledge",
     },
     content: {
         id: "content",
         name: "Content Engine",
         subtitle: "Thought Leadership",
-        description: "Blog posts, social media, marketing copy, and thought leadership content",
+        description:
+            "Blog posts, social media, marketing copy, and thought leadership content",
         color: "bg-primary-red",
         lightColor: "bg-primary-red-light",
         textColor: "text-primary-red",
@@ -170,8 +201,31 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
             "Email campaigns",
             "Thought leadership pieces",
         ],
-        example: '"Write a LinkedIn post about AI trends in my industry"',
+        example:
+            '"Write a LinkedIn post about AI trends in my industry"',
         href: "/chat?agent=content",
+    },
+    roundtable: {
+        id: "roundtable",
+        name: "Round Table",
+        subtitle: "C-Suite Boardroom",
+        description:
+            "Get multi-perspective guidance from your entire virtual C-suite in one conversation",
+        color: "bg-accent-gold",
+        lightColor: "bg-amber-50",
+        textColor: "text-accent-gold",
+        paidOnly: true,
+        capabilities: [
+            "Multi-advisor perspectives on any question",
+            "Synthesized executive recommendations",
+            "Cross-functional analysis",
+            "Drill into individual advisor viewpoints",
+            "Choose which advisors weigh in",
+        ],
+        example:
+            '"I\'m thinking about expanding into a new market — what should I consider?"',
+        disclaimer: "Available on PowerUser, Pro, and Team plans",
+        href: "/roundtable",
     },
 };
 
@@ -185,9 +239,10 @@ export const agentIcons: Record<AgentType, typeof Cpu> = {
     sales: DollarSign,
     knowledge: BookOpen,
     content: PenTool,
+    roundtable: MessagesSquare,
 };
 
-// Agent order for UI display
+// Agent order for UI display (Round Table excluded — it has its own nav item)
 export const agentOrder: AgentType[] = [
     "technology",
     "coach",
@@ -197,4 +252,14 @@ export const agentOrder: AgentType[] = [
     "sales",
     "knowledge",
     "content",
+];
+
+// Round Table eligible advisors for the UI selector
+export const roundTableAdvisorOrder: AgentType[] = [
+    "technology",
+    "coach",
+    "legal",
+    "hr",
+    "marketing",
+    "sales",
 ];

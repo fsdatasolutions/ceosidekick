@@ -16,6 +16,8 @@ import {
     AlertCircle,
     FolderOpen,
     Sparkles,
+    MessagesSquare,
+    Crown,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -31,11 +33,14 @@ interface NavItem {
     icon: React.ElementType;
     label: string;
     href: string;
+    badge?: string;
+    paidOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
+    { icon: MessagesSquare, label: "Round Table", href: "/roundtable", paidOnly: true },
     { icon: FileText, label: "Templates", href: "/documents" },
     { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
     { icon: Sparkles, label: "Content Engine", href: "/content-engine" },
@@ -44,13 +49,16 @@ const navItems: NavItem[] = [
 
 interface SidebarNavProps {
     isAdmin: boolean;
+    userTier?: string; // "free" | "power" | "pro" | "team"
 }
 
-export function SidebarNav({ isAdmin }: SidebarNavProps) {
+export function SidebarNav({ isAdmin, userTier = "free" }: SidebarNavProps) {
     const pathname = usePathname();
     const [isAdminView, setIsAdminView] = useState(true);
     const [settingsIncomplete, setSettingsIncomplete] = useState(false);
     const [isCheckingSettings, setIsCheckingSettings] = useState(true);
+
+    const isPaidUser = userTier === "power" || userTier === "pro" || userTier === "team";
 
     // Load saved preference on mount
     useEffect(() => {
@@ -64,7 +72,6 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
     useEffect(() => {
         checkSettingsCompletion();
 
-        // Listen for settings updates from the settings page
         const handleSettingsUpdate = () => {
             checkSettingsCompletion();
         };
@@ -82,7 +89,6 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
                 const data = await res.json();
                 const settings = data.settings || {};
 
-                // Check if required fields are populated
                 const missingFields = REQUIRED_SETTINGS_FIELDS.filter(
                     (field) => !settings[field] || settings[field].trim() === ""
                 );
@@ -102,7 +108,6 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
         localStorage.setItem("adminViewMode", newMode ? "admin" : "user");
     }
 
-    // Show admin features only if user is admin AND in admin view mode
     const showAdminFeatures = isAdmin && isAdminView;
     const isSettingsActive = pathname === "/settings";
 
@@ -110,21 +115,52 @@ export function SidebarNav({ isAdmin }: SidebarNavProps) {
         <nav className="flex-1 p-4 flex flex-col">
             <ul className="space-y-1 flex-1">
                 {navItems.map((item) => {
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                    const isActive =
+                        pathname === item.href || pathname.startsWith(item.href + "/");
+
+                    // Round Table: show for all users but style differently for free tier
+                    const isLockedPremium = item.paidOnly && !isPaidUser;
+                    const isRoundTable = item.href === "/roundtable";
 
                     return (
                         <li key={item.href}>
-                            <Link
-                                href={item.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                                    isActive
-                                        ? "bg-primary-red/10 text-primary-red font-medium"
-                                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-                                }`}
-                            >
-                                <item.icon className="w-5 h-5" />
-                                {item.label}
-                            </Link>
+                            {isLockedPremium ? (
+                                // Premium feature — show but link to pricing
+                                <Link
+                                    href="/pricing"
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors group relative
+                                        ${isRoundTable
+                                        ? "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:from-amber-100 hover:to-orange-100"
+                                        : "text-neutral-400 hover:bg-neutral-50"
+                                    }`}
+                                >
+                                    <item.icon className="w-5 h-5" />
+                                    <span className="flex-1">{item.label}</span>
+                                    <Crown className="w-4 h-4 text-amber-500" />
+                                </Link>
+                            ) : (
+                                // Normal or unlocked premium nav item
+                                <Link
+                                    href={item.href}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                                        isActive
+                                            ? isRoundTable
+                                                ? "bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 font-medium border border-amber-300"
+                                                : "bg-primary-red/10 text-primary-red font-medium"
+                                            : isRoundTable
+                                                ? "bg-gradient-to-r from-amber-50/50 to-orange-50/50 text-amber-700 hover:from-amber-50 hover:to-orange-50 border border-amber-100"
+                                                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                    }`}
+                                >
+                                    <item.icon className="w-5 h-5" />
+                                    <span className="flex-1">{item.label}</span>
+                                    {isRoundTable && (
+                                        <span className="text-[10px] font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                                            New
+                                        </span>
+                                    )}
+                                </Link>
+                            )}
                         </li>
                     );
                 })}

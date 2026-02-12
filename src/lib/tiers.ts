@@ -58,6 +58,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     features: [
       "250 messages/month",
       "All 8 AI advisors",
+      "Round Table — multi-advisor boardroom",
       "100MB document storage",
       "Priority email support",
       "Conversation export",
@@ -75,6 +76,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     features: [
       "2,500 messages/month",
       "All 8 AI advisors",
+      "Round Table — multi-advisor boardroom",
       "500MB document storage",
       "Priority support",
       "Conversation export",
@@ -93,6 +95,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     features: [
       "15,000 messages/month",
       "All 8 AI advisors",
+      "Round Table — multi-advisor boardroom",
       "2GB document storage",
       "Multiple team members",
       "Shared knowledge base",
