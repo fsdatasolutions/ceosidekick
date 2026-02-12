@@ -1,38 +1,70 @@
 // src/app/api/chat/roundtable/route.ts
-// Round Table API endpoint - orchestrates multi-advisor conversations
+// Round Table API endpoint - orchestrates multi-advisor conversations with persistence
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { streamRoundTableConversation } from "@/agents/graph";
 import { AgentType } from "@/agents/types";
 import { ROUND_TABLE_ELIGIBLE_ADVISORS } from "@/agents/round-table";
+import { eq } from "drizzle-orm";
 import {
     getUserTier,
     checkMessageAllowance,
     incrementMessageUsage,
-    getUserUsage,
 } from "@/lib/usage";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // Round Table needs more time for parallel calls
+export const maxDuration = 120;
 
-// Fetch user settings from DB (same pattern as your existing chat route)
+// Lazy database imports (same pattern as chat route)
+async function getDb() {
+    if (!process.env.DATABASE_URL) return null;
+    const { db } = await import("@/db");
+    return db;
+}
+
+async function getSchema() {
+    const { conversations, messages, userSettings } = await import("@/db/schema");
+    return { conversations, messages, userSettings };
+}
+
+// Fetch user settings (convert null → undefined for type compatibility)
 async function getUserSettings(userId: string) {
-    try {
-        const { db } = await import("@/db");
-        const { eq } = await import("drizzle-orm");
-        const { userSettings } = await import("@/db/schema");
+    const db = await getDb();
+    if (!db) return undefined;
 
+    try {
+        const { userSettings } = await getSchema();
         const settings = await db
             .select()
             .from(userSettings)
             .where(eq(userSettings.userId, userId))
             .limit(1);
 
-        return settings[0] || null;
+        if (settings.length === 0) return undefined;
+
+        const s = settings[0];
+        return {
+            companyName: s.companyName || undefined,
+            industry: s.industry || undefined,
+            companySize: s.companySize || undefined,
+            annualRevenue: s.annualRevenue || undefined,
+            productsServices: s.productsServices || undefined,
+            targetMarket: s.targetMarket || undefined,
+            userRole: s.userRole || undefined,
+            yearsExperience: s.yearsExperience || undefined,
+            areasOfFocus: s.areasOfFocus || undefined,
+            currentChallenges: s.currentChallenges || undefined,
+            shortTermGoals: s.shortTermGoals || undefined,
+            longTermGoals: s.longTermGoals || undefined,
+            techStack: s.techStack || undefined,
+            teamStructure: s.teamStructure || undefined,
+            communicationStyle: s.communicationStyle || undefined,
+            responseLength: s.responseLength || undefined,
+        };
     } catch (err) {
         console.warn("[RoundTable API] Failed to fetch settings:", err);
-        return null;
+        return undefined;
     }
 }
 
@@ -58,8 +90,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check message allowance (Round Table uses multiple messages)
-        // Minimum cost is 4 (2 advisors + classification + synthesis)
+        // Check message allowance (minimum cost: 4)
         const allowance = await checkMessageAllowance(userId, 4);
         if (!allowance.allowed) {
             return NextResponse.json(
@@ -73,55 +104,143 @@ export async function POST(req: NextRequest) {
 
         // Parse request
         const body = await req.json();
-        const { messages, conversationId, selectedAdvisors } = body;
+        const { messages: clientMessages, conversationId, selectedAdvisors } = body;
 
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        if (!clientMessages || !Array.isArray(clientMessages) || clientMessages.length === 0) {
             return NextResponse.json(
                 { error: "Messages are required" },
                 { status: 400 }
             );
         }
 
-        // Validate selected advisors if provided
+        // Validate selected advisors
         let validatedAdvisors: AgentType[] | undefined;
         if (selectedAdvisors && Array.isArray(selectedAdvisors)) {
             validatedAdvisors = selectedAdvisors.filter((a: string) =>
                 ROUND_TABLE_ELIGIBLE_ADVISORS.includes(a as AgentType)
             ) as AgentType[];
-            if (validatedAdvisors.length === 0) {
-                validatedAdvisors = undefined;
-            }
+            if (validatedAdvisors.length === 0) validatedAdvisors = undefined;
         }
 
-        // Fetch user settings for personalization
-        // Convert null values to undefined (DB returns null, UserSettings expects undefined)
-        const rawSettings = await getUserSettings(userId);
-        const settings = rawSettings
-            ? Object.fromEntries(
-                Object.entries(rawSettings).map(([key, value]) => [
-                    key,
-                    value === null ? undefined : value,
-                ])
-            )
-            : undefined;
+        // ============================================
+        // DATABASE: Get or create conversation, load history
+        // ============================================
+        const db = await getDb();
+        let currentConversationId = conversationId;
+        let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
 
-        // Create streaming response
+        // The latest user message is the last one in the clientMessages array
+        const latestUserMessage = clientMessages[clientMessages.length - 1]?.content || "";
+
+        if (db) {
+            const { conversations, messages } = await getSchema();
+
+            if (currentConversationId) {
+                // Load existing conversation history from DB
+                const existingMessages = await db
+                    .select()
+                    .from(messages)
+                    .where(eq(messages.conversationId, currentConversationId))
+                    .orderBy(messages.createdAt);
+
+                conversationHistory = existingMessages.map((m) => ({
+                    role: m.role as "user" | "assistant",
+                    content: m.content,
+                }));
+            } else {
+                // Create new conversation
+                const [newConversation] = await db
+                    .insert(conversations)
+                    .values({
+                        userId,
+                        agent: "roundtable",
+                        title: latestUserMessage.slice(0, 100),
+                    })
+                    .returning();
+
+                currentConversationId = newConversation.id;
+            }
+
+            // Save the user message
+            await db.insert(messages).values({
+                conversationId: currentConversationId,
+                role: "user",
+                content: latestUserMessage,
+            });
+        } else {
+            currentConversationId = currentConversationId || `temp-${Date.now()}`;
+        }
+
+        // Add current message to history for the AI
+        conversationHistory.push({ role: "user", content: latestUserMessage });
+
+        // Fetch user settings
+        const settings = await getUserSettings(userId);
+
+        // ============================================
+        // STREAM: Create response
+        // ============================================
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
                 try {
                     let messagesCharged = 0;
+                    let synthesisContent = "";
+                    const advisorResponsesMeta: Array<{
+                        advisorId: string;
+                        advisorName: string;
+                        response: string;
+                        relevanceScore: number;
+                        tokensUsed: number;
+                    }> = [];
+
+                    // Send conversation ID first (matches chat route pattern)
+                    const idEvent = JSON.stringify({
+                        type: "conversation_id",
+                        id: currentConversationId,
+                    });
+                    controller.enqueue(
+                        encoder.encode(`__RT_EVENT__${idEvent}__RT_END__`)
+                    );
 
                     const generator = streamRoundTableConversation({
-                        messages,
-                        conversationId,
+                        messages: conversationHistory,
+                        conversationId: currentConversationId,
                         userId,
                         settings: settings || undefined,
                         selectedAdvisors: validatedAdvisors,
                     });
 
                     for await (const chunk of generator) {
-                        // Parse the synthesis_complete event to get the message charge count
+                        // Track synthesis content for DB save
+                        const synthChunkMatch = chunk.match(
+                            /__RT_EVENT__(.+?"type"\s*:\s*"synthesis_chunk".+?)__RT_END__/
+                        );
+                        if (synthChunkMatch) {
+                            try {
+                                const event = JSON.parse(synthChunkMatch[1]);
+                                synthesisContent += event.content || "";
+                            } catch {}
+                        }
+
+                        // Track advisor responses for metadata
+                        const advisorCompleteMatch = chunk.match(
+                            /__RT_EVENT__(.+?"type"\s*:\s*"advisor_complete".+?)__RT_END__/
+                        );
+                        if (advisorCompleteMatch) {
+                            try {
+                                const event = JSON.parse(advisorCompleteMatch[1]);
+                                advisorResponsesMeta.push({
+                                    advisorId: event.advisorId,
+                                    advisorName: event.advisorName,
+                                    response: event.content,
+                                    relevanceScore: event.relevanceScore,
+                                    tokensUsed: event.tokensUsed,
+                                });
+                            } catch {}
+                        }
+
+                        // Track messages charged
                         const completeMatch = chunk.match(
                             /__RT_EVENT__(.+?"type"\s*:\s*"synthesis_complete".+?)__RT_END__/
                         );
@@ -136,12 +255,59 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(encoder.encode(chunk));
                     }
 
-                    // Increment usage after successful completion
+                    // ============================================
+                    // DATABASE: Save assistant response + metadata
+                    // ============================================
+                    if (db && currentConversationId && synthesisContent) {
+                        const { conversations, messages } = await getSchema();
+
+                        // Save assistant message with Round Table metadata
+                        await db.insert(messages).values({
+                            conversationId: currentConversationId,
+                            role: "assistant",
+                            content: synthesisContent,
+                            metadata: {
+                                type: "roundtable",
+                                advisors: advisorResponsesMeta,
+                                messagesCharged,
+                                selectedAdvisors: validatedAdvisors || "auto",
+                            },
+                        });
+
+                        // Update conversation metadata
+                        const totalMessages = conversationHistory.length + 1;
+                        await db
+                            .update(conversations)
+                            .set({
+                                lastMessageAt: new Date(),
+                                messageCount: totalMessages,
+                                updatedAt: new Date(),
+                            })
+                            .where(eq(conversations.id, currentConversationId));
+                    }
+
+                    // ============================================
+                    // USAGE: Increment after successful completion
+                    // ============================================
                     if (messagesCharged > 0) {
-                        await incrementMessageUsage(userId, messagesCharged);
-                        console.log(
-                            `[RoundTable API] Charged ${messagesCharged} messages for user ${userId}`
-                        );
+                        try {
+                            const updatedUsage = await incrementMessageUsage(userId, messagesCharged);
+                            console.log(
+                                `[RoundTable API] Charged ${messagesCharged} messages for user ${userId}. Usage: ${updatedUsage.messagesUsed}/${updatedUsage.totalAvailable}`
+                            );
+
+                            // Send usage update to client
+                            const usageEvent = JSON.stringify({
+                                type: "usage_update",
+                                usage: updatedUsage,
+                                messagesCharged,
+                            });
+                            controller.enqueue(
+                                encoder.encode(`__RT_EVENT__${usageEvent}__RT_END__`)
+                            );
+                        } catch (usageError) {
+                            console.error("[RoundTable API] Failed to increment usage:", usageError);
+                        }
                     }
 
                     controller.close();
@@ -162,8 +328,9 @@ export async function POST(req: NextRequest) {
         return new Response(stream, {
             headers: {
                 "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-transform",
                 Connection: "keep-alive",
+                "X-Accel-Buffering": "no",
             },
         });
     } catch (error) {

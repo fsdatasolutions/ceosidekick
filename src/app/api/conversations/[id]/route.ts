@@ -1,3 +1,4 @@
+//src/app/api/conversations/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
@@ -16,8 +17,8 @@ async function getSchema() {
 
 // DELETE - Delete a conversation
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -36,15 +37,15 @@ export async function DELETE(
 
     // Verify the conversation belongs to the user
     const existing = await db
-      .select()
-      .from(conversations)
-      .where(
-        and(
-          eq(conversations.id, id),
-          eq(conversations.userId, session.user.id)
+        .select()
+        .from(conversations)
+        .where(
+            and(
+                eq(conversations.id, id),
+                eq(conversations.userId, session.user.id)
+            )
         )
-      )
-      .limit(1);
+        .limit(1);
 
     if (existing.length === 0) {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -60,16 +61,16 @@ export async function DELETE(
   } catch (error) {
     console.error("Conversation DELETE error:", error);
     return NextResponse.json(
-      { error: "Failed to delete conversation" },
-      { status: 500 }
+        { error: "Failed to delete conversation" },
+        { status: 500 }
     );
   }
 }
 
 // GET - Get a single conversation with messages
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -88,15 +89,15 @@ export async function GET(
 
     // Verify the conversation belongs to the user
     const conv = await db
-      .select()
-      .from(conversations)
-      .where(
-        and(
-          eq(conversations.id, id),
-          eq(conversations.userId, session.user.id)
+        .select()
+        .from(conversations)
+        .where(
+            and(
+                eq(conversations.id, id),
+                eq(conversations.userId, session.user.id)
+            )
         )
-      )
-      .limit(1);
+        .limit(1);
 
     if (conv.length === 0) {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -104,10 +105,10 @@ export async function GET(
 
     // Get messages
     const msgs = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, id))
-      .orderBy(messages.createdAt);
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, id))
+        .orderBy(messages.createdAt);
 
     return NextResponse.json({
       conversation: conv[0],
@@ -115,14 +116,15 @@ export async function GET(
         id: m.id,
         role: m.role,
         content: m.content,
+        metadata: m.metadata || null,
         createdAt: m.createdAt.toISOString(),
       })),
     });
   } catch (error) {
     console.error("Conversation GET error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch conversation" },
-      { status: 500 }
+        { error: "Failed to fetch conversation" },
+        { status: 500 }
     );
   }
 }

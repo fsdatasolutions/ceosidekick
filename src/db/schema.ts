@@ -264,7 +264,8 @@ export type AgentType =
     | "marketing"
     | "sales"
     | "knowledge"
-    | "content";
+    | "content"
+    | "roundtable";
 
 export const conversations = pgTable(
     "conversations",
@@ -894,24 +895,6 @@ export const contentImagesRelations = relations(contentImages, ({ one, many }) =
     contentVersionsAsHero: many(contentVersions),
 }));
 
-// ============================================
-// UPDATE EXISTING RELATIONS
-// Add these to the existing usersRelations:
-// ============================================
-
-/*
-Add to usersRelations ({ one, many }) => ({
-    ...existing relations,
-    contentItems: many(contentItems),
-    contentImages: many(contentImages),
-}));
-
-Add to organizationsRelations ({ many }) => ({
-    ...existing relations,
-    contentItems: many(contentItems),
-    contentImages: many(contentImages),
-}));
-*/
 
 // ============================================
 // TYPE EXPORTS
@@ -925,4 +908,3 @@ export type NewContentVersion = typeof contentVersions.$inferInsert;
 
 export type ContentImage = typeof contentImages.$inferSelect;
 export type NewContentImage = typeof contentImages.$inferInsert;
-
