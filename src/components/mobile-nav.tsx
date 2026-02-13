@@ -18,6 +18,8 @@ import {
     AlertCircle,
     FolderOpen,
     Sparkles,
+    MessagesSquare,
+    Crown,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -56,6 +58,7 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
     const [isAdminView, setIsAdminView] = useState(true);
     const [settingsIncomplete, setSettingsIncomplete] = useState(false);
     const [isCheckingSettings, setIsCheckingSettings] = useState(true);
+    const [userTier, setUserTier] = useState<string>("free");
     const pathname = usePathname();
 
     // Load saved preference on mount
@@ -65,6 +68,22 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
             setIsAdminView(saved !== "user");
         }
     }, [isAdmin]);
+
+    // Fetch user tier for premium feature gating
+    useEffect(() => {
+        async function fetchTier() {
+            try {
+                const res = await fetch("/api/usage");
+                if (res.ok) {
+                    const data = await res.json();
+                    setUserTier(data.usage?.tier || "free");
+                }
+            } catch {
+                // Default to free on error
+            }
+        }
+        fetchTier();
+    }, []);
 
     // Check settings completion on mount and listen for updates
     useEffect(() => {
@@ -128,6 +147,8 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
     // Show admin features only if user is admin AND in admin view mode
     const showAdminFeatures = isAdmin && isAdminView;
     const isSettingsActive = pathname === "/settings";
+    const isPaidUser = userTier === "power" || userTier === "pro" || userTier === "team";
+    const isRoundTableActive = pathname === "/roundtable" || pathname.startsWith("/roundtable/");
 
     return (
         <>
@@ -262,6 +283,37 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                                 </li>
                             );
                         })}
+
+                        {/* Round Table - Premium feature */}
+                        <li>
+                            {isPaidUser ? (
+                                <Link
+                                    href="/roundtable"
+                                    onClick={() => setIsOpen(false)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                                        isRoundTableActive
+                                            ? "bg-amber-100 text-amber-800 font-medium"
+                                            : "text-neutral-600 hover:bg-amber-50 hover:text-amber-700"
+                                    }`}
+                                >
+                                    <MessagesSquare className="w-5 h-5" />
+                                    <span className="flex-1">Round Table</span>
+                                    <span className="text-[10px] font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+                                        New
+                                    </span>
+                                </Link>
+                            ) : (
+                                <Link
+                                    href="/pricing"
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-neutral-400 hover:bg-neutral-50 transition-colors"
+                                >
+                                    <MessagesSquare className="w-5 h-5" />
+                                    <span className="flex-1">Round Table</span>
+                                    <Crown className="w-4 h-4 text-amber-400" />
+                                </Link>
+                            )}
+                        </li>
 
                         {/* Settings - with completion indicator */}
                         <li>
