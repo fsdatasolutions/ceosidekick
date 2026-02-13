@@ -20,6 +20,7 @@ import {
     Sparkles,
     MessagesSquare,
     Crown,
+    PenTool,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -37,13 +38,13 @@ interface NavItem {
     href: string;
 }
 
+// Core feature navigation (Pricing moved to bottom section)
 const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: MessageSquare, label: "Chat", href: "/chat" },
     { icon: FileText, label: "Templates", href: "/documents" },
     { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
     { icon: Sparkles, label: "Content Engine", href: "/content-engine" },
-    { icon: CreditCard, label: "Pricing", href: "/pricing" },
 ];
 
 interface MobileNavProps {
@@ -149,6 +150,7 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
     const isSettingsActive = pathname === "/settings";
     const isPaidUser = userTier === "power" || userTier === "pro" || userTier === "team";
     const isRoundTableActive = pathname === "/roundtable" || pathname.startsWith("/roundtable/");
+    const isPricingActive = pathname === "/pricing";
 
     return (
         <>
@@ -263,6 +265,7 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                 {/* Navigation */}
                 <nav className="flex-1 p-4 overflow-y-auto">
                     <ul className="space-y-1">
+                        {/* Core feature navigation */}
                         {navItems.map((item) => {
                             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
@@ -315,6 +318,9 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             )}
                         </li>
 
+                        {/* Divider before utility nav */}
+                        <li className="pt-3 mt-3 border-t border-neutral-200" aria-hidden="true" />
+
                         {/* Settings - with completion indicator */}
                         <li>
                             <Link
@@ -352,6 +358,22 @@ export function MobileNav({ userName, userEmail, userImage, isAdmin = false }: M
                             >
                                 <Star className="w-5 h-5" />
                                 Feedback
+                            </Link>
+                        </li>
+
+                        {/* Pricing - Bottom of nav */}
+                        <li>
+                            <Link
+                                href="/pricing"
+                                onClick={() => setIsOpen(false)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                                    isPricingActive
+                                        ? "bg-primary-red/10 text-primary-red font-medium"
+                                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                                }`}
+                            >
+                                <CreditCard className="w-5 h-5" />
+                                Pricing
                             </Link>
                         </li>
 
