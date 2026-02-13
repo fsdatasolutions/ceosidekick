@@ -6,7 +6,6 @@ import { checkAdminAccess } from "@/lib/admin";
 import { UserSection } from "@/components/user-section";
 import { MobileNav } from "@/components/mobile-nav";
 import { SidebarNav } from "@/components/sidebar-nav";
-import { getUserTier } from "@/lib/usage";
 
 export default async function DashboardLayout({
                                                   children,
@@ -26,18 +25,6 @@ export default async function DashboardLayout({
 
     // Check admin status from database (secure server-side check)
     const { isAdmin } = await checkAdminAccess(session.user.id);
-
-    // Fetch user tier for premium feature gating
-    let userTier = "free";
-    // try {
-    //     userTier = await getUserTier(session.user.id);
-    // } catch (err) {
-    //     console.error("Failed to fetch user tier:", err);
-    // }    // try {
-    //     userTier = await getUserTier(session.user.id);
-    // } catch (err) {
-    //     console.error("Failed to fetch user tier:", err);
-    // }
 
     return (
         <div className="min-h-screen bg-neutral-50 flex">
@@ -69,8 +56,8 @@ export default async function DashboardLayout({
                     </Link>
                 </div>
 
-                {/* Navigation with Admin View Toggle */}
-                <SidebarNav isAdmin={isAdmin} userTier={userTier} />
+                {/* Navigation - SidebarNav fetches tier client-side */}
+                <SidebarNav isAdmin={isAdmin} />
 
                 {/* User Section */}
                 <UserSection
