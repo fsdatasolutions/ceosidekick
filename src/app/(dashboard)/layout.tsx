@@ -29,11 +29,15 @@ export default async function DashboardLayout({
 
     // Fetch user tier for premium feature gating
     let userTier = "free";
-    try {
-        userTier = await getUserTier(session.user.id);
-    } catch (err) {
-        console.error("Failed to fetch user tier:", err);
-    }
+    // try {
+    //     userTier = await getUserTier(session.user.id);
+    // } catch (err) {
+    //     console.error("Failed to fetch user tier:", err);
+    // }    // try {
+    //     userTier = await getUserTier(session.user.id);
+    // } catch (err) {
+    //     console.error("Failed to fetch user tier:", err);
+    // }
 
     return (
         <div className="min-h-screen bg-neutral-50 flex">
