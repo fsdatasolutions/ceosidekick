@@ -226,10 +226,10 @@ export default function KnowledgeBasePage() {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="font-display text-3xl font-bold text-neutral-900 mb-2">
-              Knowledge Base
+              Company Library
             </h1>
             <p className="text-neutral-600">
-              Upload documents to create a searchable knowledge base for your team.
+              Upload documents to create a searchable library for your team.
             </p>
           </div>
           <div className="flex gap-3">
