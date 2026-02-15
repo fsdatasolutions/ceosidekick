@@ -42,7 +42,7 @@ export function Pricing() {
                   {/* Popular Badge */}
                   {plan.popular && !plan.comingSoon && (
                       <div className="absolute top-0 left-0 right-0 bg-primary-red text-white text-center py-1.5 text-sm font-semibold">
-                        <Sparkles className="w-4 h-4 inline-block mr-1" />
+                        <Sparkles className="w-4 h-4 inline-block mr-1" aria-hidden="true" />
                         Most Popular
                       </div>
                   )}
@@ -108,7 +108,7 @@ export function Pricing() {
                             <Check className={cn(
                                 "w-5 h-5 flex-shrink-0 mt-0.5",
                                 plan.comingSoon ? "text-neutral-400" : "text-success"
-                            )} />
+                            )} aria-hidden="true" />
                             <span className={cn(
                                 plan.comingSoon ? "text-neutral-400" : "text-neutral-600"
                             )}>

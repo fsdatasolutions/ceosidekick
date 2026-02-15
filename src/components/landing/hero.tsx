@@ -7,7 +7,7 @@ import { AgentAvatar } from "@/components/ui/agent-avatar";
 
 const benefits = [
   "No credit card required",
-  "50 free messages/month",
+  "30 free messages/month",
   "Access all AI advisors",
 ];
 
@@ -15,11 +15,11 @@ export function Hero() {
   return (
       <section className="relative min-h-screen flex items-center pt-24 pb-16 overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 hero-pattern" />
+        <div className="absolute inset-0 hero-pattern" aria-hidden="true" />
 
         {/* Decorative Elements */}
-        <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary-red/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-0 w-80 h-80 bg-accent-teal/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary-red/5 rounded-full blur-3xl" aria-hidden="true" />
+        <div className="absolute bottom-1/4 left-0 w-80 h-80 bg-accent-teal/5 rounded-full blur-3xl" aria-hidden="true" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -27,11 +27,11 @@ export function Hero() {
             <div className="text-center lg:text-left">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-red-light border border-primary-red/20 text-primary-red text-sm font-semibold mb-6 animate-fade-up">
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2" aria-hidden="true">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-red opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-red"></span>
               </span>
-                Now in Beta — Get Early Access
+                Now in Beta &mdash; Get Early Access
               </div>
 
               {/* Headline */}
@@ -51,7 +51,7 @@ export function Hero() {
                 <Link href="/signup">
                   <Button size="lg" className="group">
                     Start Free Trial
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
                   </Button>
                 </Link>
                 <Button
@@ -62,7 +62,7 @@ export function Hero() {
                       document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                     }}
                 >
-                  <Play className="w-5 h-5" />
+                  <Play className="w-5 h-5" aria-hidden="true" />
                   Watch Demo
                 </Button>
               </div>
@@ -74,7 +74,7 @@ export function Hero() {
                         key={index}
                         className="flex items-center gap-2 text-sm text-neutral-600"
                     >
-                      <CheckCircle2 className="w-4 h-4 text-success" />
+                      <CheckCircle2 className="w-4 h-4 text-success" aria-hidden="true" />
                       {benefit}
                     </div>
                 ))}
@@ -87,7 +87,7 @@ export function Hero() {
                 {/* Main Card */}
                 <div className="bg-white rounded-2xl card-shadow border border-neutral-200/50 overflow-hidden">
                   {/* Browser Chrome */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-200">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-200" aria-hidden="true">
                     <div className="flex gap-1.5">
                       <div className="w-3 h-3 rounded-full bg-red-400" />
                       <div className="w-3 h-3 rounded-full bg-yellow-400" />
@@ -120,15 +120,15 @@ export function Hero() {
                         </p>
                         <div className="space-y-1.5 text-xs text-neutral-600">
                           <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden="true" />
                             Lower upfront cost ($50-150/user/mo)
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden="true" />
                             Faster time to value (days vs months)
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-warning" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />
                             May need customization later
                           </div>
                         </div>
@@ -139,7 +139,7 @@ export function Hero() {
                     <div className="flex gap-3">
                       <AgentAvatar agentId="technology" size="sm" className="flex-shrink-0" />
                       <div className="bg-neutral-100 px-4 py-3 rounded-2xl">
-                        <div className="flex gap-1">
+                        <div className="flex gap-1" aria-label="AI advisor is typing">
                           <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce" style={{ animationDelay: "0ms" }} />
                           <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce" style={{ animationDelay: "150ms" }} />
                           <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce" style={{ animationDelay: "300ms" }} />

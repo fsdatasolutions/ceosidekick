@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { href: "#features", label: "Features" },
@@ -38,13 +38,13 @@ export function Header() {
           )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex items-center justify-between">
+          <nav className="flex items-center justify-between" aria-label="Main navigation">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
                 <img
                     src="/images/robin-logo.png"
-                    alt="CEO SideKick"
+                    alt="CEO Sidekick logo &mdash; AI-powered business advisory platform"
                     className="w-6 h-6 object-contain"
                 />
               </div>
@@ -81,11 +81,11 @@ export function Header() {
                     {session?.user?.image ? (
                         <img
                             src={session.user.image}
-                            alt={session.user.name || "User"}
+                            alt={session.user.name || "User avatar"}
                             className="w-9 h-9 rounded-full border-2 border-neutral-200"
                         />
                     ) : (
-                        <div className="w-9 h-9 rounded-full bg-primary-red flex items-center justify-center text-white text-sm font-semibold">
+                        <div className="w-9 h-9 rounded-full bg-primary-red flex items-center justify-center text-white text-sm font-semibold" aria-hidden="true">
                           {session?.user?.name?.charAt(0) || "U"}
                         </div>
                     )}
@@ -108,11 +108,13 @@ export function Header() {
             <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={isMobileMenuOpen}
             >
               {isMobileMenuOpen ? (
-                  <X className="w-6 h-6 text-neutral-700" />
+                  <X className="w-6 h-6 text-neutral-700" aria-hidden="true" />
               ) : (
-                  <Menu className="w-6 h-6 text-neutral-700" />
+                  <Menu className="w-6 h-6 text-neutral-700" aria-hidden="true" />
               )}
             </button>
           </nav>

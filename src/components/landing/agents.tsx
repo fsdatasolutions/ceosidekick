@@ -25,7 +25,7 @@ export function Agents() {
               A complete C-suite at your fingertips
             </h2>
             <p className="text-lg text-neutral-600">
-              Eight specialized AI advisors, each trained on best practices in their domain.
+              Seven specialized AI advisors, each trained on best practices in their domain.
               Switch between advisors seamlessly based on your current challenge.
             </p>
           </div>
@@ -82,7 +82,7 @@ function AgentCard({ agent }: AgentCardProps) {
                     key={capIndex}
                     className="flex items-center gap-2 text-xs text-neutral-700"
                 >
-                  <div className={`w-1 h-1 rounded-full ${agent.color}`} />
+                  <div className={`w-1 h-1 rounded-full ${agent.color}`} aria-hidden="true" />
                   {capability}
                 </div>
             ))}
@@ -113,7 +113,7 @@ function AgentCard({ agent }: AgentCardProps) {
                 className="w-full group-hover:border-neutral-400 transition-colors"
             >
               Try {agent.name.split(" ")[0]}
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </Button>
           </Link>
         </div>

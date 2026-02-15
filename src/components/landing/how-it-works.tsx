@@ -9,7 +9,7 @@ const steps = [
     icon: MessageSquare,
     title: "Ask Any Business Question",
     description:
-        "Type your question in plain English. Whether it's about hiring, technology, legal matters, or strategy — just ask like you would a trusted advisor.",
+        "Type your question in plain English. Whether it\u2019s about hiring, technology, legal matters, or strategy \u2014 just ask like you would a trusted advisor.",
     color: "bg-primary-red",
   },
   {
@@ -51,7 +51,7 @@ export function HowItWorks() {
           {/* Steps */}
           <div className="relative">
             {/* Connection Line */}
-            <div className="hidden lg:block absolute top-24 left-1/2 w-2/3 h-0.5 bg-neutral-200 -translate-x-1/2" />
+            <div className="hidden lg:block absolute top-24 left-1/2 w-2/3 h-0.5 bg-neutral-200 -translate-x-1/2" aria-hidden="true" />
 
             <div className="grid md:grid-cols-3 gap-12 lg:gap-8">
               {steps.map((step, index) => (
@@ -59,9 +59,9 @@ export function HowItWorks() {
                     {/* Step Number */}
                     <div className="relative inline-block mb-6">
                       <div className={`w-20 h-20 rounded-2xl ${step.color} flex items-center justify-center shadow-lg relative z-10`}>
-                        <step.icon className="w-8 h-8 text-white" />
+                        <step.icon className="w-8 h-8 text-white" aria-hidden="true" />
                       </div>
-                      <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white border-2 border-neutral-200 flex items-center justify-center text-sm font-bold text-neutral-900 z-20">
+                      <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white border-2 border-neutral-200 flex items-center justify-center text-sm font-bold text-neutral-900 z-20" aria-hidden="true">
                         {step.number}
                       </div>
                     </div>
@@ -81,7 +81,7 @@ export function HowItWorks() {
           {/* Visual Demo */}
           <div className="mt-20 bg-neutral-900 rounded-3xl p-8 lg:p-12 overflow-hidden relative">
             {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-5">
+            <div className="absolute inset-0 opacity-5" aria-hidden="true">
               <div className="absolute top-0 left-0 w-96 h-96 bg-primary-red rounded-full blur-3xl" />
               <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent-teal rounded-full blur-3xl" />
             </div>
@@ -104,7 +104,7 @@ export function HowItWorks() {
                     "Conversation history for ongoing projects",
                   ].map((item, index) => (
                       <div key={index} className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-accent-gold flex items-center justify-center flex-shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-accent-gold flex items-center justify-center flex-shrink-0" aria-hidden="true">
                           <svg
                               className="w-3 h-3 text-neutral-900"
                               fill="none"
