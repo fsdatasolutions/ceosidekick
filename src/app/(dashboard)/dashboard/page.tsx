@@ -18,7 +18,6 @@ import {
   MessagesSquare,
   Crown,
   PenTool,
-  Users,
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -255,22 +254,24 @@ export default async function DashboardPage() {
                 usageData.status === "exceeded"
                     ? "bg-red-50 border-red-200"
                     : "bg-amber-50 border-amber-200"
-            }`}>
+            }`}
+                 role="alert"
+            >
               <div className="flex items-start gap-4">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     usageData.status === "exceeded" ? "bg-red-100" : "bg-amber-100"
                 }`}>
                   <Zap className={`w-6 h-6 ${
                       usageData.status === "exceeded" ? "text-red-600" : "text-amber-600"
-                  }`} />
+                  }`} aria-hidden="true" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-neutral-900 mb-1">
+                  <h2 className="font-semibold text-neutral-900 mb-1">
                     {usageData.status === "exceeded"
                         ? "Message Limit Reached"
                         : "Running Low on Messages"
                     }
-                  </h3>
+                  </h2>
                   <p className="text-sm text-neutral-600 mb-3">
                     {usageData.status === "exceeded"
                         ? `You've used all ${usageData.totalAvailable} messages this month. Upgrade your plan or buy a message pack to continue.`
@@ -280,7 +281,7 @@ export default async function DashboardPage() {
                   <div className="flex gap-2">
                     <Link href="/pricing">
                       <Button size="sm">
-                        <TrendingUp className="w-4 h-4" />
+                        <TrendingUp className="w-4 h-4" aria-hidden="true" />
                         Upgrade Plan
                       </Button>
                     </Link>
@@ -300,12 +301,12 @@ export default async function DashboardPage() {
             <div className="mb-8 p-5 bg-gradient-to-r from-primary-red/10 to-amber-500/10 border border-primary-red/20 rounded-xl">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-lg bg-primary-red/10 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-6 h-6 text-primary-red" />
+                  <Sparkles className="w-6 h-6 text-primary-red" aria-hidden="true" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-neutral-900 mb-1">
+                  <h2 className="font-semibold text-neutral-900 mb-1">
                     {!hasSettings ? "Personalize Your AI Advisors" : "Complete Your Setup"}
-                  </h3>
+                  </h2>
                   <p className="text-sm text-neutral-600 mb-3">
                     {!hasSettings
                         ? "Add your business context to get tailored advice from all AI advisors."
@@ -313,7 +314,7 @@ export default async function DashboardPage() {
                     }
                   </p>
                   <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-white/50 rounded-full h-2 max-w-xs">
+                    <div className="flex-1 bg-white/50 rounded-full h-2 max-w-xs" role="progressbar" aria-valuenow={settingsComplete} aria-valuemin={0} aria-valuemax={4} aria-label={`Setup progress: ${settingsComplete} of 4 sections complete`}>
                       <div
                           className="bg-primary-red h-2 rounded-full transition-all"
                           style={{ width: `${(settingsComplete / 4) * 100}%` }}
@@ -325,7 +326,7 @@ export default async function DashboardPage() {
                 <Link href="/settings">
                   <Button size="sm">
                     {!hasSettings ? "Get Started" : "Continue Setup"}
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </Link>
               </div>
@@ -338,7 +339,7 @@ export default async function DashboardPage() {
           <div className="bg-white rounded-xl border border-neutral-200 p-4">
             <div className="flex items-center gap-4 mb-3">
               <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-neutral-600" />
+                <MessageSquare className="w-5 h-5 text-neutral-600" aria-hidden="true" />
               </div>
               <div className="flex-1">
                 <div className="flex items-baseline gap-1">
@@ -348,7 +349,7 @@ export default async function DashboardPage() {
                 <p className="text-sm text-neutral-500">Messages This Month</p>
               </div>
             </div>
-            <div className="w-full bg-neutral-100 rounded-full h-2">
+            <div className="w-full bg-neutral-100 rounded-full h-2" role="progressbar" aria-valuenow={usageData.messagesUsed} aria-valuemin={0} aria-valuemax={usageData.totalAvailable} aria-label={`Message usage: ${usageData.messagesUsed} of ${usageData.totalAvailable}`}>
               <div
                   className={`h-2 rounded-full transition-all ${
                       usageData.status === "exceeded" ? "bg-red-500" :
@@ -373,7 +374,7 @@ export default async function DashboardPage() {
 
           <div className="bg-white rounded-xl border border-neutral-200 p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-neutral-600" />
+              <Clock className="w-5 h-5 text-neutral-600" aria-hidden="true" />
             </div>
             <div>
               <p className="text-2xl font-bold text-neutral-900">{conversationCount}</p>
@@ -383,7 +384,7 @@ export default async function DashboardPage() {
 
           <div className="bg-white rounded-xl border border-neutral-200 p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-neutral-600" />
+              <BookOpen className="w-5 h-5 text-neutral-600" aria-hidden="true" />
             </div>
             <div>
               <p className="text-2xl font-bold text-neutral-900">{documentCount}</p>
@@ -408,9 +409,9 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="w-11 h-11 rounded-xl bg-primary-red/10 flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5 text-primary-red" />
+                  <MessageSquare className="w-5 h-5 text-primary-red" aria-hidden="true" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-primary-red transition-colors" />
+                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-primary-red transition-colors" aria-hidden="true" />
               </div>
               <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-primary-red transition-colors">
                 Chat with Advisors
@@ -420,7 +421,7 @@ export default async function DashboardPage() {
               </p>
               {/* Mini advisor avatars */}
               <div className="flex items-center gap-1">
-                {dashboardAgents.slice(0, 5).map((agent, i) => (
+                {dashboardAgents.slice(0, 5).map((agent) => (
                     <div key={agent.id} className="w-7 h-7 -ml-1 first:ml-0 ring-2 ring-white rounded-full overflow-hidden">
                       <AgentAvatar agentId={agent.id} size="sm" />
                     </div>
@@ -440,9 +441,9 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="w-11 h-11 rounded-xl bg-teal-50 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-teal-600" />
+                  <FileText className="w-5 h-5 text-teal-600" aria-hidden="true" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-teal-600 transition-colors" />
+                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-teal-600 transition-colors" aria-hidden="true" />
               </div>
               <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-teal-700 transition-colors">
                 Templates
@@ -462,9 +463,9 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <FolderOpen className="w-5 h-5 text-blue-600" />
+                  <FolderOpen className="w-5 h-5 text-blue-600" aria-hidden="true" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-blue-600 transition-colors" />
+                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-blue-600 transition-colors" aria-hidden="true" />
               </div>
               <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-blue-700 transition-colors">
                 Company Library
@@ -490,9 +491,9 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="w-11 h-11 rounded-xl bg-purple-50 flex items-center justify-center">
-                  <PenTool className="w-5 h-5 text-purple-600" />
+                  <PenTool className="w-5 h-5 text-purple-600" aria-hidden="true" />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-purple-600 transition-colors" />
+                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-purple-600 transition-colors" aria-hidden="true" />
               </div>
               <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-purple-700 transition-colors">
                 Content Engine
@@ -513,13 +514,13 @@ export default async function DashboardPage() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center">
-                      <MessagesSquare className="w-5 h-5 text-amber-600" />
+                      <MessagesSquare className="w-5 h-5 text-amber-600" aria-hidden="true" />
                     </div>
                     <div className="flex items-center gap-2">
                   <span className="text-[10px] font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
                     New
                   </span>
-                      <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-amber-600 transition-colors" />
+                      <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-amber-600 transition-colors" aria-hidden="true" />
                     </div>
                   </div>
                   <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-amber-700 transition-colors">
@@ -536,9 +537,9 @@ export default async function DashboardPage() {
                 <div className="group relative bg-neutral-50 rounded-xl border border-neutral-200 border-dashed p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-11 h-11 rounded-xl bg-neutral-100 flex items-center justify-center">
-                      <MessagesSquare className="w-5 h-5 text-neutral-400" />
+                      <MessagesSquare className="w-5 h-5 text-neutral-400" aria-hidden="true" />
                     </div>
-                    <Crown className="w-5 h-5 text-amber-400" />
+                    <Crown className="w-5 h-5 text-amber-400" aria-hidden="true" />
                   </div>
                   <h3 className="font-semibold text-neutral-500 mb-1">
                     Round Table
@@ -565,7 +566,7 @@ export default async function DashboardPage() {
             <Link href="/chat">
               <Button variant="ghost" size="sm">
                 View All
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </Button>
             </Link>
           </div>
@@ -587,7 +588,7 @@ export default async function DashboardPage() {
                         {agent.description}
                       </p>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-neutral-400 group-hover:text-primary-red group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-5 h-5 text-neutral-400 group-hover:text-primary-red group-hover:translate-x-1 transition-all" aria-hidden="true" />
                   </div>
                 </Link>
             ))}
@@ -606,7 +607,7 @@ export default async function DashboardPage() {
                 <Link href="/chat">
                   <Button variant="ghost" size="sm">
                     View All
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </Link>
             )}
@@ -634,10 +635,10 @@ export default async function DashboardPage() {
                       </span>
                           </div>
                           <p className="text-sm text-neutral-500">
-                            {agentName} • {conversation.messageCount} messages
+                            {agentName} &middot; {conversation.messageCount} messages
                           </p>
                         </div>
-                        <ArrowRight className="w-5 h-5 text-neutral-400" />
+                        <ArrowRight className="w-5 h-5 text-neutral-400" aria-hidden="true" />
                       </Link>
                   );
                 })}
@@ -645,7 +646,7 @@ export default async function DashboardPage() {
           ) : (
               <div className="bg-white rounded-xl border border-neutral-200 p-8 text-center">
                 <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-6 h-6 text-neutral-400" />
+                  <MessageSquare className="w-6 h-6 text-neutral-400" aria-hidden="true" />
                 </div>
                 <h3 className="font-medium text-neutral-900 mb-2">No conversations yet</h3>
                 <p className="text-sm text-neutral-500 mb-4">
@@ -654,7 +655,7 @@ export default async function DashboardPage() {
                 <Link href="/chat?agent=technology">
                   <Button>
                     Start Your First Chat
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </Link>
               </div>

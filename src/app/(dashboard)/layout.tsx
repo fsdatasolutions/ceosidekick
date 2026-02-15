@@ -40,11 +40,11 @@ export default async function DashboardLayout({
             <aside className="hidden md:flex w-64 bg-white border-r border-neutral-200 flex-col fixed h-full">
                 {/* Logo */}
                 <div className="p-6 border-b border-neutral-200">
-                    <Link href="/" className="flex items-center gap-2">
+                    <Link href="/dashboard" className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
                             <img
                                 src="/images/robin-logo.png"
-                                alt="CEO SideKick"
+                                alt="CEO Sidekick logo — AI-powered business advisory platform"
                                 className="w-6 h-6 object-contain"
                             />
                         </div>
@@ -57,7 +57,9 @@ export default async function DashboardLayout({
                 </div>
 
                 {/* Navigation - SidebarNav fetches tier client-side */}
-                <SidebarNav isAdmin={isAdmin} />
+                <nav aria-label="Main navigation">
+                    <SidebarNav isAdmin={isAdmin} />
+                </nav>
 
                 {/* User Section */}
                 <UserSection
