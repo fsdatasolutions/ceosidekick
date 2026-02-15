@@ -25,6 +25,7 @@ export interface AgentConfig {
     name: string;
     subtitle: string;
     description: string;
+    altText: string;         // Descriptive alt text for avatar images (SEO + accessibility)
     color: string;           // Tailwind bg class (e.g., "bg-accent-teal")
     lightColor: string;      // Tailwind light bg class for cards
     textColor: string;       // Tailwind text class
@@ -118,6 +119,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Technology Partner",
         subtitle: "Virtual CTO/CIO",
         description: "Technology and automation strategy advisor. Get guidance on tech stack decisions, digital transformation, and build vs. buy analysis.",
+        altText: "CEO Sidekick AI Technology Partner \u2014 virtual CTO advisor",
         color: AGENT_COLORS.technology.bg,
         lightColor: AGENT_COLORS.technology.light,
         textColor: AGENT_COLORS.technology.text,
@@ -138,6 +140,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Executive Coach",
         subtitle: "Leadership Partner",
         description: "Leadership development and strategic thinking partner. Prepare for difficult conversations, set OKRs, and develop as a leader.",
+        altText: "CEO Sidekick AI Executive Coach \u2014 leadership development advisor",
         color: AGENT_COLORS.coach.bg,
         lightColor: AGENT_COLORS.coach.light,
         textColor: AGENT_COLORS.coach.text,
@@ -158,6 +161,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Legal Advisor",
         subtitle: "Contract & Compliance",
         description: "General legal guidance and document review. Get contract red flags identified and understand business structure options.",
+        altText: "CEO Sidekick AI Legal Advisor \u2014 contract and compliance guidance",
         color: AGENT_COLORS.legal.bg,
         lightColor: AGENT_COLORS.legal.light,
         textColor: AGENT_COLORS.legal.text,
@@ -179,6 +183,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "HR Partner",
         subtitle: "People Operations",
         description: "Human resources guidance and documentation. Create job descriptions, develop interview questions, and build HR processes.",
+        altText: "CEO Sidekick AI HR Partner \u2014 hiring and people operations advisor",
         color: AGENT_COLORS.hr.bg,
         lightColor: AGENT_COLORS.hr.light,
         textColor: AGENT_COLORS.hr.text,
@@ -199,6 +204,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Marketing Partner",
         subtitle: "Growth & Brand",
         description: "Marketing strategy and brand development advisor. Plan campaigns, develop positioning, and optimize your marketing spend.",
+        altText: "CEO Sidekick AI Marketing Partner \u2014 growth and brand strategy advisor",
         color: AGENT_COLORS.marketing.bg,
         lightColor: AGENT_COLORS.marketing.light,
         textColor: AGENT_COLORS.marketing.text,
@@ -219,6 +225,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Sales Partner",
         subtitle: "Revenue & Deals",
         description: "Sales strategy and deal-closing advisor. Build your sales process, handle objections, and improve your close rate.",
+        altText: "CEO Sidekick AI Sales Partner \u2014 revenue and deal strategy advisor",
         color: AGENT_COLORS.sales.bg,
         lightColor: AGENT_COLORS.sales.light,
         textColor: AGENT_COLORS.sales.text,
@@ -239,6 +246,7 @@ export const AGENTS: Record<AgentType, AgentConfig> = {
         name: "Content Engine",
         subtitle: "Thought Leadership",
         description: "AI-powered content generation for marketing and thought leadership. Create blog posts, social media, and marketing copy.",
+        altText: "CEO Sidekick AI Content Engine \u2014 blog and marketing copy generator",
         color: AGENT_COLORS.content.bg,
         lightColor: AGENT_COLORS.content.light,
         textColor: AGENT_COLORS.content.text,

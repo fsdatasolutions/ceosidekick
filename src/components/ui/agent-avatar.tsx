@@ -92,6 +92,7 @@ const SIZE_CONFIG: Record<AvatarSize, {
 
 const DEFAULT_AGENT = {
     name: "AI Advisor",
+    altText: "CEO Sidekick AI Advisor",
     color: "bg-neutral-500",
     hex: "#6B7280",
 };
@@ -123,6 +124,7 @@ export function AgentAvatar({
 
     // Generate initials for fallback (handle unknown agents)
     const agentName = agent?.name || DEFAULT_AGENT.name;
+    const agentAltText = agent?.altText || DEFAULT_AGENT.altText;
     const initials = agentName
         .split(" ")
         .map((word) => word[0])
@@ -152,7 +154,7 @@ export function AgentAvatar({
                 // Avatar Image
                 <Image
                     src={avatarUrl}
-                    alt={`${agentName} avatar`}
+                    alt={agentAltText}
                     width={sizeConfig.image}
                     height={sizeConfig.image}
                     className="w-full h-full object-cover"
@@ -176,6 +178,7 @@ export function AgentAvatar({
                 <div
                     className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
                     style={{ backgroundColor: hexColor }}
+                    aria-hidden="true"
                     title="AI Advisor"
                 />
             )}
