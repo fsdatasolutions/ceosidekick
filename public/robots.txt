@@ -1,0 +1,20 @@
+# CEO Sidekick - robots.txt
+# https://ceosidekick.biz
+
+# Allow all search engines to crawl public pages
+User-agent: *
+Allow: /
+
+# Block authenticated/app routes that shouldn't be indexed
+Disallow: /dashboard
+Disallow: /chat
+Disallow: /knowledge-base
+Disallow: /settings
+Disallow: /api/
+
+# Block Next.js internal routes
+Disallow: /_next/
+Disallow: /static/
+
+# Sitemap location
+Sitemap: https://ceosidekick.biz/sitemap.xml
