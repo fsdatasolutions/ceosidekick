@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         siteName: "CEO Sidekick",
         title: "CEO Sidekick — AI Business Advisors for Small Business",
         description:
-            "Get 24/7 access to 7 AI-powered C-suite advisors. Executive guidance at a fraction of the cost.",
+            "Get 24/7 access to 7 AI business advisors for strategy, legal, HR, marketing, sales, and content creation. Expert guidance for small business — try it free.",
         images: [
             {
                 url: "/images/og-image.png",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "CEO Sidekick — AI Business Advisors for Small Business",
         description:
-            "7 AI-powered C-suite advisors available 24/7. Strategy, legal, HR, marketing, and more.",
+            "Get 24/7 access to 7 AI business advisors for strategy, legal, HR, marketing, sales, and content creation. Expert guidance for small business — try it free.",
         images: ["/images/og-image.png"],
     },
     robots: {
