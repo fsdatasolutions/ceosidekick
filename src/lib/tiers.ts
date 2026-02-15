@@ -42,7 +42,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     description: "Perfect for trying out CEO Sidekick",
     features: [
       "30 messages/month",
-      "All 8 AI advisors",
+      "All 7 AI advisors",
       "10MB document storage",
       "Email support",
     ],
@@ -57,8 +57,8 @@ export const TIERS: Record<TierType, TierConfig> = {
     description: "For solo entrepreneurs getting serious",
     features: [
       "250 messages/month",
-      "All 8 AI advisors",
-      "Round Table — multi-advisor boardroom",
+      "All 7 AI advisors",
+      "Round Table \u2014 multi-advisor boardroom",
       "100MB document storage",
       "Priority email support",
       "Conversation export",
@@ -75,8 +75,8 @@ export const TIERS: Record<TierType, TierConfig> = {
     description: "For growing businesses that need more",
     features: [
       "2,500 messages/month",
-      "All 8 AI advisors",
-      "Round Table — multi-advisor boardroom",
+      "All 7 AI advisors",
+      "Round Table \u2014 multi-advisor boardroom",
       "500MB document storage",
       "Priority support",
       "Conversation export",
@@ -94,8 +94,8 @@ export const TIERS: Record<TierType, TierConfig> = {
     description: "Custom solutions for teams",
     features: [
       "15,000 messages/month",
-      "All 8 AI advisors",
-      "Round Table — multi-advisor boardroom",
+      "All 7 AI advisors",
+      "Round Table \u2014 multi-advisor boardroom",
       "2GB document storage",
       "Multiple team members",
       "Shared knowledge base",
