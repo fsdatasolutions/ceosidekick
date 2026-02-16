@@ -1,5 +1,6 @@
 // src/app/about/page.tsx
 // About Us page — public, SEO-optimized, server component
+// Advisor data sourced from centralized agent-config.ts
 // Sections: Hero, Mission/Vision, Founder, AI Advisor Team, Values, CTA
 
 import Link from "next/link";
@@ -15,6 +16,7 @@ import {
     Rocket,
     Users,
 } from "lucide-react";
+import { getAllAgents, AGENT_COLORS, type AgentType } from "@/config/agent-config";
 
 // ============================================
 // STRUCTURED DATA (JSON-LD)
@@ -43,81 +45,18 @@ const organizationJsonLd = {
 };
 
 // ============================================
-// AI ADVISOR DATA — with avatar images
+// BORDER COLORS (mapped from agent config)
 // ============================================
 
-const advisors = [
-    {
-        id: "technology",
-        name: "Technology Partner",
-        subtitle: "Virtual CTO",
-        description:
-            "Technology strategy, architecture decisions, and digital transformation guidance for founders without a technical co-founder.",
-        avatarUrl: "/images/avatars/technology-partner.png",
-        borderColor: "border-teal-200",
-        textColor: "text-teal-700",
-    },
-    {
-        id: "coach",
-        name: "Executive Coach",
-        subtitle: "Leadership Partner",
-        description:
-            "Leadership development, decision-making frameworks, and strategic thinking to help you grow as a business leader.",
-        avatarUrl: "/images/avatars/executive-coach.png",
-        borderColor: "border-purple-200",
-        textColor: "text-purple-700",
-    },
-    {
-        id: "legal",
-        name: "Legal Advisor",
-        subtitle: "Contract & Compliance",
-        description:
-            "Contract review, terms of service guidance, and business compliance checklists to protect your business.",
-        avatarUrl: "/images/avatars/legal-advisor.png",
-        borderColor: "border-blue-200",
-        textColor: "text-blue-700",
-    },
-    {
-        id: "hr",
-        name: "HR Partner",
-        subtitle: "People Operations",
-        description:
-            "Job descriptions, hiring processes, performance reviews, and HR policy development for growing teams.",
-        avatarUrl: "/images/avatars/hr-partner.png",
-        borderColor: "border-green-200",
-        textColor: "text-green-700",
-    },
-    {
-        id: "marketing",
-        name: "Marketing Partner",
-        subtitle: "Growth & Brand",
-        description:
-            "Marketing strategy, brand positioning, campaign planning, and analytics to grow your audience and revenue.",
-        avatarUrl: "/images/avatars/marketing-partner.png",
-        borderColor: "border-pink-200",
-        textColor: "text-pink-700",
-    },
-    {
-        id: "sales",
-        name: "Sales Partner",
-        subtitle: "Revenue & Deals",
-        description:
-            "Sales process development, pipeline management, objection handling, and proposal strategy to close more deals.",
-        avatarUrl: "/images/avatars/sales-partner.png",
-        borderColor: "border-orange-200",
-        textColor: "text-orange-700",
-    },
-    {
-        id: "content",
-        name: "Content Engine",
-        subtitle: "Thought Leadership",
-        description:
-            "AI-powered content generation for blog posts, LinkedIn articles, social media, and marketing copy.",
-        avatarUrl: "/images/avatars/content-engine.png",
-        borderColor: "border-red-200",
-        textColor: "text-red-700",
-    },
-];
+const BORDER_COLORS: Record<AgentType, string> = {
+    technology: "border-teal-200",
+    coach: "border-purple-200",
+    legal: "border-blue-200",
+    hr: "border-green-200",
+    marketing: "border-pink-200",
+    sales: "border-orange-200",
+    content: "border-red-200",
+};
 
 // ============================================
 // COMPANY VALUES
@@ -163,6 +102,8 @@ const values = [
 // ============================================
 
 export default function AboutPage() {
+    const agents = getAllAgents();
+
     return (
         <>
             {/* JSON-LD Structured Data */}
@@ -301,8 +242,7 @@ export default function AboutPage() {
                                 <div className="relative">
                                     <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center overflow-hidden border border-neutral-200">
 
-                                        <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
-
+                                         <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
                                     </div>
                                     {/* Decorative accent */}
                                     <div
@@ -375,16 +315,16 @@ export default function AboutPage() {
                         </div>
 
                         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {advisors.map((advisor) => (
+                            {agents.map((agent) => (
                                 <article
-                                    key={advisor.id}
-                                    className={`group relative rounded-2xl border ${advisor.borderColor} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
+                                    key={agent.id}
+                                    className={`group relative rounded-2xl border ${BORDER_COLORS[agent.id]} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
                                 >
                                     <div className="flex items-start gap-4 mb-4">
                                         <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shadow-sm">
                                             <Image
-                                                src={advisor.avatarUrl}
-                                                alt={`${advisor.name} — AI ${advisor.subtitle}`}
+                                                src={agent.avatarUrl}
+                                                alt={agent.altText}
                                                 width={56}
                                                 height={56}
                                                 className="w-full h-full object-cover"
@@ -392,17 +332,15 @@ export default function AboutPage() {
                                         </div>
                                         <div>
                                             <h3 className="font-display font-bold text-lg text-neutral-900">
-                                                {advisor.name}
+                                                {agent.name}
                                             </h3>
-                                            <p
-                                                className={`text-sm ${advisor.textColor} font-medium`}
-                                            >
-                                                {advisor.subtitle}
+                                            <p className={`text-sm ${agent.textColor} font-medium`}>
+                                                {agent.subtitle}
                                             </p>
                                         </div>
                                     </div>
                                     <p className="text-neutral-600 text-sm leading-relaxed">
-                                        {advisor.description}
+                                        {agent.description}
                                     </p>
                                 </article>
                             ))}
