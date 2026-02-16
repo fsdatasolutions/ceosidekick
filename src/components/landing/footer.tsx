@@ -11,42 +11,28 @@ const footerLinks = {
       { label: "Features", href: "#features" },
       { label: "AI Advisors", href: "#agents" },
       { label: "Pricing", href: "#pricing" },
-      { label: "Content Engine", href: "https://ce.ceosidekick.biz" },
-      { label: "Roadmap", href: "#" },
-    ],
-  },
-  resources: {
-    title: "Resources",
-    links: [
-      { label: "Documentation", href: "#" },
-      { label: "Blog", href: "#" },
-      { label: "Case Studies", href: "#" },
-      { label: "Help Center", href: "#" },
-      { label: "API (Coming Soon)", href: "#" },
+      { label: "Roadmap", href: "/roadmap" },
     ],
   },
   company: {
     title: "Company",
     links: [
       { label: "About", href: "/about" },
-      { label: "Careers", href: "#" },
-      { label: "Contact", href: "#" },
-      { label: "Partners", href: "#" },
+      { label: "Contact", href: "mailto:support@ceosidekick.biz" },
     ],
   },
   legal: {
     title: "Legal",
     links: [
-      { label: "Privacy Policy", href: "#" },
-      { label: "Terms of Service", href: "#" },
-      { label: "Cookie Policy", href: "#" },
-      { label: "Security", href: "#" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
     ],
   },
 };
 
+// TODO: Replace # with actual social URLs
 const socialLinks = [
-  { icon: Twitter, href: "#", label: "Twitter" },
+  { icon: Twitter, href: "#", label: "Twitter / X" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
   { icon: Github, href: "#", label: "GitHub" },
 ];
@@ -57,7 +43,7 @@ export function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Footer */}
           <div className="py-16">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
               {/* Brand Column */}
               <div className="col-span-2">
                 <Link href="/" className="flex items-center gap-2 mb-4">
@@ -79,20 +65,23 @@ export function Footer() {
                   guidance across strategy, technology, legal, HR, and more.
                 </p>
                 <div className="flex gap-4">
-                  {socialLinks.map((social, index) => (
-                      <a
+                  {socialLinks
+                      .filter((social) => social.href !== "#")
+                      .map((social, index) => (
+                    < a
                           key={index}
-                          href={social.href}
-                          className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
-                          aria-label={social.label}
-                          rel="noopener noreferrer"
-                      >
-                        <social.icon
-                            className="w-5 h-5 text-neutral-400"
-                            aria-hidden="true"
-                        />
-                      </a>
-                  ))}
+                    href={social.href}
+                    target="_blank"
+                    className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                    aria-label={social.label}
+                    rel="noopener noreferrer"
+                    >
+                    <social.icon
+                    className="w-5 h-5 text-neutral-400"
+                    aria-hidden="true"
+                    />
+                    </a>
+                    ))}
                 </div>
               </div>
 

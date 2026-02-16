@@ -1,5 +1,6 @@
 // src/lib/tiers.ts
 // Subscription tiers and message pack configuration
+// Single source of truth for all pricing, limits, and feature gating
 
 export type TierType = "free" | "power" | "pro" | "team";
 
@@ -9,7 +10,7 @@ export interface TierConfig {
   price: number; // Monthly price in cents
   priceDisplay: string;
   messagesPerMonth: number;
-  documentStorageMB: number;
+  companyLibraryStorageMB: number; // RAG document storage limit
   features: string[];
   description?: string; // For marketing/landing pages
   isPopular?: boolean;
@@ -28,6 +29,18 @@ export interface MessagePackConfig {
 }
 
 // ===========================================
+// FEATURE GATING
+// ===========================================
+// Free:      Chat with all 7 AI advisors
+// Paid:      + Company Library (RAG), Business Document Templates, Round Table
+
+export const PAID_FEATURES = [
+  "Company Library — upload & search your documents",
+  "Business Document Templates",
+  "Round Table — multi-advisor boardroom",
+] as const;
+
+// ===========================================
 // SUBSCRIPTION TIERS
 // ===========================================
 
@@ -38,13 +51,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     price: 0,
     priceDisplay: "$0",
     messagesPerMonth: 30,
-    documentStorageMB: 10,
+    companyLibraryStorageMB: 0,
     description: "Perfect for trying out CEO Sidekick",
     features: [
       "30 messages/month",
       "All 7 AI advisors",
-      "10MB document storage",
-      "Email support",
     ],
   },
   power: {
@@ -53,15 +64,14 @@ export const TIERS: Record<TierType, TierConfig> = {
     price: 2900, // $29.00
     priceDisplay: "$29",
     messagesPerMonth: 250,
-    documentStorageMB: 100,
+    companyLibraryStorageMB: 100,
     description: "For solo entrepreneurs getting serious",
     features: [
       "250 messages/month",
       "All 7 AI advisors",
-      "Round Table \u2014 multi-advisor boardroom",
-      "100MB document storage",
-      "Priority email support",
-      "Conversation export",
+      "Company Library — 100MB document storage",
+      "Business Document Templates",
+      "Round Table — multi-advisor boardroom",
     ],
     isPopular: true,
   },
@@ -71,17 +81,14 @@ export const TIERS: Record<TierType, TierConfig> = {
     price: 19900, // $199.00
     priceDisplay: "$199",
     messagesPerMonth: 2500,
-    documentStorageMB: 500,
+    companyLibraryStorageMB: 500,
     description: "For growing businesses that need more",
     features: [
       "2,500 messages/month",
       "All 7 AI advisors",
-      "Round Table \u2014 multi-advisor boardroom",
-      "500MB document storage",
-      "Priority support",
-      "Conversation export",
-      "API access",
-      "Custom integrations",
+      "Company Library — 500MB document storage",
+      "Business Document Templates",
+      "Round Table — multi-advisor boardroom",
     ],
   },
   team: {
@@ -90,17 +97,16 @@ export const TIERS: Record<TierType, TierConfig> = {
     price: 50000, // $500.00
     priceDisplay: "$500",
     messagesPerMonth: 15000,
-    documentStorageMB: 2048, // 2GB
+    companyLibraryStorageMB: 2048, // 2GB
     description: "Custom solutions for teams",
     features: [
       "15,000 messages/month",
       "All 7 AI advisors",
-      "Round Table \u2014 multi-advisor boardroom",
-      "2GB document storage",
+      "Company Library — 2GB document storage",
+      "Business Document Templates",
+      "Round Table — multi-advisor boardroom",
       "Multiple team members",
       "Shared knowledge base",
-      "Admin dashboard",
-      "Dedicated support",
     ],
     isComingSoon: true,
   },
@@ -153,6 +159,17 @@ export function getTierByStripePriceId(priceId: string): TierConfig | undefined 
   return Object.values(TIERS).find((tier) => tier.stripePriceId === priceId);
 }
 
+/** Check if a tier has access to paid features (Company Library, Templates, Round Table) */
+export function hasPaidFeatures(tierId: TierType | string): boolean {
+  return tierId !== "free";
+}
+
+/** Get the Company Library storage limit in bytes for a tier */
+export function getStorageLimitBytes(tierId: TierType | string): number {
+  const tier = getTier(tierId);
+  return tier.companyLibraryStorageMB * 1024 * 1024;
+}
+
 export function formatMessageCount(count: number): string {
   if (count >= 1000) {
     return `${(count / 1000).toFixed(count % 1000 === 0 ? 0 : 1)}k`;
@@ -165,7 +182,10 @@ export function getUsagePercentage(used: number, limit: number): number {
   return Math.min(Math.round((used / limit) * 100), 100);
 }
 
-export function getUsageStatus(used: number, limit: number): "ok" | "warning" | "critical" | "exceeded" {
+export function getUsageStatus(
+    used: number,
+    limit: number
+): "ok" | "warning" | "critical" | "exceeded" {
   const percentage = getUsagePercentage(used, limit);
   if (percentage >= 100) return "exceeded";
   if (percentage >= 90) return "critical";
@@ -184,7 +204,6 @@ export function getAvailableTiers(includeComingSoon = false): TierConfig[] {
 // LANDING PAGE HELPERS
 // ===========================================
 
-// Convert tier config to landing page plan format
 export interface LandingPagePlan {
   name: string;
   description: string;

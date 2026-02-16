@@ -26,19 +26,19 @@ export async function GET() {
             return NextResponse.json({
                 usage: {
                     messagesThisMonth: 0,
-                    messageLimit: 50,
+                    messageLimit: 30,
                     conversationCount: 0,
                     documentCount: 0,
                     plan: "free",
                     tier: "free",
                     tierName: "Free",
                     tierPrice: "$0",
-                    documentStorageMB: 10,
+                    companyLibraryStorageMB: 0,
                     messagesUsed: 0,
-                    messagesLimit: 50,
+                    messagesLimit: 30,
                     bonusMessages: 0,
-                    totalAvailable: 50,
-                    remaining: 50,
+                    totalAvailable: 30,
+                    remaining: 30,
                     percentage: 0,
                     period: "",
                     status: "ok",
@@ -78,7 +78,7 @@ export async function GET() {
                 conversationCount: conversationResult[0]?.count || 0,
                 documentCount: documentResult[0]?.count || 0,
                 tierPrice: tier.priceDisplay,
-                documentStorageMB: tier.documentStorageMB,
+                companyLibraryStorageMB: tier.companyLibraryStorageMB,
             },
         });
     } catch (error) {
