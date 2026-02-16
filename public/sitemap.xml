@@ -3,9 +3,17 @@
     <!-- Homepage / Landing Page -->
     <url>
         <loc>https://ceosidekick.biz/</loc>
-        <lastmod>2026-02-15</lastmod>
+        <lastmod>2026-02-16</lastmod>
         <changefreq>weekly</changefreq>
         <priority>1.0</priority>
+    </url>
+
+    <!-- About Page -->
+    <url>
+        <loc>https://ceosidekick.biz/about</loc>
+        <lastmod>2026-02-16</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
     </url>
 
     <!-- Authentication Pages -->
@@ -38,7 +46,7 @@
 
     <!-- AI Advisor Chat Routes -->
     <url>
-        <loc>https://ceosidekick.biz/chat?agent=strategy</loc>
+        <loc>https://ceosidekick.biz/chat?agent=technology</loc>
         <lastmod>2026-02-15</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>

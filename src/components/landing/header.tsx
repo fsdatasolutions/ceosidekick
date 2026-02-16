@@ -1,3 +1,4 @@
+// src/components/landing/header.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,6 +13,7 @@ const navLinks = [
   { href: "#agents", label: "AI Advisors" },
   { href: "#pricing", label: "Pricing" },
   { href: "#testimonials", label: "Testimonials" },
+  { href: "/about", label: "About" },
 ];
 
 export function Header() {
@@ -44,7 +46,7 @@ export function Header() {
               <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
                 <img
                     src="/images/robin-logo.png"
-                    alt="CEO Sidekick logo &mdash; AI-powered business advisory platform"
+                    alt="CEO Sidekick logo — AI-powered business advisory platform"
                     className="w-6 h-6 object-contain"
                 />
               </div>
@@ -85,7 +87,10 @@ export function Header() {
                             className="w-9 h-9 rounded-full border-2 border-neutral-200"
                         />
                     ) : (
-                        <div className="w-9 h-9 rounded-full bg-primary-red flex items-center justify-center text-white text-sm font-semibold" aria-hidden="true">
+                        <div
+                            className="w-9 h-9 rounded-full bg-primary-red flex items-center justify-center text-white text-sm font-semibold"
+                            aria-hidden="true"
+                        >
                           {session?.user?.name?.charAt(0) || "U"}
                         </div>
                     )}

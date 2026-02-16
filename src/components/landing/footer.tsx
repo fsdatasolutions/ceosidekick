@@ -1,7 +1,8 @@
+// src/components/landing/footer.tsx
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Twitter, Linkedin, Github } from "lucide-react";
+import { Twitter, Linkedin, Github } from "lucide-react";
 
 const footerLinks = {
   product: {
@@ -27,7 +28,7 @@ const footerLinks = {
   company: {
     title: "Company",
     links: [
-      { label: "About", href: "#" },
+      { label: "About", href: "/about" },
       { label: "Careers", href: "#" },
       { label: "Contact", href: "#" },
       { label: "Partners", href: "#" },
@@ -60,10 +61,10 @@ export function Footer() {
               {/* Brand Column */}
               <div className="col-span-2">
                 <Link href="/" className="flex items-center gap-2 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20">
                     <img
                         src="/images/robin-logo.png"
-                        alt="CEO Sidekick logo &mdash; AI-powered business advisory platform"
+                        alt="CEO Sidekick logo — AI-powered business advisory platform"
                         className="w-6 h-6 object-contain"
                     />
                   </div>
@@ -74,8 +75,8 @@ export function Footer() {
                   </div>
                 </Link>
                 <p className="text-neutral-400 text-sm leading-relaxed mb-6 max-w-xs">
-                  Your AI-powered C-suite. On-demand access to executive-level guidance
-                  across strategy, technology, legal, HR, and more.
+                  Your AI-powered C-suite. On-demand access to executive-level
+                  guidance across strategy, technology, legal, HR, and more.
                 </p>
                 <div className="flex gap-4">
                   {socialLinks.map((social, index) => (
@@ -84,8 +85,12 @@ export function Footer() {
                           href={social.href}
                           className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                           aria-label={social.label}
+                          rel="noopener noreferrer"
                       >
-                        <social.icon className="w-5 h-5 text-neutral-400" aria-hidden="true" />
+                        <social.icon
+                            className="w-5 h-5 text-neutral-400"
+                            aria-hidden="true"
+                        />
                       </a>
                   ))}
                 </div>
@@ -94,7 +99,9 @@ export function Footer() {
               {/* Link Columns */}
               {Object.entries(footerLinks).map(([key, section]) => (
                   <div key={key}>
-                    <h3 className="font-semibold text-white mb-4">{section.title}</h3>
+                    <h3 className="font-semibold text-white mb-4">
+                      {section.title}
+                    </h3>
                     <ul className="space-y-3">
                       {section.links.map((link, index) => (
                           <li key={index}>
@@ -116,7 +123,8 @@ export function Footer() {
           <div className="py-6 border-t border-white/10">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-sm text-neutral-500">
-                &copy; {new Date().getFullYear()} Full Stack Data Solutions. All rights reserved.
+                &copy; {new Date().getFullYear()} Full Stack Data Solutions. All
+                rights reserved.
               </p>
               <div className="flex items-center gap-6">
               <span className="text-xs text-neutral-600">
