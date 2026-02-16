@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ImageGallery } from "./components/image-gallery";
 import { ImageUploadModal } from "./components/image-upload-modal";
 import { ImageGenerateModal } from "./components/image-generate-modal";
+import { refreshSignedUrl } from "@/lib/gcs";
 
 interface PageProps {
   searchParams: Promise<{
@@ -78,20 +79,23 @@ export default async function ImagesPage({ searchParams }: PageProps) {
   const hasMore = pagination.hasMore ?? false;
 
   // Transform images to match the expected interface for ImageGallery
-  const transformedImages = images.map((img) => ({
-    id: img.id,
-    name: img.name,
-    url: img.gcsUrl, // Map gcsUrl to url
-    mimeType: img.mimeType,
-    size: img.size,
-    width: img.width ?? undefined,
-    height: img.height ?? undefined,
-    source: img.source,
-    prompt: img.generatedFromPrompt ?? undefined,
-    altText: img.altText ?? undefined,
-    usageCount: img.usageCount ?? 0,
-    createdAt: img.createdAt.toISOString(),
-  }));
+  // Generate fresh signed URLs for serving
+  const transformedImages = await Promise.all(
+    images.map(async (img) => ({
+      id: img.id,
+      name: img.name,
+      url: await refreshSignedUrl(img.gcsPath, 1), // 1 day expiry
+      mimeType: img.mimeType,
+      size: img.size,
+      width: img.width ?? undefined,
+      height: img.height ?? undefined,
+      source: img.source,
+      prompt: img.generatedFromPrompt ?? undefined,
+      altText: img.altText ?? undefined,
+      usageCount: img.usageCount ?? 0,
+      createdAt: img.createdAt.toISOString(),
+    }))
+  );
 
   return (
       <div className="p-8">

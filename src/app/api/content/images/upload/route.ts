@@ -3,8 +3,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { uploadImageToGCS } from "@/lib/gcs";
+import { uploadImageToGCS, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
+import { logErrorToFeedback } from "@/lib/services/error-logger";
 
 // TODO: Import your actual usage/credit functions
 // import { deductMessageCredit, checkMessageCredits } from "@/lib/services/usage";
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
             console.warn("Could not extract image dimensions:", e);
         }
 
-        // Upload to GCS
+        // Upload to GCS — this is required for uploads (no fallback URL like DALL-E)
         const uploadResult = await uploadImageToGCS({
             userId,
             fileName: file.name,
@@ -108,46 +109,72 @@ export async function POST(request: NextRequest) {
             buffer,
         });
 
+        // Track warnings for non-fatal errors
+        const warnings: string[] = [];
+        let savedImage: any = null;
+
         // Create database record
-        const image = await createContentImage({
-            userId,
-            name: customName || file.name,
-            originalName: file.name,
-            gcsUrl: uploadResult.gcsUrl,
-            gcsBucket: uploadResult.gcsBucket,
-            gcsPath: uploadResult.gcsPath,
-            mimeType: uploadResult.mimeType,
-            size: uploadResult.size,
-            width,
-            height,
-            source: "upload",
-            altText: altText || undefined,
-        });
+        try {
+            savedImage = await createContentImage({
+                userId,
+                name: customName || file.name,
+                originalName: file.name,
+                gcsUrl: uploadResult.gcsUrl,
+                gcsBucket: uploadResult.gcsBucket,
+                gcsPath: uploadResult.gcsPath,
+                mimeType: uploadResult.mimeType,
+                size: uploadResult.size,
+                width,
+                height,
+                source: "upload",
+                altText: altText || undefined,
+            });
+        } catch (dbError: any) {
+            console.error("Database insert error (non-fatal):", dbError);
+            warnings.push("Image was uploaded but could not be saved to the library.");
+            logErrorToFeedback({
+                userId,
+                source: "content-image-upload-db",
+                error: dbError,
+                metadata: { fileName: file.name, gcsPath: uploadResult.gcsPath, size: uploadResult.size },
+            });
+        }
 
         // Deduct 1 credit for upload
         await deductMessageCredit(userId, {
             type: "content_image_upload",
             agent: "content",
             metadata: {
-                imageId: image.id,
+                imageId: savedImage?.id,
                 fileName: file.name,
                 size: uploadResult.size,
+                hadWarnings: warnings.length > 0,
             },
         });
+
+        // Generate a fresh signed URL for the response
+        let imageUrl: string;
+        try {
+            imageUrl = await refreshSignedUrl(uploadResult.gcsPath, 1); // 1 day expiry
+        } catch (urlError: any) {
+            console.error("Signed URL generation error (non-fatal):", urlError);
+            imageUrl = uploadResult.gcsUrl;
+        }
 
         return NextResponse.json({
             success: true,
             image: {
-                id: image.id,
-                name: image.name,
-                url: image.gcsUrl,
-                mimeType: image.mimeType,
-                size: image.size,
-                width: image.width,
-                height: image.height,
-                source: image.source,
-                createdAt: image.createdAt,
+                id: savedImage?.id || null,
+                name: savedImage?.name || customName || file.name,
+                url: imageUrl,
+                mimeType: uploadResult.mimeType,
+                size: uploadResult.size,
+                width: savedImage?.width || width,
+                height: savedImage?.height || height,
+                source: "upload",
+                createdAt: savedImage?.createdAt || new Date().toISOString(),
             },
+            ...(warnings.length > 0 && { warnings }),
         });
     } catch (error: any) {
         console.error("Image upload error:", error);

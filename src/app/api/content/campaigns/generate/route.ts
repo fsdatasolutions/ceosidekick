@@ -13,8 +13,9 @@ import {
     type CampaignOutputs,
 } from "@/lib/services/content-campaigns";
 import { generateImage } from "@/lib/dalle";
-import { uploadImageFromUrl } from "@/lib/gcs";
+import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
+import { logErrorToFeedback } from "@/lib/services/error-logger";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -307,41 +308,77 @@ export async function POST(request: NextRequest) {
 
                     console.log("[Campaign Generate] DALL-E returned image URL");
 
-                    // Upload to GCS
-                    console.log("[Campaign Generate] Uploading to GCS...");
-                    const uploadResult = await uploadImageFromUrl(imageResult.imageUrl, {
-                        userId,
-                        fileName: `campaign-hero-${Date.now()}.png`,
-                        mimeType: 'image/png',
-                    });
+                    // Upload to GCS (non-fatal — image was already generated)
+                    let uploadResult: any = null;
+                    let savedImage: any = null;
+                    let finalImageUrl: string = imageResult.imageUrl; // Fallback to DALL-E's temporary URL
 
-                    console.log("[Campaign Generate] Uploaded to GCS:", uploadResult.gcsPath);
+                    try {
+                        console.log("[Campaign Generate] Uploading to GCS...");
+                        uploadResult = await uploadImageFromUrl(imageResult.imageUrl, {
+                            userId,
+                            fileName: `campaign-hero-${Date.now()}.png`,
+                            mimeType: 'image/png',
+                        });
+                        console.log("[Campaign Generate] Uploaded to GCS:", uploadResult.gcsPath);
+                    } catch (gcsError: unknown) {
+                        const gcsMsg = gcsError instanceof Error ? gcsError.message : 'Unknown GCS error';
+                        console.error("[Campaign Generate] GCS upload error (non-fatal):", gcsMsg, gcsError);
+                        logErrorToFeedback({
+                            userId,
+                            source: "campaign-generate-image-gcs",
+                            error: gcsError,
+                            metadata: { campaignId: campaign.id, imagePrompt },
+                        });
+                    }
 
-                    // Save to database
-                    console.log("[Campaign Generate] Saving image to database...");
-                    const image = await createContentImage({
-                        userId,
-                        name: `Hero: ${brief.topic.substring(0, 50)}`,
-                        originalName: `campaign-hero.png`,
-                        gcsUrl: uploadResult.gcsUrl,
-                        gcsBucket: uploadResult.gcsBucket,
-                        gcsPath: uploadResult.gcsPath,
-                        mimeType: 'image/png',
-                        size: uploadResult.size,
-                        width: 1792,
-                        height: 1024,
-                        source: 'dalle',
-                        generatedFromPrompt: imagePrompt,
-                        aiModel: 'dall-e-3',
-                    });
+                    // Save to database (only if GCS upload succeeded)
+                    if (uploadResult) {
+                        try {
+                            console.log("[Campaign Generate] Saving image to database...");
+                            savedImage = await createContentImage({
+                                userId,
+                                name: `Hero: ${brief.topic.substring(0, 50)}`,
+                                originalName: `campaign-hero.png`,
+                                gcsUrl: uploadResult.gcsUrl,
+                                gcsBucket: uploadResult.gcsBucket,
+                                gcsPath: uploadResult.gcsPath,
+                                mimeType: 'image/png',
+                                size: uploadResult.size,
+                                width: 1792,
+                                height: 1024,
+                                source: 'dalle',
+                                generatedFromPrompt: imagePrompt,
+                                aiModel: 'dall-e-3',
+                            });
+                            console.log("[Campaign Generate] Image saved to database:", savedImage.id);
+                        } catch (dbError: unknown) {
+                            const dbMsg = dbError instanceof Error ? dbError.message : 'Unknown DB error';
+                            console.error("[Campaign Generate] DB insert error (non-fatal):", dbMsg, dbError);
+                            logErrorToFeedback({
+                                userId,
+                                source: "campaign-generate-image-db",
+                                error: dbError,
+                                metadata: { campaignId: campaign.id, gcsPath: uploadResult.gcsPath },
+                            });
+                        }
 
-                    console.log("[Campaign Generate] Image saved to database:", image.id);
+                        // Generate a fresh signed URL
+                        try {
+                            finalImageUrl = await refreshSignedUrl(uploadResult.gcsPath, 1);
+                        } catch {
+                            finalImageUrl = uploadResult.gcsUrl;
+                        }
+                    }
 
                     updateCampaignContent(campaign.id, 'image', {
                         status: 'completed',
-                        id: image.id,
-                        url: uploadResult.gcsUrl,
+                        id: savedImage?.id || null,
+                        url: finalImageUrl,
                         prompt: imagePrompt,
+                        ...((!uploadResult || !savedImage) && {
+                            warning: "Image was generated but could not be fully saved. The URL may be temporary.",
+                        }),
                     });
 
                     console.log("[Campaign Generate] Image saved to campaign");

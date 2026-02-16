@@ -9,8 +9,9 @@ import {
     updateCampaignContent,
 } from "@/lib/services/content-campaigns";
 import { generateImage } from "@/lib/dalle";
-import { uploadImageFromUrl } from "@/lib/gcs";
+import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
+import { logErrorToFeedback } from "@/lib/services/error-logger";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -157,33 +158,69 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         style: 'vivid',
                     });
 
-                    const uploadResult = await uploadImageFromUrl(imageResult.imageUrl, {
-                        userId,
-                        fileName: `campaign-hero-${Date.now()}.png`,
-                        mimeType: 'image/png',
-                    });
+                    // Upload to GCS (non-fatal — image was already generated)
+                    let regenUploadResult: any = null;
+                    let regenSavedImage: any = null;
+                    let regenFinalUrl: string = imageResult.imageUrl;
 
-                    const image = await createContentImage({
-                        userId,
-                        name: `Hero: ${brief.topic.substring(0, 50)}`,
-                        originalName: `campaign-hero.png`,
-                        gcsUrl: uploadResult.gcsUrl,
-                        gcsBucket: uploadResult.gcsBucket,
-                        gcsPath: uploadResult.gcsPath,
-                        mimeType: 'image/png',
-                        size: uploadResult.size,
-                        width: 1792,
-                        height: 1024,
-                        source: 'dalle',
-                        generatedFromPrompt: imagePrompt,
-                        aiModel: 'dall-e-3',
-                    });
+                    try {
+                        regenUploadResult = await uploadImageFromUrl(imageResult.imageUrl, {
+                            userId,
+                            fileName: `campaign-hero-${Date.now()}.png`,
+                            mimeType: 'image/png',
+                        });
+                    } catch (gcsError: unknown) {
+                        console.error("[Campaign Regenerate] GCS upload error (non-fatal):", gcsError);
+                        logErrorToFeedback({
+                            userId,
+                            source: "campaign-regenerate-image-gcs",
+                            error: gcsError,
+                            metadata: { campaignId: id, imagePrompt },
+                        });
+                    }
+
+                    if (regenUploadResult) {
+                        try {
+                            regenSavedImage = await createContentImage({
+                                userId,
+                                name: `Hero: ${brief.topic.substring(0, 50)}`,
+                                originalName: `campaign-hero.png`,
+                                gcsUrl: regenUploadResult.gcsUrl,
+                                gcsBucket: regenUploadResult.gcsBucket,
+                                gcsPath: regenUploadResult.gcsPath,
+                                mimeType: 'image/png',
+                                size: regenUploadResult.size,
+                                width: 1792,
+                                height: 1024,
+                                source: 'dalle',
+                                generatedFromPrompt: imagePrompt,
+                                aiModel: 'dall-e-3',
+                            });
+                        } catch (dbError: unknown) {
+                            console.error("[Campaign Regenerate] DB insert error (non-fatal):", dbError);
+                            logErrorToFeedback({
+                                userId,
+                                source: "campaign-regenerate-image-db",
+                                error: dbError,
+                                metadata: { campaignId: id, gcsPath: regenUploadResult.gcsPath },
+                            });
+                        }
+
+                        try {
+                            regenFinalUrl = await refreshSignedUrl(regenUploadResult.gcsPath, 1);
+                        } catch {
+                            regenFinalUrl = regenUploadResult.gcsUrl;
+                        }
+                    }
 
                     updateCampaignContent(id, 'image', {
                         status: 'completed',
-                        id: image.id,
-                        url: uploadResult.gcsUrl,
+                        id: regenSavedImage?.id || null,
+                        url: regenFinalUrl,
                         prompt: imagePrompt,
+                        ...((!regenUploadResult || !regenSavedImage) && {
+                            warning: "Image was generated but could not be fully saved. The URL may be temporary.",
+                        }),
                     });
                     break;
                 }

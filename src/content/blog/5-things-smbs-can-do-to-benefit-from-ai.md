@@ -6,7 +6,7 @@ heroImage: "/images/5ThingSMBAI.jpg"
 category: "Artificial Intelligence"
 author:
   name: "Shannon McGill"
-  role: "Principal Consultant"
+  role: "Founder/CEO"
   image: "/images/founder.jpg"
 featured: true
 ---

@@ -1,6 +1,7 @@
 // src/app/about/page.tsx
 // About Us page — public, SEO-optimized, server component
 // Advisor data sourced from centralized agent-config.ts
+// Advisor cards now link to individual detail pages at /about/[advisor]
 // Sections: Hero, Mission/Vision, Founder, AI Advisor Team, Values, CTA
 
 import Link from "next/link";
@@ -17,6 +18,7 @@ import {
     Users,
 } from "lucide-react";
 import { getAllAgents, AGENT_COLORS, type AgentType } from "@/config/agent-config";
+import { advisorPageContent } from "@/config/advisor-page-content";
 
 // ============================================
 // STRUCTURED DATA (JSON-LD)
@@ -56,6 +58,20 @@ const BORDER_COLORS: Record<AgentType, string> = {
     marketing: "border-pink-200",
     sales: "border-orange-200",
     content: "border-red-200",
+};
+
+// ============================================
+// AGENT ID TO SLUG MAPPING
+// ============================================
+
+const AGENT_SLUG_MAP: Record<AgentType, string> = {
+    technology: "technology-partner",
+    coach: "executive-coach",
+    legal: "legal-advisor",
+    hr: "hr-partner",
+    marketing: "marketing-partner",
+    sales: "sales-partner",
+    content: "content-engine",
 };
 
 // ============================================
@@ -242,7 +258,7 @@ export default function AboutPage() {
                                 <div className="relative">
                                     <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center overflow-hidden border border-neutral-200">
 
-                                         <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
+                                        <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
                                     </div>
                                     {/* Decorative accent */}
                                     <div
@@ -315,35 +331,43 @@ export default function AboutPage() {
                         </div>
 
                         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {agents.map((agent) => (
-                                <article
-                                    key={agent.id}
-                                    className={`group relative rounded-2xl border ${BORDER_COLORS[agent.id]} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
-                                >
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shadow-sm">
-                                            <Image
-                                                src={agent.avatarUrl}
-                                                alt={agent.altText}
-                                                width={56}
-                                                height={56}
-                                                className="w-full h-full object-cover"
-                                            />
+                            {agents.map((agent) => {
+                                const slug = AGENT_SLUG_MAP[agent.id];
+                                return (
+                                    <Link
+                                        key={agent.id}
+                                        href={`/about/${slug}`}
+                                        className={`group relative rounded-2xl border ${BORDER_COLORS[agent.id]} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
+                                    >
+                                        <div className="flex items-start gap-4 mb-4">
+                                            <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shadow-sm">
+                                                <Image
+                                                    src={agent.avatarUrl}
+                                                    alt={agent.altText}
+                                                    width={56}
+                                                    height={56}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-display font-bold text-lg text-neutral-900 group-hover:text-neutral-700 transition-colors">
+                                                    {agent.name}
+                                                </h3>
+                                                <p className={`text-sm ${agent.textColor} font-medium`}>
+                                                    {agent.subtitle}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 className="font-display font-bold text-lg text-neutral-900">
-                                                {agent.name}
-                                            </h3>
-                                            <p className={`text-sm ${agent.textColor} font-medium`}>
-                                                {agent.subtitle}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <p className="text-neutral-600 text-sm leading-relaxed">
-                                        {agent.description}
-                                    </p>
-                                </article>
-                            ))}
+                                        <p className="text-neutral-600 text-sm leading-relaxed mb-3">
+                                            {agent.description}
+                                        </p>
+                                        <span className={`inline-flex items-center gap-1 text-sm font-medium ${agent.textColor} group-hover:gap-2 transition-all`}>
+                                            Learn more
+                                            <ArrowRight className="w-3.5 h-3.5" />
+                                        </span>
+                                    </Link>
+                                );
+                            })}
 
                             {/* Round Table card */}
                             <article className="group relative rounded-2xl border border-amber-200 bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">

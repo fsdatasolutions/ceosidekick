@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateImage, getGenerationCredits, validateGenerationOptions, getAvailableOptions } from "@/lib/dalle";
 import type { GenerationOptions, DalleModel, ImageSize, ImageQuality, ImageStyle } from "@/lib/dalle";
-import { uploadImageFromUrl } from "@/lib/gcs";
+import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
+import { logErrorToFeedback } from "@/lib/services/error-logger";
 
 // TODO: Import your actual usage/credit functions
 // import { deductMessageCredits, checkMessageCreditsAmount } from "@/lib/services/usage";
@@ -95,71 +96,120 @@ export async function POST(request: NextRequest) {
         const imageName = name || `AI Image - ${new Date().toISOString().split("T")[0]}`;
         const fileName = `${imageName.replace(/[^a-zA-Z0-9]/g, "_")}.png`;
 
-        // Upload the generated image to GCS
-        const uploadResult = await uploadImageFromUrl(generationResult.imageUrl, {
-            userId,
-            fileName,
-            mimeType: "image/png",
-        });
-
         // Parse dimensions from size
         const [width, height] = size.split("x").map(Number);
 
-        // Create database record
-        const image = await createContentImage({
-            userId,
-            name: imageName,
-            originalName: fileName,
-            gcsUrl: uploadResult.gcsUrl,
-            gcsBucket: uploadResult.gcsBucket,
-            gcsPath: uploadResult.gcsPath,
-            mimeType: "image/png",
-            size: uploadResult.size,
-            width,
-            height,
-            source: "dalle",
-            generatedFromPrompt: prompt,
-            aiModel: model,
-            generationSettings: {
-                size,
-                quality: options.quality,
-                style: options.style,
-                revisedPrompt: generationResult.revisedPrompt,
-            },
-            altText: altText || generationResult.revisedPrompt || prompt.substring(0, 500),
-        });
+        // Track warnings for non-fatal errors (GCS upload, DB insert)
+        const warnings: string[] = [];
+        let savedImage: any = null;
+        let imageUrl: string = generationResult.imageUrl; // Fallback to DALL-E's temporary URL
 
-        // Deduct credits
+        // Upload the generated image to GCS
+        let uploadResult: any = null;
+        try {
+            uploadResult = await uploadImageFromUrl(generationResult.imageUrl, {
+                userId,
+                fileName,
+                mimeType: "image/png",
+            });
+        } catch (gcsError: any) {
+            console.error("GCS upload error (non-fatal):", gcsError);
+            warnings.push("Image was generated but could not be saved to storage. Using temporary URL.");
+            logErrorToFeedback({
+                userId,
+                source: "content-image-generate-gcs",
+                error: gcsError,
+                metadata: { prompt, model, size, fileName },
+            });
+        }
+
+        // Create database record (only if GCS upload succeeded)
+        if (uploadResult) {
+            try {
+                savedImage = await createContentImage({
+                    userId,
+                    name: imageName,
+                    originalName: fileName,
+                    gcsUrl: uploadResult.gcsUrl,
+                    gcsBucket: uploadResult.gcsBucket,
+                    gcsPath: uploadResult.gcsPath,
+                    mimeType: "image/png",
+                    size: uploadResult.size,
+                    width,
+                    height,
+                    source: "dalle",
+                    generatedFromPrompt: prompt,
+                    aiModel: model,
+                    generationSettings: {
+                        size,
+                        quality: options.quality,
+                        style: options.style,
+                        revisedPrompt: generationResult.revisedPrompt,
+                    },
+                    altText: (altText || generationResult.revisedPrompt || prompt).substring(0, 500),
+                });
+            } catch (dbError: any) {
+                console.error("Database insert error (non-fatal):", dbError);
+                warnings.push("Image was generated and uploaded but could not be saved to the library.");
+                logErrorToFeedback({
+                    userId,
+                    source: "content-image-generate-db",
+                    error: dbError,
+                    metadata: { prompt, model, size, gcsPath: uploadResult.gcsPath },
+                });
+            }
+        }
+
+        // Generate the best available URL for the response
+        if (uploadResult) {
+            try {
+                imageUrl = await refreshSignedUrl(uploadResult.gcsPath, 1); // 1 day expiry
+            } catch (urlError: any) {
+                console.error("Signed URL generation error (non-fatal):", urlError);
+                // Fall back to base GCS URL — client may not be able to access it directly,
+                // but it's better than nothing
+                imageUrl = uploadResult.gcsUrl;
+            }
+        }
+
+        // Deduct credits (image was generated regardless of storage/DB outcome)
         await deductMessageCredits(userId, creditCost, {
             type: "content_image_generate",
             agent: "content",
             metadata: {
-                imageId: image.id,
+                imageId: savedImage?.id,
                 model,
                 size,
                 quality: options.quality,
                 style: options.style,
                 creditCost,
+                hadWarnings: warnings.length > 0,
             },
         });
 
         return NextResponse.json({
             success: true,
             image: {
-                id: image.id,
-                name: image.name,
-                url: image.gcsUrl,
-                mimeType: image.mimeType,
-                size: image.size,
-                width: image.width,
-                height: image.height,
-                source: image.source,
-                prompt: image.generatedFromPrompt,
+                id: savedImage?.id || null,
+                name: savedImage?.name || imageName,
+                url: imageUrl,
+                mimeType: "image/png",
+                size: savedImage?.size || uploadResult?.size || null,
+                width,
+                height,
+                source: "dalle",
+                prompt,
                 revisedPrompt: generationResult.revisedPrompt,
-                generationSettings: image.generationSettings,
-                createdAt: image.createdAt,
+                generationSettings: savedImage?.generationSettings || {
+                    size,
+                    quality: options.quality,
+                    style: options.style,
+                    revisedPrompt: generationResult.revisedPrompt,
+                },
+                createdAt: savedImage?.createdAt || new Date().toISOString(),
             },
             creditsUsed: creditCost,
+            ...(warnings.length > 0 && { warnings }),
         });
     } catch (error: any) {
         console.error("Image generation error:", error);

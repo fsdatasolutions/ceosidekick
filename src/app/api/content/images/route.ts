@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { listContentImages } from "@/lib/services/content-images";
+import { refreshSignedUrl } from "@/lib/gcs";
 
 export async function GET(request: NextRequest) {
     try {
@@ -36,11 +37,12 @@ export async function GET(request: NextRequest) {
             offset: validOffset,
         });
 
-        return NextResponse.json({
-            images: images.map((image) => ({
+        // Generate fresh signed URLs for all images
+        const imagesWithUrls = await Promise.all(
+            images.map(async (image) => ({
                 id: image.id,
                 name: image.name,
-                url: image.gcsUrl,
+                url: await refreshSignedUrl(image.gcsPath, 1), // 1 day expiry
                 mimeType: image.mimeType,
                 size: image.size,
                 width: image.width,
@@ -50,7 +52,11 @@ export async function GET(request: NextRequest) {
                 altText: image.altText,
                 usageCount: image.usageCount,
                 createdAt: image.createdAt,
-            })),
+            }))
+        );
+
+        return NextResponse.json({
+            images: imagesWithUrls,
             pagination,
         });
     } catch (error: any) {

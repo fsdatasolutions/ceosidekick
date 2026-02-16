@@ -8,7 +8,7 @@ import {
     updateContentImage,
     deleteContentImage,
 } from "@/lib/services/content-images";
-import { deleteImageFromGCS } from "@/lib/gcs";
+import { deleteImageFromGCS, refreshSignedUrl } from "@/lib/gcs";
 
 interface RouteParams {
     params: Promise<{
@@ -39,12 +39,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             );
         }
 
+        // Generate a fresh signed URL for serving
+        const signedUrl = await refreshSignedUrl(image.gcsPath, 1); // 1 day expiry
+
         return NextResponse.json({
             image: {
                 id: image.id,
                 name: image.name,
                 originalName: image.originalName,
-                url: image.gcsUrl,
+                url: signedUrl,
                 mimeType: image.mimeType,
                 size: image.size,
                 width: image.width,

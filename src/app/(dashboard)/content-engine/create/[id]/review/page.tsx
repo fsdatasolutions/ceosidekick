@@ -23,6 +23,8 @@ import {
     ChevronDown,
     ChevronUp,
     X,
+    ExternalLink,
+    Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -125,6 +127,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
     // Editable content states
     const [editingType, setEditingType] = useState<ContentType | null>(null);
     const [editedContent, setEditedContent] = useState<EditedContent>({});
+
+    // Publishing states
+    const [publishingBlog, setPublishingBlog] = useState(false);
+    const [publishedBlogUrl, setPublishedBlogUrl] = useState<string | null>(null);
+    const [linkedinShared, setLinkedinShared] = useState<Record<string, boolean>>({});
 
     // Expanded sections
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -328,6 +335,78 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
             setError(errorMessage);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleLinkedInShare = (contentType: 'linkedinPost' | 'linkedinArticle') => {
+        if (!campaign) return;
+
+        let text = '';
+
+        if (contentType === 'linkedinPost') {
+            const post = getPostContent();
+            text = post?.content || '';
+        } else if (contentType === 'linkedinArticle') {
+            const article = getArticleContent();
+            const title = article?.title || '';
+            const description = article?.description || '';
+
+            if (publishedBlogUrl) {
+                // If blog was published, share with link
+                const siteUrl = window.location.origin;
+                text = `${title}\n\n${description}\n\nRead the full article: ${siteUrl}${publishedBlogUrl}`;
+            } else {
+                // Share the article content directly (truncated for LinkedIn)
+                const content = article?.content || '';
+                text = content.length > 2500
+                    ? `${title}\n\n${content.substring(0, 2500)}...`
+                    : `${title}\n\n${content}`;
+            }
+        }
+
+        const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
+        window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
+
+        setLinkedinShared(prev => ({ ...prev, [contentType]: true }));
+    };
+
+    const handlePublishBlog = async () => {
+        if (!campaign) return;
+
+        setPublishingBlog(true);
+        setError(null);
+
+        try {
+            const blog = getBlogContent();
+            if (!blog?.title || !blog?.content) {
+                throw new Error('Blog content is incomplete');
+            }
+
+            const response = await fetch(`/api/content/campaigns/${id}/publish-blog`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: blog.title,
+                    content: blog.content,
+                    description: blog.description || '',
+                    category: blog.category || 'Technology',
+                    tags: blog.tags || [],
+                    heroImageId: campaign.generated.image?.id || undefined,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to publish blog post');
+            }
+
+            setPublishedBlogUrl(data.url);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to publish blog post';
+            setError(errorMessage);
+        } finally {
+            setPublishingBlog(false);
         }
     };
 
@@ -535,6 +614,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                         regenerating={regenerating === 'linkedinArticle'}
                         onEdit={() => startEditing('linkedinArticle')}
                         editing={editingType === 'linkedinArticle'}
+                        onPublish={() => handleLinkedInShare('linkedinArticle')}
+                        publishLabel="Share on LinkedIn"
+                        publishIcon={ExternalLink}
+                        published={linkedinShared.linkedinArticle}
+                        publishedMessage="Opened in LinkedIn"
                     >
                         {editingType === 'linkedinArticle' ? (
                             <EditableArticleContent
@@ -579,6 +663,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                         regenerating={regenerating === 'linkedinPost'}
                         onEdit={() => startEditing('linkedinPost')}
                         editing={editingType === 'linkedinPost'}
+                        onPublish={() => handleLinkedInShare('linkedinPost')}
+                        publishLabel="Share on LinkedIn"
+                        publishIcon={ExternalLink}
+                        published={linkedinShared.linkedinPost}
+                        publishedMessage="Opened in LinkedIn"
                     >
                         {editingType === 'linkedinPost' ? (
                             <EditablePostContent
@@ -615,6 +704,22 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                         regenerating={regenerating === 'webBlog'}
                         onEdit={() => startEditing('webBlog')}
                         editing={editingType === 'webBlog'}
+                        onPublish={handlePublishBlog}
+                        publishLabel="Publish to Blog"
+                        publishIcon={Globe}
+                        publishing={publishingBlog}
+                        published={!!publishedBlogUrl}
+                        publishedMessage={publishedBlogUrl ? (
+                            <a
+                                href={publishedBlogUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 underline"
+                            >
+                                <Globe className="w-3 h-3" />
+                                View published post: {publishedBlogUrl}
+                            </a>
+                        ) : undefined}
                     >
                         {editingType === 'webBlog' ? (
                             <EditableBlogContent
@@ -689,6 +794,12 @@ function ContentSection({
                             regenerating,
                             onEdit,
                             editing,
+                            onPublish,
+                            publishLabel,
+                            publishIcon: PublishIcon,
+                            publishing,
+                            published,
+                            publishedMessage,
                             children,
                         }: {
     title: string;
@@ -701,6 +812,12 @@ function ContentSection({
     regenerating: boolean;
     onEdit?: () => void;
     editing?: boolean;
+    onPublish?: () => void;
+    publishLabel?: string;
+    publishIcon?: React.ComponentType<{ className?: string }>;
+    publishing?: boolean;
+    published?: boolean;
+    publishedMessage?: React.ReactNode;
     children: React.ReactNode;
 }) {
     const getStatusColor = (status: string) => {
@@ -736,7 +853,7 @@ function ContentSection({
 
             {expanded && (
                 <div className="px-4 pb-4 border-t border-neutral-100">
-                    <div className="flex gap-2 my-3">
+                    <div className="flex gap-2 my-3 flex-wrap">
                         <Button
                             size="sm"
                             variant="outline"
@@ -756,7 +873,35 @@ function ContentSection({
                                 Edit
                             </Button>
                         )}
+                        {onPublish && status === 'completed' && !editing && (
+                            published ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
+                                    <Check className="w-3 h-3" />
+                                    {publishedMessage || "Published"}
+                                </span>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={onPublish}
+                                    disabled={publishing}
+                                    className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                                >
+                                    {publishing ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : PublishIcon ? (
+                                        <PublishIcon className="w-3 h-3" />
+                                    ) : (
+                                        <ExternalLink className="w-3 h-3" />
+                                    )}
+                                    {publishLabel || "Publish"}
+                                </Button>
+                            )
+                        )}
                     </div>
+                    {published && publishedMessage && typeof publishedMessage !== 'string' && (
+                        <div className="mb-3">{publishedMessage}</div>
+                    )}
                     {children}
                 </div>
             )}

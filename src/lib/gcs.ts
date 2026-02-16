@@ -85,9 +85,9 @@ export async function uploadImageToGCS(options: UploadOptions): Promise<UploadRe
         },
     });
 
-    // Generate a signed URL for access (valid for 7 days)
-    // Note: You may want to implement URL refresh logic for longer-term storage
-    const gcsUrl = await generateReadSignedUrl(gcsPath, 7);
+    // Store the permanent base URL (not a signed URL)
+    // Signed URLs are generated on-demand when serving images
+    const gcsUrl = `https://storage.googleapis.com/${BUCKET_NAME}/${gcsPath}`;
 
     return {
         gcsUrl,
@@ -172,4 +172,15 @@ export async function fileExistsInGCS(gcsPath: string): Promise<boolean> {
  */
 export async function getImageUrl(gcsPath: string): Promise<string> {
     return generateReadSignedUrl(gcsPath, 7);
+}
+
+/**
+ * Download a file from GCS to a local filesystem path.
+ * Used for copying GCS images to the public directory for blog posts.
+ */
+export async function downloadFileFromGCS(gcsPath: string, destination: string): Promise<void> {
+    const storage = getStorageClient();
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file(gcsPath);
+    await file.download({ destination });
 }
