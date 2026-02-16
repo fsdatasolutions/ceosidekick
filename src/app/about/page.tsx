@@ -3,15 +3,9 @@
 // Sections: Hero, Mission/Vision, Founder, AI Advisor Team, Values, CTA
 
 import Link from "next/link";
+import Image from "next/image";
 import {
-    Cpu,
-    Target,
-    Scale,
-    Users,
-    TrendingUp,
-    DollarSign,
     BookOpen,
-    PenTool,
     ArrowRight,
     Lightbulb,
     Shield,
@@ -19,8 +13,8 @@ import {
     Zap,
     Globe,
     Rocket,
+    Users,
 } from "lucide-react";
-import Image from "next/image";
 
 // ============================================
 // STRUCTURED DATA (JSON-LD)
@@ -49,7 +43,7 @@ const organizationJsonLd = {
 };
 
 // ============================================
-// AI ADVISOR DATA
+// AI ADVISOR DATA — with avatar images
 // ============================================
 
 const advisors = [
@@ -59,11 +53,9 @@ const advisors = [
         subtitle: "Virtual CTO",
         description:
             "Technology strategy, architecture decisions, and digital transformation guidance for founders without a technical co-founder.",
-        icon: Cpu,
-        color: "bg-teal-600",
-        lightBg: "bg-teal-50",
-        textColor: "text-teal-700",
+        avatarUrl: "/images/avatars/technology-partner.png",
         borderColor: "border-teal-200",
+        textColor: "text-teal-700",
     },
     {
         id: "coach",
@@ -71,11 +63,9 @@ const advisors = [
         subtitle: "Leadership Partner",
         description:
             "Leadership development, decision-making frameworks, and strategic thinking to help you grow as a business leader.",
-        icon: Target,
-        color: "bg-purple-600",
-        lightBg: "bg-purple-50",
-        textColor: "text-purple-700",
+        avatarUrl: "/images/avatars/executive-coach.png",
         borderColor: "border-purple-200",
+        textColor: "text-purple-700",
     },
     {
         id: "legal",
@@ -83,11 +73,9 @@ const advisors = [
         subtitle: "Contract & Compliance",
         description:
             "Contract review, terms of service guidance, and business compliance checklists to protect your business.",
-        icon: Scale,
-        color: "bg-blue-600",
-        lightBg: "bg-blue-50",
-        textColor: "text-blue-700",
+        avatarUrl: "/images/avatars/legal-advisor.png",
         borderColor: "border-blue-200",
+        textColor: "text-blue-700",
     },
     {
         id: "hr",
@@ -95,11 +83,9 @@ const advisors = [
         subtitle: "People Operations",
         description:
             "Job descriptions, hiring processes, performance reviews, and HR policy development for growing teams.",
-        icon: Users,
-        color: "bg-green-600",
-        lightBg: "bg-green-50",
-        textColor: "text-green-700",
+        avatarUrl: "/images/avatars/hr-partner.png",
         borderColor: "border-green-200",
+        textColor: "text-green-700",
     },
     {
         id: "marketing",
@@ -107,11 +93,9 @@ const advisors = [
         subtitle: "Growth & Brand",
         description:
             "Marketing strategy, brand positioning, campaign planning, and analytics to grow your audience and revenue.",
-        icon: TrendingUp,
-        color: "bg-pink-600",
-        lightBg: "bg-pink-50",
-        textColor: "text-pink-700",
+        avatarUrl: "/images/avatars/marketing-partner.png",
         borderColor: "border-pink-200",
+        textColor: "text-pink-700",
     },
     {
         id: "sales",
@@ -119,11 +103,9 @@ const advisors = [
         subtitle: "Revenue & Deals",
         description:
             "Sales process development, pipeline management, objection handling, and proposal strategy to close more deals.",
-        icon: DollarSign,
-        color: "bg-orange-600",
-        lightBg: "bg-orange-50",
-        textColor: "text-orange-700",
+        avatarUrl: "/images/avatars/sales-partner.png",
         borderColor: "border-orange-200",
+        textColor: "text-orange-700",
     },
     {
         id: "content",
@@ -131,11 +113,9 @@ const advisors = [
         subtitle: "Thought Leadership",
         description:
             "AI-powered content generation for blog posts, LinkedIn articles, social media, and marketing copy.",
-        icon: PenTool,
-        color: "bg-red-600",
-        lightBg: "bg-red-50",
-        textColor: "text-red-700",
+        avatarUrl: "/images/avatars/content-engine.png",
         borderColor: "border-red-200",
+        textColor: "text-red-700",
     },
 ];
 
@@ -320,15 +300,9 @@ export default function AboutPage() {
                             <div className="md:col-span-2 flex justify-center">
                                 <div className="relative">
                                     <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-2xl bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center overflow-hidden border border-neutral-200">
-                                         <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
-                                        {/*<div className="text-center px-4">*/}
-                                        {/*    <div className="w-20 h-20 rounded-full bg-neutral-300/50 mx-auto mb-3 flex items-center justify-center">*/}
-                                        {/*        <Users className="w-10 h-10 text-neutral-400" />*/}
-                                        {/*    </div>*/}
-                                        {/*    <p className="text-sm text-neutral-400 font-medium">*/}
-                                        {/*        Founder Photo*/}
-                                        {/*    </p>*/}
-                                        {/*</div>*/}
+
+                                        <Image src="/images/founder.jpg" alt="Shannon, Founder and CEO of CEO Sidekick" width={288} height={288} className="rounded-2xl object-cover" />
+
                                     </div>
                                     {/* Decorative accent */}
                                     <div
@@ -401,40 +375,43 @@ export default function AboutPage() {
                         </div>
 
                         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {advisors.map((advisor) => {
-                                const Icon = advisor.icon;
-                                return (
-                                    <article
-                                        key={advisor.id}
-                                        className={`group relative rounded-2xl border ${advisor.borderColor} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
-                                    >
-                                        <div className="flex items-start gap-4 mb-4">
-                                            <div
-                                                className={`flex-shrink-0 w-11 h-11 rounded-xl ${advisor.color} flex items-center justify-center`}
-                                            >
-                                                <Icon className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-display font-bold text-lg text-neutral-900">
-                                                    {advisor.name}
-                                                </h3>
-                                                <p className={`text-sm ${advisor.textColor} font-medium`}>
-                                                    {advisor.subtitle}
-                                                </p>
-                                            </div>
+                            {advisors.map((advisor) => (
+                                <article
+                                    key={advisor.id}
+                                    className={`group relative rounded-2xl border ${advisor.borderColor} bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
+                                >
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shadow-sm">
+                                            <Image
+                                                src={advisor.avatarUrl}
+                                                alt={`${advisor.name} — AI ${advisor.subtitle}`}
+                                                width={56}
+                                                height={56}
+                                                className="w-full h-full object-cover"
+                                            />
                                         </div>
-                                        <p className="text-neutral-600 text-sm leading-relaxed">
-                                            {advisor.description}
-                                        </p>
-                                    </article>
-                                );
-                            })}
+                                        <div>
+                                            <h3 className="font-display font-bold text-lg text-neutral-900">
+                                                {advisor.name}
+                                            </h3>
+                                            <p
+                                                className={`text-sm ${advisor.textColor} font-medium`}
+                                            >
+                                                {advisor.subtitle}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-neutral-600 text-sm leading-relaxed">
+                                        {advisor.description}
+                                    </p>
+                                </article>
+                            ))}
 
                             {/* Round Table card */}
                             <article className="group relative rounded-2xl border border-amber-200 bg-white p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
                                 <div className="flex items-start gap-4 mb-4">
-                                    <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                                        <BookOpen className="w-5 h-5 text-white" />
+                                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
+                                        <BookOpen className="w-7 h-7 text-white" />
                                     </div>
                                     <div>
                                         <h3 className="font-display font-bold text-lg text-neutral-900">
