@@ -16,9 +16,18 @@ export async function POST(request: NextRequest) {
 
         // 1. Parse request body
         const body = await request.json();
-        const { content, visibility = "PUBLIC" } = body as {
+        const {
+            content,
+            visibility = "PUBLIC",
+            articleUrl,
+            articleTitle,
+            articleDescription,
+        } = body as {
             content: string;
             visibility?: "PUBLIC" | "CONNECTIONS";
+            articleUrl?: string;
+            articleTitle?: string;
+            articleDescription?: string;
         };
 
         if (!content || !content.trim()) {
@@ -60,6 +69,13 @@ export async function POST(request: NextRequest) {
             authorUrn,
             commentary: content,
             visibility,
+            ...(articleUrl && {
+                article: {
+                    source: articleUrl,
+                    title: articleTitle,
+                    description: articleDescription,
+                },
+            }),
         });
 
         if (!result.success) {

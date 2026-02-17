@@ -42,6 +42,11 @@ export interface LinkedInPostOptions {
     authorUrn: string;
     commentary: string;
     visibility?: "PUBLIC" | "CONNECTIONS";
+    article?: {
+        source: string;       // The URL to share (creates a link-preview card)
+        title?: string;       // Title for the link preview
+        description?: string; // Description for the link preview
+    };
 }
 
 interface LinkedInAccountRow {
@@ -176,9 +181,9 @@ export async function createPost(
     accessToken: string,
     options: LinkedInPostOptions
 ): Promise<{ success: boolean; postId?: string; error?: string }> {
-    const { authorUrn, commentary, visibility = "PUBLIC" } = options;
+    const { authorUrn, commentary, visibility = "PUBLIC", article } = options;
 
-    const body = {
+    const body: Record<string, unknown> = {
         author: authorUrn,
         commentary,
         visibility,
@@ -189,6 +194,17 @@ export async function createPost(
         },
         lifecycleState: "PUBLISHED",
     };
+
+    // Add article content for link-share posts (creates a link preview card)
+    if (article?.source) {
+        body.content = {
+            article: {
+                source: article.source,
+                ...(article.title && { title: article.title }),
+                ...(article.description && { description: article.description }),
+            },
+        };
+    }
 
     const response = await fetch(LINKEDIN_POSTS_URL, {
         method: "POST",

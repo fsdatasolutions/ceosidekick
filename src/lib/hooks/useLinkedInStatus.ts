@@ -61,7 +61,15 @@ export function useLinkedInPost() {
     const [error, setError] = useState<string | null>(null);
     const [reconnectRequired, setReconnectRequired] = useState(false);
 
-    const postToLinkedIn = useCallback(async (content: string, visibility: string = "PUBLIC") => {
+    const postToLinkedIn = useCallback(async (
+        content: string,
+        options?: {
+            visibility?: string;
+            articleUrl?: string;
+            articleTitle?: string;
+            articleDescription?: string;
+        }
+    ) => {
         setPosting(true);
         setError(null);
         setSuccess(false);
@@ -71,7 +79,13 @@ export function useLinkedInPost() {
             const response = await fetch("/api/linkedin/post", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content, visibility }),
+                body: JSON.stringify({
+                    content,
+                    visibility: options?.visibility || "PUBLIC",
+                    articleUrl: options?.articleUrl,
+                    articleTitle: options?.articleTitle,
+                    articleDescription: options?.articleDescription,
+                }),
             });
 
             const data = await response.json();

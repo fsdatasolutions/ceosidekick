@@ -19,8 +19,16 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  Linkedin,
+  Send,
+  AlertTriangle,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface Article {
   id: string;
@@ -70,6 +78,69 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // LinkedIn API
+  const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
+  const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
+  const [attachedUrl, setAttachedUrl] = useState("");
+
+  /**
+   * Strip markdown formatting for plain-text sharing on LinkedIn.
+   */
+  const stripMarkdown = (md: string): string => {
+    return md
+      .replace(/^---\n[\s\S]*?\n---\n*/m, '')
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/__(.+?)__/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/_(.+?)_/g, '$1')
+      .replace(/^[-*_]{3,}\s*$/gm, '')
+      .replace(/^\s*[-*]\s+/gm, '- ')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/\[LINK:\s*[^\]]+\]/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  };
+
+  const handleCopyContent = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handlePostToLinkedIn = async () => {
+    // Strip markdown and prepare clean text for LinkedIn
+    const cleanContent = stripMarkdown(content);
+    // LinkedIn post limit is ~3000 chars; use title + description as commentary for link posts
+    let commentary: string;
+    if (attachedUrl) {
+      // Link-share: short commentary, let the card do the heavy lifting
+      commentary = `${title}\n\n${description}`;
+    } else {
+      // Text post: include as much of the article as fits
+      const fullText = `${title}\n\n${cleanContent}`;
+      commentary = fullText.length > 2800
+        ? `${fullText.substring(0, 2800)}...`
+        : fullText;
+    }
+
+    await postToLinkedIn(commentary, {
+      ...(attachedUrl && {
+        articleUrl: attachedUrl,
+        articleTitle: title,
+        articleDescription: description,
+      }),
+    });
+  };
 
   // Load article
   useEffect(() => {
@@ -524,6 +595,126 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Share on LinkedIn */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <h3 className="font-medium text-neutral-900 mb-3 flex items-center gap-2">
+              <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+              Share on LinkedIn
+            </h3>
+
+            {linkedInLoading ? (
+              <div className="flex items-center gap-2 text-sm text-neutral-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Checking connection...
+              </div>
+            ) : linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? (
+              <div className="space-y-2">
+                {linkedInPostSuccess ? (
+                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                    <CheckCircle className="w-4 h-4" />
+                    Shared on LinkedIn!
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-neutral-500 mb-2">
+                      Share as a LinkedIn post. Attach a link to create a preview card.
+                    </p>
+                    <div>
+                      <label className="block text-xs text-neutral-500 mb-1">
+                        Attach link (optional)
+                      </label>
+                      <input
+                        type="url"
+                        value={attachedUrl}
+                        onChange={(e) => setAttachedUrl(e.target.value)}
+                        placeholder="https://yourblog.com/article-slug"
+                        className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                      {attachedUrl && (
+                        <p className="text-xs text-neutral-400 mt-1">
+                          Post will include a link preview card
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
+                      onClick={handlePostToLinkedIn}
+                      disabled={linkedInPosting || !content.trim()}
+                    >
+                      {linkedInPosting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      {linkedInPosting ? "Posting..." : "Share on LinkedIn"}
+                    </Button>
+                  </>
+                )}
+                {linkedInPostError && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                    {linkedInPostError}
+                    {reconnectRequired && (
+                      <a href="/api/linkedin/authorize" className="block mt-1 text-[#0A66C2] hover:underline font-medium">
+                        Reconnect LinkedIn
+                      </a>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-neutral-500">
+                  Connected as {linkedInStatus.profile?.name || "LinkedIn User"}
+                </p>
+              </div>
+            ) : linkedInStatus?.tokenExpired ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-amber-600">
+                  <AlertTriangle className="w-4 h-4" />
+                  Token expired
+                </div>
+                <a href="/api/linkedin/authorize">
+                  <Button size="sm" className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white">
+                    Reconnect LinkedIn
+                  </Button>
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-neutral-500">
+                  Connect your LinkedIn account to share directly.
+                </p>
+                <Link href="/settings">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Linkedin className="w-4 h-4" />
+                    Connect in Settings
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <h3 className="font-medium text-neutral-900 mb-3">Quick Actions</h3>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleCopyContent}
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied ? "Copied!" : "Copy Content"}
+              </Button>
+              <a
+                href="https://www.linkedin.com/feed/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-start gap-2 w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm hover:bg-neutral-50 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open LinkedIn
+              </a>
+            </div>
           </div>
 
           {/* Danger Zone */}

@@ -404,21 +404,38 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
         if (!campaign) return;
 
         let text = '';
+        let articleOptions: { articleUrl?: string; articleTitle?: string; articleDescription?: string } = {};
 
         if (contentType === 'linkedinPost') {
             const post = getPostContent();
             text = post?.content || '';
+
+            // If blog was published, attach the link as an article card
+            if (publishedBlogUrl) {
+                const siteUrl = window.location.origin;
+                const blog = getBlogContent();
+                articleOptions = {
+                    articleUrl: `${siteUrl}${publishedBlogUrl}`,
+                    articleTitle: blog?.title,
+                    articleDescription: blog?.description,
+                };
+            }
         } else if (contentType === 'linkedinArticle') {
             const article = getArticleContent();
             const title = article?.title || '';
             const description = article?.description || '';
 
             if (publishedBlogUrl) {
-                // If blog was published, share with a link to the published post
+                // Blog published → use link-share: short commentary + article card
                 const siteUrl = window.location.origin;
-                text = `${title}\n\n${description}\n\nRead the full article: ${siteUrl}${publishedBlogUrl}`;
+                text = `${title}\n\n${description}`;
+                articleOptions = {
+                    articleUrl: `${siteUrl}${publishedBlogUrl}`,
+                    articleTitle: title,
+                    articleDescription: description,
+                };
             } else {
-                // Share the article content — strip markdown for clean LinkedIn text
+                // No published blog — fall back to full-text share
                 const rawContent = article?.content || '';
                 const cleanContent = stripMarkdown(rawContent);
                 // LinkedIn post limit is ~3000 chars; truncate if needed
@@ -431,15 +448,20 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
         // If LinkedIn is connected via API, post directly
         if (linkedInStatus?.connected && !linkedInStatus?.tokenExpired) {
             resetLinkedInPost();
-            const result = await postToLinkedIn(text);
+            const result = await postToLinkedIn(text, {
+                ...articleOptions,
+            });
             if (result) {
                 setLinkedInApiPosted(prev => ({ ...prev, [contentType]: true }));
             }
             return;
         }
 
-        // Fallback: Open LinkedIn web share dialog
-        const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
+        // Fallback: Open LinkedIn web share dialog (no article card support)
+        const fallbackText = articleOptions.articleUrl
+            ? `${text}\n\n${articleOptions.articleUrl}`
+            : text;
+        const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(fallbackText)}`;
         window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
 
         setLinkedinShared(prev => ({ ...prev, [contentType]: true }));

@@ -65,6 +65,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
   // LinkedIn API
   const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
   const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
+  const [attachedUrl, setAttachedUrl] = useState("");
 
   // Load post
   useEffect(() => {
@@ -474,18 +475,40 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                         Posted to LinkedIn!
                       </div>
                   ) : (
-                      <Button
-                          className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
-                          onClick={() => postToLinkedIn(content)}
-                          disabled={linkedInPosting || !content.trim() || isOverLimit}
-                      >
-                        {linkedInPosting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Send className="w-4 h-4" />
-                        )}
-                        {linkedInPosting ? "Posting..." : "Post to LinkedIn"}
-                      </Button>
+                      <>
+                        {/* Optional: Attach a blog/article link for a link-preview card */}
+                        <div>
+                          <label className="block text-xs text-neutral-500 mb-1">
+                            Attach link (optional)
+                          </label>
+                          <input
+                              type="url"
+                              value={attachedUrl}
+                              onChange={(e) => setAttachedUrl(e.target.value)}
+                              placeholder="https://yourblog.com/post-slug"
+                              className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                          />
+                          {attachedUrl && (
+                              <p className="text-xs text-neutral-400 mt-1">
+                                Post will include a link preview card
+                              </p>
+                          )}
+                        </div>
+                        <Button
+                            className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
+                            onClick={() => postToLinkedIn(content, {
+                              ...(attachedUrl && { articleUrl: attachedUrl }),
+                            })}
+                            disabled={linkedInPosting || !content.trim() || isOverLimit}
+                        >
+                          {linkedInPosting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                              <Send className="w-4 h-4" />
+                          )}
+                          {linkedInPosting ? "Posting..." : "Post to LinkedIn"}
+                        </Button>
+                      </>
                   )}
                   {linkedInPostError && (
                       <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
