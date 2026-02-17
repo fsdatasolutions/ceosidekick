@@ -29,8 +29,7 @@ import {
     Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
-import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInStatus, useLinkedInOrgStatus, useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface GeneratedImage {
     id?: string;
@@ -157,8 +156,10 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
 
     // LinkedIn API connection status
     const { status: linkedInStatus } = useLinkedInStatus();
+    const { status: linkedInOrgStatus } = useLinkedInOrgStatus();
     const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired, reset: resetLinkedInPost } = useLinkedInPost();
     const [linkedInApiPosted, setLinkedInApiPosted] = useState<Record<string, boolean>>({});
+    const [postAs, setPostAs] = useState("personal");
 
     // Expanded sections
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -450,6 +451,7 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
             resetLinkedInPost();
             const result = await postToLinkedIn(text, {
                 ...articleOptions,
+                postAs,
             });
             if (result) {
                 setLinkedInApiPosted(prev => ({ ...prev, [contentType]: true }));
@@ -683,6 +685,28 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                             </a>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Post as selector (shown when org pages connected + LinkedIn personal connected) */}
+            {linkedInStatus?.connected && !linkedInStatus?.tokenExpired && linkedInOrgStatus?.connected && linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                <div className="mb-4 p-3 bg-[#0A66C2]/5 border border-[#0A66C2]/20 rounded-lg flex items-center gap-3">
+                    <Linkedin className="w-4 h-4 text-[#0A66C2] shrink-0" />
+                    <label className="text-sm text-neutral-700 whitespace-nowrap">Post as:</label>
+                    <select
+                        value={postAs}
+                        onChange={(e) => setPostAs(e.target.value)}
+                        className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A66C2]/20 focus:border-[#0A66C2] bg-white"
+                    >
+                        <option value="personal">
+                            {linkedInStatus.profile?.name || "Personal Profile"}
+                        </option>
+                        {linkedInOrgStatus.orgs.map((org) => (
+                            <option key={org.id} value={org.id}>
+                                {org.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             )}
 

@@ -1,13 +1,14 @@
 // src/lib/hooks/useLinkedInStatus.ts
 // Shared React hooks for LinkedIn connection status and posting.
 // Used across Settings, campaign review page, and post editor.
+// Supports both personal profile and organization page connections.
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 
 // ============================================
-// LinkedIn Connection Status Hook
+// LinkedIn Personal Connection Status Hook
 // ============================================
 
 interface LinkedInProfile {
@@ -52,6 +53,53 @@ export function useLinkedInStatus() {
 }
 
 // ============================================
+// LinkedIn Organization Connection Status Hook
+// ============================================
+
+export interface LinkedInOrg {
+    id: string;
+    name: string;
+    vanityName?: string;
+    logoUrl?: string;
+}
+
+interface LinkedInOrgStatus {
+    connected: boolean;
+    configured?: boolean;
+    orgs?: LinkedInOrg[];
+    tokenExpired?: boolean;
+}
+
+export function useLinkedInOrgStatus() {
+    const [status, setStatus] = useState<LinkedInOrgStatus | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    const fetchStatus = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await fetch("/api/linkedin/org/status");
+            if (response.ok) {
+                const data = await response.json();
+                setStatus(data);
+            } else {
+                setStatus({ connected: false });
+            }
+        } catch (error) {
+            console.error("Failed to fetch LinkedIn org status:", error);
+            setStatus({ connected: false });
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchStatus();
+    }, [fetchStatus]);
+
+    return { status, loading, refetch: fetchStatus };
+}
+
+// ============================================
 // LinkedIn Post Hook
 // ============================================
 
@@ -68,6 +116,7 @@ export function useLinkedInPost() {
             articleUrl?: string;
             articleTitle?: string;
             articleDescription?: string;
+            postAs?: string; // "personal" (default) or org ID
         }
     ) => {
         setPosting(true);
@@ -85,6 +134,7 @@ export function useLinkedInPost() {
                     articleUrl: options?.articleUrl,
                     articleTitle: options?.articleTitle,
                     articleDescription: options?.articleDescription,
+                    postAs: options?.postAs || "personal",
                 }),
             });
 

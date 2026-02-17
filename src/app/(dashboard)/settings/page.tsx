@@ -24,7 +24,7 @@ import {
   ExternalLink,
   Unlink,
 } from "lucide-react";
-import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInStatus, useLinkedInOrgStatus } from "@/lib/hooks/useLinkedInStatus";
 
 // Types
 interface UserSettings {
@@ -211,19 +211,23 @@ export default function SettingsPage() {
     plan: "starter",
   });
 
-  // LinkedIn connection
+  // LinkedIn personal connection
   const { status: linkedInStatus, loading: linkedInLoading, refetch: refetchLinkedIn } = useLinkedInStatus();
   const [disconnecting, setDisconnecting] = useState(false);
   const [linkedInMessage, setLinkedInMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const searchParams = useSearchParams();
 
-  // Handle LinkedIn callback query params
+  // LinkedIn org connection
+  const { status: linkedInOrgStatus, loading: linkedInOrgLoading, refetch: refetchLinkedInOrg } = useLinkedInOrgStatus();
+  const [disconnectingOrg, setDisconnectingOrg] = useState(false);
+  const [linkedInOrgMessage, setLinkedInOrgMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Handle LinkedIn callback query params (personal + org)
   useEffect(() => {
     const linkedInParam = searchParams.get("linkedin");
     if (linkedInParam === "connected") {
       setLinkedInMessage({ type: "success", text: "LinkedIn connected successfully!" });
       refetchLinkedIn();
-      // Clean URL
       window.history.replaceState({}, "", "/settings");
       setTimeout(() => setLinkedInMessage(null), 5000);
     } else if (linkedInParam === "error") {
@@ -232,7 +236,20 @@ export default function SettingsPage() {
       window.history.replaceState({}, "", "/settings");
       setTimeout(() => setLinkedInMessage(null), 8000);
     }
-  }, [searchParams, refetchLinkedIn]);
+
+    const linkedInOrgParam = searchParams.get("linkedin_org");
+    if (linkedInOrgParam === "connected") {
+      setLinkedInOrgMessage({ type: "success", text: "Organization pages connected successfully!" });
+      refetchLinkedInOrg();
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setLinkedInOrgMessage(null), 5000);
+    } else if (linkedInOrgParam === "error") {
+      const errorMsg = searchParams.get("linkedin_org_error") || "Failed to connect organization pages";
+      setLinkedInOrgMessage({ type: "error", text: errorMsg });
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setLinkedInOrgMessage(null), 8000);
+    }
+  }, [searchParams, refetchLinkedIn, refetchLinkedInOrg]);
 
   async function disconnectLinkedIn() {
     setDisconnecting(true);
@@ -249,6 +266,24 @@ export default function SettingsPage() {
       setLinkedInMessage({ type: "error", text: "Failed to disconnect LinkedIn." });
     } finally {
       setDisconnecting(false);
+    }
+  }
+
+  async function disconnectLinkedInOrg() {
+    setDisconnectingOrg(true);
+    try {
+      const response = await fetch("/api/linkedin/org/disconnect", { method: "POST" });
+      if (response.ok) {
+        setLinkedInOrgMessage({ type: "success", text: "Organization pages disconnected." });
+        refetchLinkedInOrg();
+        setTimeout(() => setLinkedInOrgMessage(null), 3000);
+      } else {
+        setLinkedInOrgMessage({ type: "error", text: "Failed to disconnect organization pages." });
+      }
+    } catch {
+      setLinkedInOrgMessage({ type: "error", text: "Failed to disconnect organization pages." });
+    } finally {
+      setDisconnectingOrg(false);
     }
   }
 
@@ -1071,6 +1106,104 @@ export default function SettingsPage() {
                               <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
                                 <Linkedin className="w-3.5 h-3.5 mr-1.5" />
                                 Connect LinkedIn
+                              </Button>
+                            </a>
+                          </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* LinkedIn Organization Pages Card */}
+                <div className="p-5 rounded-xl border border-neutral-200 bg-neutral-50">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-[#0A66C2]/10 flex items-center justify-center shrink-0">
+                      <Building className="w-5 h-5 text-[#0A66C2]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-neutral-900 mb-1">Organization Pages</h3>
+                      <p className="text-xs text-neutral-400 mb-2">Post to company LinkedIn pages you administer</p>
+
+                      {/* Org status message banner */}
+                      {linkedInOrgMessage && (
+                          <div
+                              className={`mb-3 px-3 py-2 rounded-lg text-sm ${
+                                  linkedInOrgMessage.type === "success"
+                                      ? "bg-green-50 text-green-700 border border-green-200"
+                                      : "bg-red-50 text-red-700 border border-red-200"
+                              }`}
+                          >
+                            {linkedInOrgMessage.text}
+                          </div>
+                      )}
+
+                      {linkedInOrgLoading ? (
+                          <div className="flex items-center gap-2 text-sm text-neutral-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Checking connection...
+                          </div>
+                      ) : linkedInOrgStatus?.connected ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              <span className="text-sm text-green-700 font-medium">
+                                Connected
+                              </span>
+                            </div>
+                            {linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                                <div className="mb-2 space-y-1">
+                                  {linkedInOrgStatus.orgs.map((org) => (
+                                      <div key={org.id} className="flex items-center gap-2 text-sm text-neutral-700">
+                                        <Building className="w-3.5 h-3.5 text-neutral-400" />
+                                        {org.name}
+                                      </div>
+                                  ))}
+                                </div>
+                            )}
+                            {linkedInOrgStatus.tokenExpired && (
+                                <div className="flex items-center gap-2 mb-2 text-amber-600">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span className="text-sm">Token expired — reconnect to continue posting.</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              {linkedInOrgStatus.tokenExpired && (
+                                  <a href="/api/linkedin/org/authorize">
+                                    <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
+                                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                                      Reconnect
+                                    </Button>
+                                  </a>
+                              )}
+                              <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={disconnectLinkedInOrg}
+                                  disabled={disconnectingOrg}
+                                  className="text-neutral-600"
+                              >
+                                {disconnectingOrg ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                ) : (
+                                    <Unlink className="w-3.5 h-3.5 mr-1.5" />
+                                )}
+                                Disconnect
+                              </Button>
+                            </div>
+                          </>
+                      ) : linkedInOrgStatus?.configured === false ? (
+                          <p className="text-sm text-neutral-500">
+                            Organization integration is not configured. Add <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">LINKEDIN_ORG_CLIENT_ID</code> and <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">LINKEDIN_ORG_CLIENT_SECRET</code> to your environment variables.
+                          </p>
+                      ) : (
+                          <>
+                            <p className="text-sm text-neutral-500 mb-3">
+                              Connect a separate LinkedIn app with the Community Management API to post as your organization pages.
+                            </p>
+                            <a href="/api/linkedin/org/authorize">
+                              <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
+                                <Building className="w-3.5 h-3.5 mr-1.5" />
+                                Connect Organization Pages
                               </Button>
                             </a>
                           </>

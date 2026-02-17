@@ -26,8 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
-import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInStatus, useLinkedInOrgStatus, useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface Post {
   id: string;
@@ -64,8 +63,10 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
 
   // LinkedIn API
   const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
+  const { status: linkedInOrgStatus } = useLinkedInOrgStatus();
   const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
   const [attachedUrl, setAttachedUrl] = useState("");
+  const [postAs, setPostAs] = useState("personal");
 
   // Load post
   useEffect(() => {
@@ -476,6 +477,28 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                       </div>
                   ) : (
                       <>
+                        {/* Post as selector (personal + org pages) */}
+                        {linkedInOrgStatus?.connected && linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">
+                                Post as
+                              </label>
+                              <select
+                                  value={postAs}
+                                  onChange={(e) => setPostAs(e.target.value)}
+                                  className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 bg-white"
+                              >
+                                <option value="personal">
+                                  {linkedInStatus.profile?.name || "Personal Profile"}
+                                </option>
+                                {linkedInOrgStatus.orgs.map((org) => (
+                                    <option key={org.id} value={org.id}>
+                                      {org.name}
+                                    </option>
+                                ))}
+                              </select>
+                            </div>
+                        )}
                         {/* Optional: Attach a blog/article link for a link-preview card */}
                         <div>
                           <label className="block text-xs text-neutral-500 mb-1">
@@ -498,6 +521,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                             className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
                             onClick={() => postToLinkedIn(content, {
                               ...(attachedUrl && { articleUrl: attachedUrl }),
+                              postAs,
                             })}
                             disabled={linkedInPosting || !content.trim() || isOverLimit}
                         >
@@ -506,7 +530,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                           ) : (
                               <Send className="w-4 h-4" />
                           )}
-                          {linkedInPosting ? "Posting..." : "Post to LinkedIn"}
+                          {linkedInPosting ? "Posting..." : postAs !== "personal" ? `Post as ${linkedInOrgStatus?.orgs?.find(o => o.id === postAs)?.name || "Organization"}` : "Post to LinkedIn"}
                         </Button>
                       </>
                   )}

@@ -27,8 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
-import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInStatus, useLinkedInOrgStatus, useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface Article {
   id: string;
@@ -82,8 +81,10 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
   // LinkedIn API
   const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
+  const { status: linkedInOrgStatus } = useLinkedInOrgStatus();
   const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
   const [attachedUrl, setAttachedUrl] = useState("");
+  const [postAs, setPostAs] = useState("personal");
 
   /**
    * Strip markdown formatting for plain-text sharing on LinkedIn.
@@ -139,6 +140,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
         articleTitle: title,
         articleDescription: description,
       }),
+      postAs,
     });
   };
 
@@ -621,6 +623,28 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                     <p className="text-xs text-neutral-500 mb-2">
                       Share as a LinkedIn post. Attach a link to create a preview card.
                     </p>
+                    {/* Post as selector (personal + org pages) */}
+                    {linkedInOrgStatus?.connected && linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                        <div>
+                          <label className="block text-xs text-neutral-500 mb-1">
+                            Post as
+                          </label>
+                          <select
+                              value={postAs}
+                              onChange={(e) => setPostAs(e.target.value)}
+                              className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
+                          >
+                            <option value="personal">
+                              {linkedInStatus?.profile?.name || "Personal Profile"}
+                            </option>
+                            {linkedInOrgStatus.orgs.map((org) => (
+                                <option key={org.id} value={org.id}>
+                                  {org.name}
+                                </option>
+                            ))}
+                          </select>
+                        </div>
+                    )}
                     <div>
                       <label className="block text-xs text-neutral-500 mb-1">
                         Attach link (optional)
@@ -648,7 +672,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       ) : (
                         <Send className="w-4 h-4" />
                       )}
-                      {linkedInPosting ? "Posting..." : "Share on LinkedIn"}
+                      {linkedInPosting ? "Posting..." : postAs !== "personal" ? `Post as ${linkedInOrgStatus?.orgs?.find(o => o.id === postAs)?.name || "Organization"}` : "Share on LinkedIn"}
                     </Button>
                   </>
                 )}
