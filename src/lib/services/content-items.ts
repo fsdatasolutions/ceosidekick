@@ -3,11 +3,12 @@
 
 import { db } from "@/db";
 import { contentItems, contentVersions } from "@/db/schema";
-import { eq, and, desc, count, asc } from "drizzle-orm";
+import { eq, and, desc, count, asc, lte } from "drizzle-orm";
 import type { ContentItem, ContentVersion } from "@/db/schema";
+import type { SchedulingMeta } from "@/lib/types/scheduling";
 
 export type ContentType = "linkedin_article" | "linkedin_post" | "web_blog";
-export type ContentStatus = "draft" | "published" | "archived";
+export type ContentStatus = "draft" | "scheduled" | "published" | "failed" | "archived";
 
 export interface CreateContentInput {
     userId: string;
@@ -43,6 +44,7 @@ export interface UpdateContentInput {
     authorImageUrl?: string;
     publishedAt?: Date | null;
     scheduledFor?: Date | null;
+    schedulingMeta?: SchedulingMeta | null;
 }
 
 export interface ListContentOptions {
@@ -269,6 +271,150 @@ export async function archiveContentItem(
         .returning();
 
     return item || null;
+}
+
+// ============================================
+// SCHEDULING OPERATIONS
+// ============================================
+
+/**
+ * Schedule a content item for future LinkedIn publishing.
+ * Sets status to "scheduled" and stores the scheduling metadata.
+ */
+export async function scheduleContentItem(
+    itemId: string,
+    userId: string,
+    scheduledFor: Date,
+    schedulingMeta: SchedulingMeta
+): Promise<ContentItem | null> {
+    const [item] = await db
+        .update(contentItems)
+        .set({
+            status: "scheduled",
+            scheduledFor,
+            schedulingMeta,
+            updatedAt: new Date(),
+        })
+        .where(
+            and(
+                eq(contentItems.id, itemId),
+                eq(contentItems.userId, userId)
+            )
+        )
+        .returning();
+
+    return item || null;
+}
+
+/**
+ * Cancel a scheduled content item, reverting it to draft.
+ * Only works on items with status "scheduled".
+ */
+export async function cancelSchedule(
+    itemId: string,
+    userId: string
+): Promise<ContentItem | null> {
+    const [item] = await db
+        .update(contentItems)
+        .set({
+            status: "draft",
+            scheduledFor: null,
+            schedulingMeta: null,
+            updatedAt: new Date(),
+        })
+        .where(
+            and(
+                eq(contentItems.id, itemId),
+                eq(contentItems.userId, userId),
+                eq(contentItems.status, "scheduled")
+            )
+        )
+        .returning();
+
+    return item || null;
+}
+
+/**
+ * Get all scheduled content items that are due for publishing.
+ * Used by the cron job — queries across all users.
+ */
+export async function getScheduledDueItems(): Promise<ContentItem[]> {
+    return db
+        .select()
+        .from(contentItems)
+        .where(
+            and(
+                eq(contentItems.status, "scheduled"),
+                lte(contentItems.scheduledFor, new Date())
+            )
+        )
+        .orderBy(asc(contentItems.scheduledFor))
+        .limit(20);
+}
+
+/**
+ * Mark a content item as failed after a publish attempt.
+ * Updates the schedulingMeta with error details and retry count.
+ */
+export async function markContentFailed(
+    itemId: string,
+    errorMessage: string
+): Promise<void> {
+    // Read current item to get existing meta
+    const [item] = await db
+        .select()
+        .from(contentItems)
+        .where(eq(contentItems.id, itemId))
+        .limit(1);
+
+    if (!item) return;
+
+    const meta = (item.schedulingMeta as SchedulingMeta) || {};
+    meta.errorMessage = errorMessage;
+    meta.retryCount = (meta.retryCount || 0) + 1;
+    meta.lastAttemptAt = new Date().toISOString();
+
+    await db
+        .update(contentItems)
+        .set({
+            status: "failed",
+            schedulingMeta: meta,
+            updatedAt: new Date(),
+        })
+        .where(eq(contentItems.id, itemId));
+}
+
+/**
+ * Mark a content item as successfully published by the scheduler.
+ * Used by the cron job after a successful LinkedIn API call.
+ */
+export async function markContentPublished(
+    itemId: string,
+    linkedinPostId?: string
+): Promise<void> {
+    // Read current item to get existing meta
+    const [item] = await db
+        .select()
+        .from(contentItems)
+        .where(eq(contentItems.id, itemId))
+        .limit(1);
+
+    if (!item) return;
+
+    const meta = (item.schedulingMeta as SchedulingMeta) || {};
+    if (linkedinPostId) {
+        meta.linkedinPostId = linkedinPostId;
+    }
+
+    await db
+        .update(contentItems)
+        .set({
+            status: "published",
+            publishedAt: new Date(),
+            schedulingMeta: meta,
+            updatedAt: new Date(),
+        })
+        .where(eq(contentItems.id, itemId));
 }
 
 // ============================================

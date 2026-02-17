@@ -1,5 +1,5 @@
 // src/lib/usage.ts
-// Usage tracking utilities for message limits
+// Usage tracking utilities for credit limits
 
 import { db } from "@/db";
 import { eq, and, sql } from "drizzle-orm";
@@ -14,14 +14,14 @@ export interface UsageInfo {
     tier: TierType;
     tierName: string;
     period: string;
-    messagesUsed: number;
-    messagesLimit: number;
-    bonusMessages: number;
+    creditsUsed: number;
+    creditsLimit: number;
+    bonusCredits: number;
     totalAvailable: number;
     remaining: number;
     percentage: number;
     status: "ok" | "warning" | "critical" | "exceeded";
-    canSendMessage: boolean;
+    canUseCredits: boolean;
 }
 
 export interface UsageCheckResult {
@@ -65,7 +65,7 @@ export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof mo
     // Get user's subscription to determine limit
     const subscription = await getUserSubscription(userId);
     const tier = getTier(subscription?.tier || "free");
-    const currentTierLimit = tier.messagesPerMonth;
+    const currentTierLimit = tier.creditsPerMonth;
 
     // Try to get existing record
     const existing = await db
@@ -79,12 +79,12 @@ export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof mo
 
     if (existing[0]) {
         // Sync the limit if tier has changed (e.g., user upgraded)
-        if (existing[0].messagesLimit !== currentTierLimit) {
-            console.log(`[Usage] Syncing message limit: ${existing[0].messagesLimit} -> ${currentTierLimit} for user ${userId}`);
+        if (existing[0].creditsLimit !== currentTierLimit) {
+            console.log(`[Usage] Syncing credit limit: ${existing[0].creditsLimit} -> ${currentTierLimit} for user ${userId}`);
             const [updated] = await db
                 .update(monthlyUsage)
                 .set({
-                    messagesLimit: currentTierLimit,
+                    creditsLimit: currentTierLimit,
                     updatedAt: new Date(),
                 })
                 .where(and(
@@ -103,9 +103,9 @@ export async function getOrCreateMonthlyUsage(userId: string): Promise<typeof mo
         .values({
             userId,
             period,
-            messagesUsed: 0,
-            messagesLimit: currentTierLimit,
-            bonusMessages: 0,
+            creditsUsed: 0,
+            creditsLimit: currentTierLimit,
+            bonusCredits: 0,
         })
         .returning();
 
@@ -123,40 +123,40 @@ export async function getUserUsage(userId: string): Promise<UsageInfo> {
 
     const usage = await getOrCreateMonthlyUsage(userId);
 
-    const totalAvailable = usage.messagesLimit + usage.bonusMessages;
-    const remaining = Math.max(0, totalAvailable - usage.messagesUsed);
-    const percentage = getUsagePercentage(usage.messagesUsed, totalAvailable);
-    const status = getUsageStatus(usage.messagesUsed, totalAvailable);
+    const totalAvailable = usage.creditsLimit + usage.bonusCredits;
+    const remaining = Math.max(0, totalAvailable - usage.creditsUsed);
+    const percentage = getUsagePercentage(usage.creditsUsed, totalAvailable);
+    const status = getUsageStatus(usage.creditsUsed, totalAvailable);
 
     return {
         tier: tierType,
         tierName: tier.name,
         period: usage.period,
-        messagesUsed: usage.messagesUsed,
-        messagesLimit: usage.messagesLimit,
-        bonusMessages: usage.bonusMessages,
+        creditsUsed: usage.creditsUsed,
+        creditsLimit: usage.creditsLimit,
+        bonusCredits: usage.bonusCredits,
         totalAvailable,
         remaining,
         percentage,
         status,
-        canSendMessage: remaining > 0,
+        canUseCredits: remaining > 0,
     };
 }
 
 // ===========================================
-// CHECK IF USER CAN SEND MESSAGE
+// CHECK IF USER CAN USE CREDITS
 // ===========================================
 
-export async function checkMessageAllowance(userId: string, messageCost: number = 1): Promise<UsageCheckResult> {
+export async function checkCreditAllowance(userId: string, creditCost: number = 1): Promise<UsageCheckResult> {
     const usage = await getUserUsage(userId);
 
-    // Check if user has enough messages for this cost
-    if (usage.remaining < messageCost) {
+    // Check if user has enough credits for this cost
+    if (usage.remaining < creditCost) {
         return {
             allowed: false,
-            reason: messageCost > 1
-                ? `Voice messages cost ${messageCost} credits. You have ${usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`
-                : "You've reached your monthly message limit. Upgrade your plan or purchase a message pack to continue.",
+            reason: creditCost > 1
+                ? `This action costs ${creditCost} credits. You have ${usage.remaining} remaining. Upgrade your plan or purchase a credit pack to continue.`
+                : "You've reached your monthly credit limit. Upgrade your plan or purchase a credit pack to continue.",
             usage,
         };
     }
@@ -168,10 +168,10 @@ export async function checkMessageAllowance(userId: string, messageCost: number 
 }
 
 // ===========================================
-// INCREMENT MESSAGE USAGE
+// INCREMENT CREDIT USAGE
 // ===========================================
 
-export async function incrementMessageUsage(userId: string, amount: number = 1): Promise<UsageInfo> {
+export async function incrementCreditUsage(userId: string, amount: number = 1): Promise<UsageInfo> {
     const period = getCurrentPeriod();
 
     // Ensure usage record exists
@@ -181,7 +181,7 @@ export async function incrementMessageUsage(userId: string, amount: number = 1):
     await db
         .update(monthlyUsage)
         .set({
-            messagesUsed: sql`${monthlyUsage.messagesUsed} + ${amount}`,
+            creditsUsed: sql`${monthlyUsage.creditsUsed} + ${amount}`,
             updatedAt: new Date(),
         })
         .where(and(
@@ -194,20 +194,20 @@ export async function incrementMessageUsage(userId: string, amount: number = 1):
 }
 
 // ===========================================
-// ADD BONUS MESSAGES (from pack purchases)
+// ADD BONUS CREDITS (from pack purchases)
 // ===========================================
 
-export async function addBonusMessages(userId: string, amount: number): Promise<UsageInfo> {
+export async function addBonusCredits(userId: string, amount: number): Promise<UsageInfo> {
     const period = getCurrentPeriod();
 
     // Ensure usage record exists
     await getOrCreateMonthlyUsage(userId);
 
-    // Add bonus messages
+    // Add bonus credits
     await db
         .update(monthlyUsage)
         .set({
-            bonusMessages: sql`${monthlyUsage.bonusMessages} + ${amount}`,
+            bonusCredits: sql`${monthlyUsage.bonusCredits} + ${amount}`,
             updatedAt: new Date(),
         })
         .where(and(
@@ -281,7 +281,7 @@ export async function upgradeTier(userId: string, newTier: TierType): Promise<vo
     await db
         .update(monthlyUsage)
         .set({
-            messagesLimit: tier.messagesPerMonth,
+            creditsLimit: tier.creditsPerMonth,
             updatedAt: new Date(),
         })
         .where(and(

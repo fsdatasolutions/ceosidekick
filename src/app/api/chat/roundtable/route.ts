@@ -9,9 +9,10 @@ import { ROUND_TABLE_ELIGIBLE_ADVISORS } from "@/agents/round-table";
 import { eq } from "drizzle-orm";
 import {
     getUserTier,
-    checkMessageAllowance,
-    incrementMessageUsage,
+    checkCreditAllowance,
+    incrementCreditUsage,
 } from "@/lib/usage";
+import { tokensToCredits } from "@/lib/credits";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -90,12 +91,12 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check message allowance (minimum cost: 4)
-        const allowance = await checkMessageAllowance(userId, 4);
+        // Check credit allowance (pre-check with minimum 1 credit)
+        const allowance = await checkCreditAllowance(userId, 1);
         if (!allowance.allowed) {
             return NextResponse.json(
                 {
-                    error: allowance.reason || "Message limit reached.",
+                    error: allowance.reason || "Credit limit reached.",
                     limitReached: true,
                 },
                 { status: 429 }
@@ -184,7 +185,7 @@ export async function POST(req: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    let messagesCharged = 0;
+                    let totalTokensUsed = 0;
                     let synthesisContent = "";
                     const advisorResponsesMeta: Array<{
                         advisorId: string;
@@ -240,7 +241,7 @@ export async function POST(req: NextRequest) {
                             } catch {}
                         }
 
-                        // Track messages charged
+                        // Track total tokens used
                         const completeMatch = chunk.match(
                             /__RT_EVENT__(.+?"type"\s*:\s*"synthesis_complete".+?)__RT_END__/
                         );
@@ -248,7 +249,7 @@ export async function POST(req: NextRequest) {
                             try {
                                 const event = JSON.parse(completeMatch[1]);
                                 const meta = JSON.parse(event.content);
-                                messagesCharged = meta.messagesCharged || 0;
+                                totalTokensUsed = meta.totalTokensUsed || 0;
                             } catch {}
                         }
 
@@ -269,7 +270,7 @@ export async function POST(req: NextRequest) {
                             metadata: {
                                 type: "roundtable",
                                 advisors: advisorResponsesMeta,
-                                messagesCharged,
+                                totalTokensUsed,
                                 selectedAdvisors: validatedAdvisors || "auto",
                             },
                         });
@@ -287,26 +288,27 @@ export async function POST(req: NextRequest) {
                     }
 
                     // ============================================
-                    // USAGE: Increment after successful completion
+                    // USAGE: Deduct token-scaled credits after completion
                     // ============================================
-                    if (messagesCharged > 0) {
+                    if (totalTokensUsed > 0) {
                         try {
-                            const updatedUsage = await incrementMessageUsage(userId, messagesCharged);
+                            const creditsCharged = tokensToCredits(totalTokensUsed);
+                            const updatedUsage = await incrementCreditUsage(userId, creditsCharged);
                             console.log(
-                                `[RoundTable API] Charged ${messagesCharged} messages for user ${userId}. Usage: ${updatedUsage.messagesUsed}/${updatedUsage.totalAvailable}`
+                                `[RoundTable API] Charged ${creditsCharged} credits (${totalTokensUsed} tokens) for user ${userId}. Usage: ${updatedUsage.creditsUsed}/${updatedUsage.totalAvailable}`
                             );
 
                             // Send usage update to client
                             const usageEvent = JSON.stringify({
                                 type: "usage_update",
                                 usage: updatedUsage,
-                                messagesCharged,
+                                creditsCharged,
                             });
                             controller.enqueue(
                                 encoder.encode(`__RT_EVENT__${usageEvent}__RT_END__`)
                             );
                         } catch (usageError) {
-                            console.error("[RoundTable API] Failed to increment usage:", usageError);
+                            console.error("[RoundTable API] Failed to deduct credits:", usageError);
                         }
                     }
 

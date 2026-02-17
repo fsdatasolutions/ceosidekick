@@ -1,10 +1,10 @@
 // src/app/api/stripe/checkout-pack/route.ts
-// Create Stripe checkout session for message pack purchases
+// Create Stripe checkout session for credit pack purchases
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
-import { MESSAGE_PACKS, getMessagePack } from "@/lib/tiers";
+import { getCreditPack } from "@/lib/tiers";
 import { getCurrentPeriod } from "@/lib/usage";
 
 export async function POST(request: NextRequest) {
@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
     const { packId } = body as { packId: string };
 
     // Validate pack
-    const pack = getMessagePack(packId);
+    const pack = getCreditPack(packId);
     if (!pack) {
-      return NextResponse.json({ error: "Invalid message pack" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid credit pack" }, { status: 400 });
     }
 
     // Get Stripe price ID from environment
@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/dashboard?pack=success&messages=${pack.messages}`,
+      success_url: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/dashboard?pack=success&credits=${pack.credits}`,
       cancel_url: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/dashboard?pack=cancelled`,
       metadata: {
         userId: session.user.id,
         packId,
-        messages: pack.messages.toString(),
+        credits: pack.credits.toString(),
         period: currentPeriod,
-        type: "message_pack",
+        type: "credit_pack",
       },
     });
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     await db.insert(messagePurchases).values({
       userId: session.user.id,
       packId,
-      messagesAmount: pack.messages,
+      creditsAmount: pack.credits,
       priceInCents: pack.price,
       stripeSessionId: checkoutSession.id,
       status: "pending",

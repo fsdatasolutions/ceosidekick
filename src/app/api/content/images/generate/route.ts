@@ -8,7 +8,7 @@ import type { GenerationOptions, DalleModel, ImageSize, ImageQuality, ImageStyle
 import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
-import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
+import { checkCreditAllowance, incrementCreditUsage } from "@/lib/usage";
 
 export async function POST(request: NextRequest) {
     try {
@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
         const creditCost = getGenerationCredits(options);
 
         // Check if user has enough credits
-        const usageCheck = await checkMessageAllowance(userId, creditCost);
+        const usageCheck = await checkCreditAllowance(userId, creditCost);
         if (!usageCheck.allowed) {
             return NextResponse.json(
                 {
-                    error: `Image generation requires ${creditCost} message credit${creditCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
+                    error: `Image generation requires ${creditCost} credit${creditCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a credit pack to continue.`,
                     required: creditCost,
                     usage: usageCheck.usage,
                 },
@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Deduct credits (image was generated regardless of storage/DB outcome)
-        const updatedUsage = await incrementMessageUsage(userId, creditCost);
-        console.log("[Image Generate] Credits charged:", creditCost, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+        const updatedUsage = await incrementCreditUsage(userId, creditCost);
+        console.log("[Image Generate] Credits charged:", creditCost, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
 
         return NextResponse.json({
             success: true,

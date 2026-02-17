@@ -107,9 +107,9 @@ export async function GET(request: NextRequest) {
         const currentUsage = await db
             .select({
                 userId: monthlyUsage.userId,
-                messagesUsed: monthlyUsage.messagesUsed,
-                messagesLimit: monthlyUsage.messagesLimit,
-                bonusMessages: monthlyUsage.bonusMessages,
+                creditsUsed: monthlyUsage.creditsUsed,
+                creditsLimit: monthlyUsage.creditsLimit,
+                bonusCredits: monthlyUsage.bonusCredits,
             })
             .from(monthlyUsage)
             .where(eq(monthlyUsage.period, currentPeriod));
@@ -131,9 +131,9 @@ export async function GET(request: NextRequest) {
                 conversationCount: msgStats?.conversationCount || 0,
                 tier: subInfo?.tier || "free",
                 subscriptionStatus: subInfo?.status || "none",
-                currentMonthUsage: usage?.messagesUsed || 0,
-                currentMonthLimit: usage?.messagesLimit || 50,
-                bonusMessages: usage?.bonusMessages || 0,
+                currentMonthUsage: usage?.creditsUsed || 0,
+                currentMonthLimit: usage?.creditsLimit || 50,
+                bonusCredits: usage?.bonusCredits || 0,
             };
         });
 

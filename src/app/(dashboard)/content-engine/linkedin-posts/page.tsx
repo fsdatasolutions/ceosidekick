@@ -13,6 +13,8 @@ import {
   Clock,
   CheckCircle,
   Archive,
+  CalendarClock,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listContentItems } from "@/lib/services/content-items";
@@ -59,7 +61,7 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
 
   const userId = session.user.id;
   const params = await searchParams;
-  const status = params.status as "draft" | "published" | "archived" | undefined;
+  const status = params.status as "draft" | "scheduled" | "published" | "failed" | "archived" | undefined;
   const currentPage = parseInt(params.page || "1", 10);
   const limit = 20;
   const offset = (currentPage - 1) * limit;
@@ -71,6 +73,7 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
     status: string;
     linkedinPostType: string | null;
     publishedAt: Date | null;
+    scheduledFor: Date | null;
     updatedAt: Date;
   }> = [];
   let pagination = { total: 0, limit, offset, hasMore: false };
@@ -154,10 +157,32 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
               Drafts
             </Link>
             <Link
+              href="/content-engine/linkedin-posts?status=scheduled"
+              className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
+                status === "scheduled"
+                  ? "bg-blue-100 text-blue-900 font-medium"
+                  : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+              Scheduled
+            </Link>
+            <Link
+              href="/content-engine/linkedin-posts?status=failed"
+              className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
+                status === "failed"
+                  ? "bg-red-100 text-red-900 font-medium"
+                  : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              Failed
+            </Link>
+            <Link
               href="/content-engine/linkedin-posts?status=published"
               className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
-                status === "published" 
-                  ? "bg-neutral-100 text-neutral-900 font-medium" 
+                status === "published"
+                  ? "bg-neutral-100 text-neutral-900 font-medium"
                   : "text-neutral-600 hover:bg-neutral-50"
               }`}
             >
@@ -199,11 +224,15 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      post.status === "published" 
-                        ? "bg-green-100 text-green-700" 
-                        : post.status === "archived"
-                          ? "bg-neutral-100 text-neutral-500"
-                          : "bg-amber-100 text-amber-700"
+                      post.status === "published"
+                        ? "bg-green-100 text-green-700"
+                        : post.status === "scheduled"
+                          ? "bg-blue-100 text-blue-700"
+                          : post.status === "failed"
+                            ? "bg-red-100 text-red-700"
+                            : post.status === "archived"
+                              ? "bg-neutral-100 text-neutral-500"
+                              : "bg-amber-100 text-amber-700"
                     }`}>
                       {post.status}
                     </span>
@@ -219,6 +248,9 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
                   <p className="text-xs text-neutral-400 mt-2">
                     Updated {formatRelativeTime(post.updatedAt)}
                     {post.publishedAt && ` • Published ${formatRelativeTime(post.publishedAt)}`}
+                    {post.status === "scheduled" && post.scheduledFor && (
+                      <span> • Scheduled for {new Date(post.scheduledFor).toLocaleString()}</span>
+                    )}
                   </p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-neutral-400 flex-shrink-0 mt-2" />
@@ -255,13 +287,17 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
             <MessageSquare className="w-8 h-8 text-sky-600" />
           </div>
           <h3 className="font-semibold text-neutral-900 mb-2">
-            {status === "draft" 
-              ? "No draft posts" 
-              : status === "published" 
-                ? "No published posts"
-                : status === "archived"
-                  ? "No archived posts"
-                  : "No posts yet"
+            {status === "draft"
+              ? "No draft posts"
+              : status === "scheduled"
+                ? "No scheduled posts"
+                : status === "failed"
+                  ? "No failed posts"
+                  : status === "published"
+                    ? "No published posts"
+                    : status === "archived"
+                      ? "No archived posts"
+                      : "No posts yet"
             }
           </h3>
           <p className="text-sm text-neutral-600 mb-6 max-w-md mx-auto">

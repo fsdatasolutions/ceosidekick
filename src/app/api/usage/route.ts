@@ -25,8 +25,8 @@ export async function GET() {
         if (!db) {
             return NextResponse.json({
                 usage: {
-                    messagesThisMonth: 0,
-                    messageLimit: 30,
+                    creditsThisMonth: 0,
+                    creditLimit: 30,
                     conversationCount: 0,
                     documentCount: 0,
                     plan: "free",
@@ -34,15 +34,15 @@ export async function GET() {
                     tierName: "Free",
                     tierPrice: "$0",
                     companyLibraryStorageMB: 0,
-                    messagesUsed: 0,
-                    messagesLimit: 30,
-                    bonusMessages: 0,
+                    creditsUsed: 0,
+                    creditsLimit: 30,
+                    bonusCredits: 0,
                     totalAvailable: 30,
                     remaining: 30,
                     percentage: 0,
                     period: "",
                     status: "ok",
-                    canSendMessage: true,
+                    canUseCredits: true,
                 },
             });
         }
@@ -72,8 +72,8 @@ export async function GET() {
         return NextResponse.json({
             usage: {
                 ...usage,
-                messagesThisMonth: usage.messagesUsed,
-                messageLimit: usage.messagesLimit,
+                creditsThisMonth: usage.creditsUsed,
+                creditLimit: usage.creditsLimit,
                 plan: usage.tier,
                 conversationCount: conversationResult[0]?.count || 0,
                 documentCount: documentResult[0]?.count || 0,

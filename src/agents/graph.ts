@@ -290,6 +290,7 @@ export async function runConversation(params: {
 }
 
 // Streaming version for real-time responses (individual advisors)
+// Yields text chunks, then a final sentinel with token usage data.
 export async function* streamConversation(params: {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   agent: string;
@@ -316,9 +317,22 @@ export async function* streamConversation(params: {
     ),
   ];
 
-  const stream = await llm.stream(langchainMessages);
+  // Enable streamUsage to get token counts from the stream
+  const stream = await llm.stream(langchainMessages, { streamUsage: true });
+
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   for await (const chunk of stream) {
+    // Capture usage_metadata if present on the chunk
+    const meta = (chunk as unknown as Record<string, unknown>).usage_metadata as
+        | { input_tokens?: number; output_tokens?: number }
+        | undefined;
+    if (meta) {
+      if (meta.input_tokens) inputTokens = meta.input_tokens;
+      if (meta.output_tokens) outputTokens = meta.output_tokens;
+    }
+
     let content = "";
     if (typeof chunk.content === "string") {
       content = chunk.content;
@@ -329,6 +343,9 @@ export async function* streamConversation(params: {
     }
     if (content) yield content;
   }
+
+  // Yield token usage sentinel for the chat route to parse
+  yield `__TOKEN_USAGE__${JSON.stringify({ inputTokens, outputTokens })}__TOKEN_USAGE_END__`;
 }
 
 // ============================================
@@ -449,14 +466,12 @@ async function callAdvisor(
             ? response.content
             : JSON.stringify(response.content);
 
-    // Estimate token usage (rough: 1 token ≈ 4 chars)
-    const inputTokens = Math.ceil(
-        langchainMessages.reduce((sum, m) => {
-          const c = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-          return sum + c.length;
-        }, 0) / 4
-    );
-    const outputTokens = Math.ceil(content.length / 4);
+    // Capture actual token usage from LangChain response metadata
+    const meta = (response as unknown as Record<string, unknown>).usage_metadata as
+        | { input_tokens?: number; output_tokens?: number }
+        | undefined;
+    const inputTokens = meta?.input_tokens || 0;
+    const outputTokens = meta?.output_tokens || 0;
 
     return {
       response: content,
@@ -631,11 +646,23 @@ export async function* streamRoundTableConversation(params: {
     ),
   ];
 
-  // Stream the synthesis
-  const synthesisStream = await synthesisLLM.stream(synthesisMessages);
+  // Stream the synthesis (with streamUsage to capture tokens)
+  const synthesisStream = await synthesisLLM.stream(synthesisMessages, { streamUsage: true });
 
   let totalSynthesisContent = "";
+  let synthesisInputTokens = 0;
+  let synthesisOutputTokens = 0;
+
   for await (const chunk of synthesisStream) {
+    // Capture usage_metadata from synthesis stream
+    const meta = (chunk as unknown as Record<string, unknown>).usage_metadata as
+        | { input_tokens?: number; output_tokens?: number }
+        | undefined;
+    if (meta) {
+      if (meta.input_tokens) synthesisInputTokens = meta.input_tokens;
+      if (meta.output_tokens) synthesisOutputTokens = meta.output_tokens;
+    }
+
     let content = "";
     if (typeof chunk.content === "string") {
       content = chunk.content;
@@ -654,27 +681,26 @@ export async function* streamRoundTableConversation(params: {
     }
   }
 
-  // Calculate total tokens
+  // Calculate total tokens from all advisor calls + synthesis
   const totalTokensUsed =
       advisorResponses.reduce((sum, r) => sum + r.tokensUsed, 0) +
-      Math.ceil(totalSynthesisContent.length / 4) +
-      Math.ceil(synthesisSystemPrompt.length / 4);
+      synthesisInputTokens + synthesisOutputTokens;
 
-  // Number of messages to charge: 1 per advisor + 1 for synthesis + 1 for classification
-  const messagesCharged = advisorResponses.length + 2;
+  // Credits charged based on actual token usage (will be calculated by the route)
+  const creditsCharged = totalTokensUsed; // Route will convert tokens → credits
 
   const completeEvent: RoundTableStreamEvent = {
     type: "synthesis_complete",
     content: JSON.stringify({
       totalTokensUsed,
-      messagesCharged,
+      creditsCharged,
       advisorCount: advisorResponses.length,
     }),
   };
   yield `__RT_EVENT__${JSON.stringify(completeEvent)}__RT_END__`;
 
   console.log(
-      `[RoundTable] Complete. Advisors: ${advisorResponses.length}, Tokens: ~${totalTokensUsed}, Messages charged: ${messagesCharged}`
+      `[RoundTable] Complete. Advisors: ${advisorResponses.length}, Tokens: ~${totalTokensUsed}, Credits charged: ${creditsCharged}`
   );
 }
 

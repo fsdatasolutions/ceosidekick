@@ -13,6 +13,8 @@ import {
   Clock,
   CheckCircle,
   Archive,
+  CalendarClock,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listContentItems } from "@/lib/services/content-items";
@@ -53,7 +55,7 @@ export default async function LinkedInArticlesPage({ searchParams }: PageProps) 
 
   const userId = session.user.id;
   const params = await searchParams;
-  const status = params.status as "draft" | "published" | "archived" | undefined;
+  const status = params.status as "draft" | "scheduled" | "published" | "failed" | "archived" | undefined;
   const currentPage = parseInt(params.page || "1", 10);
   const limit = 20;
   const offset = (currentPage - 1) * limit;
@@ -141,10 +143,32 @@ export default async function LinkedInArticlesPage({ searchParams }: PageProps) 
               Drafts
             </Link>
             <Link
+              href="/content-engine/linkedin-articles?status=scheduled"
+              className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
+                status === "scheduled"
+                  ? "bg-blue-100 text-blue-900 font-medium"
+                  : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+              Scheduled
+            </Link>
+            <Link
+              href="/content-engine/linkedin-articles?status=failed"
+              className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
+                status === "failed"
+                  ? "bg-red-100 text-red-900 font-medium"
+                  : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              Failed
+            </Link>
+            <Link
               href="/content-engine/linkedin-articles?status=published"
               className={`px-3 py-1.5 text-sm border-l border-neutral-200 flex items-center gap-1.5 ${
-                status === "published" 
-                  ? "bg-neutral-100 text-neutral-900 font-medium" 
+                status === "published"
+                  ? "bg-neutral-100 text-neutral-900 font-medium"
                   : "text-neutral-600 hover:bg-neutral-50"
               }`}
             >
@@ -189,11 +213,15 @@ export default async function LinkedInArticlesPage({ searchParams }: PageProps) 
                       {article.title || "Untitled Article"}
                     </h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      article.status === "published" 
-                        ? "bg-green-100 text-green-700" 
-                        : article.status === "archived"
-                          ? "bg-neutral-100 text-neutral-500"
-                          : "bg-amber-100 text-amber-700"
+                      article.status === "published"
+                        ? "bg-green-100 text-green-700"
+                        : article.status === "scheduled"
+                          ? "bg-blue-100 text-blue-700"
+                          : article.status === "failed"
+                            ? "bg-red-100 text-red-700"
+                            : article.status === "archived"
+                              ? "bg-neutral-100 text-neutral-500"
+                              : "bg-amber-100 text-amber-700"
                     }`}>
                       {article.status}
                     </span>
@@ -204,6 +232,9 @@ export default async function LinkedInArticlesPage({ searchParams }: PageProps) 
                   <p className="text-xs text-neutral-400 mt-1">
                     Updated {formatRelativeTime(article.updatedAt)}
                     {article.publishedAt && ` • Published ${formatRelativeTime(article.publishedAt)}`}
+                    {article.status === "scheduled" && article.scheduledFor && (
+                      <span> • Scheduled for {new Date(article.scheduledFor).toLocaleString()}</span>
+                    )}
                   </p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-neutral-400 flex-shrink-0" />
@@ -240,13 +271,17 @@ export default async function LinkedInArticlesPage({ searchParams }: PageProps) 
             <FileText className="w-8 h-8 text-blue-600" />
           </div>
           <h3 className="font-semibold text-neutral-900 mb-2">
-            {status === "draft" 
-              ? "No draft articles" 
-              : status === "published" 
-                ? "No published articles"
-                : status === "archived"
-                  ? "No archived articles"
-                  : "No articles yet"
+            {status === "draft"
+              ? "No draft articles"
+              : status === "scheduled"
+                ? "No scheduled articles"
+                : status === "failed"
+                  ? "No failed articles"
+                  : status === "published"
+                    ? "No published articles"
+                    : status === "archived"
+                      ? "No archived articles"
+                      : "No articles yet"
             }
           </h3>
           <p className="text-sm text-neutral-600 mb-6 max-w-md mx-auto">

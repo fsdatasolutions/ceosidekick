@@ -8,14 +8,14 @@ import Link from "next/link";
 interface UsageInfo {
   tier: string;
   tierName: string;
-  messagesUsed: number;
-  messagesLimit: number;
-  bonusMessages: number;
+  creditsUsed: number;
+  creditsLimit: number;
+  bonusCredits: number;
   totalAvailable: number;
   remaining: number;
   percentage: number;
   status: "ok" | "warning" | "critical" | "exceeded";
-  canSendMessage: boolean;
+  canUseCredits: boolean;
 }
 
 interface UsageMeterProps {
@@ -80,8 +80,8 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
     exceeded: "text-red-700",
   };
 
-  const StatusIcon = usage.status === "exceeded" ? XCircle : 
-                     usage.status === "critical" ? AlertTriangle : 
+  const StatusIcon = usage.status === "exceeded" ? XCircle :
+                     usage.status === "critical" ? AlertTriangle :
                      usage.status === "warning" ? AlertTriangle : Zap;
 
   if (compact) {
@@ -89,11 +89,11 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
       <div className={`flex items-center gap-2 ${className}`}>
         <div className={`w-2 h-2 rounded-full ${statusColors[usage.status]}`} />
         <span className="text-sm text-neutral-600">
-          {usage.remaining} messages left
+          {usage.remaining} credits left
         </span>
         {usage.status !== "ok" && showUpgrade && (
-          <Link 
-            href="/dashboard/settings?tab=billing" 
+          <Link
+            href="/dashboard/settings?tab=billing"
             className="text-xs text-primary-red hover:underline"
           >
             Upgrade
@@ -113,7 +113,7 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
           </span>
         </div>
         {showUpgrade && usage.tier !== "pro" && (
-          <Link 
+          <Link
             href="/dashboard/settings?tab=billing"
             className="text-xs font-medium text-primary-red hover:underline flex items-center gap-1"
           >
@@ -125,7 +125,7 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
 
       {/* Progress bar */}
       <div className="h-2 bg-white rounded-full overflow-hidden mb-2">
-        <div 
+        <div
           className={`h-full ${statusColors[usage.status]} transition-all duration-300`}
           style={{ width: `${Math.min(usage.percentage, 100)}%` }}
         />
@@ -134,17 +134,17 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
       {/* Usage text */}
       <div className="flex items-center justify-between text-xs">
         <span className={statusTextColors[usage.status]}>
-          {usage.messagesUsed.toLocaleString()} / {usage.totalAvailable.toLocaleString()} messages
+          {usage.creditsUsed.toLocaleString()} / {usage.totalAvailable.toLocaleString()} credits
         </span>
         <span className="text-neutral-500">
           {usage.remaining.toLocaleString()} remaining
         </span>
       </div>
 
-      {/* Bonus messages note */}
-      {usage.bonusMessages > 0 && (
+      {/* Bonus credits note */}
+      {usage.bonusCredits > 0 && (
         <p className="text-xs text-neutral-500 mt-2">
-          Includes {usage.bonusMessages.toLocaleString()} bonus messages
+          Includes {usage.bonusCredits.toLocaleString()} bonus credits
         </p>
       )}
 
@@ -152,9 +152,9 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
       {usage.status === "exceeded" && (
         <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
           <p className="text-xs text-red-700">
-            You&apos;ve reached your message limit. 
+            You&apos;ve reached your credit limit.
             <Link href="/dashboard/settings?tab=billing" className="font-medium underline ml-1">
-              Upgrade or buy more messages
+              Upgrade or buy more credits
             </Link>
           </p>
         </div>
@@ -163,7 +163,7 @@ export function UsageMeter({ compact = false, showUpgrade = true, className = ""
       {usage.status === "critical" && (
         <div className="mt-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
           <p className="text-xs text-orange-700">
-            Running low on messages! Consider upgrading your plan.
+            Running low on credits! Consider upgrading your plan.
           </p>
         </div>
       )}

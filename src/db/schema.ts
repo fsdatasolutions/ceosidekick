@@ -152,12 +152,12 @@ export const monthlyUsage = pgTable(
         // Period (YYYY-MM format for easy querying)
         period: varchar("period", { length: 7 }).notNull(), // e.g., "2025-01"
 
-        // Usage counts
-        messagesUsed: integer("messages_used").default(0).notNull(),
-        messagesLimit: integer("messages_limit").notNull(), // Snapshot of limit at period start
+        // Usage counts (credits = token-scaled, 1 credit = 3,000 tokens)
+        creditsUsed: integer("credits_used").default(0).notNull(),
+        creditsLimit: integer("credits_limit").notNull(), // Snapshot of limit at period start
 
-        // Bonus messages (from packs, promotions, etc.)
-        bonusMessages: integer("bonus_messages").default(0).notNull(),
+        // Bonus credits (from packs, promotions, etc.)
+        bonusCredits: integer("bonus_credits").default(0).notNull(),
 
         // Timestamps
         createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -171,7 +171,7 @@ export const monthlyUsage = pgTable(
 );
 
 // ============================================
-// MESSAGE CREDIT PURCHASES
+// CREDIT PURCHASES
 // ============================================
 
 export const messagePurchases = pgTable(
@@ -184,7 +184,7 @@ export const messagePurchases = pgTable(
 
         // Pack info: 'boost' | 'power_pack' | 'bulk'
         packId: varchar("pack_id", { length: 50 }).notNull(),
-        messagesAmount: integer("messages_amount").notNull(),
+        creditsAmount: integer("credits_amount").notNull(),
         priceInCents: integer("price_in_cents").notNull(),
 
         // Stripe info
@@ -682,7 +682,7 @@ export const feedbackRelations = relations(feedback, ({ one }) => ({
 
 // Content Types for the Content Engine
 export type ContentType = "linkedin_article" | "linkedin_post" | "web_blog" | "image";
-export type ContentStatus = "draft" | "published" | "archived";
+export type ContentStatus = "draft" | "scheduled" | "published" | "failed" | "archived";
 
 // ============================================
 // CONTENT ITEMS
@@ -702,7 +702,7 @@ export const contentItems = pgTable(
         // Content type: 'linkedin_article' | 'linkedin_post' | 'web_blog'
         type: varchar("type", { length: 50 }).notNull(),
 
-        // Status: 'draft' | 'published' | 'archived'
+        // Status: 'draft' | 'scheduled' | 'published' | 'failed' | 'archived'
         status: varchar("status", { length: 50 }).default("draft").notNull(),
 
         // Basic info
@@ -726,9 +726,10 @@ export const contentItems = pgTable(
         authorRole: varchar("author_role", { length: 255 }),
         authorImageUrl: varchar("author_image_url", { length: 500 }),
 
-        // Publishing info
+        // Publishing & scheduling
         publishedAt: timestamp("published_at"),
         scheduledFor: timestamp("scheduled_for"),
+        schedulingMeta: jsonb("scheduling_meta"), // LinkedIn posting options for scheduled items
 
         // AI generation metadata
         generatedFromPrompt: text("generated_from_prompt"),
@@ -748,6 +749,7 @@ export const contentItems = pgTable(
         index("content_items_status_idx").on(table.status),
         index("content_items_created_at_idx").on(table.createdAt),
         index("content_items_hero_image_idx").on(table.heroImageId),
+        index("content_items_scheduled_for_idx").on(table.scheduledFor),
     ]
 );
 

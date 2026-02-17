@@ -7,8 +7,9 @@ import { streamConversation, UserSettings } from "@/agents/graph";
 import { AgentType } from "@/agents/types";
 import { eq, desc } from "drizzle-orm";
 import { RAG_CONFIG } from "@/lib/rag-config";
-import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
+import { checkCreditAllowance, incrementCreditUsage } from "@/lib/usage";
 import { VOICE_CONFIG } from "@/lib/voice-config";
+import { calculateCreditCost } from "@/lib/credits";
 
 // Lazy database imports
 async function getDb() {
@@ -149,9 +150,6 @@ export async function POST(request: NextRequest) {
       voiceMode?: boolean;
     };
 
-    // Calculate message cost (voice messages cost more)
-    const messageCost = voiceMode ? VOICE_CONFIG.MESSAGE_COST_MULTIPLIER : 1;
-
     if (!message || typeof message !== "string") {
       return new Response(JSON.stringify({ error: "Message is required" }), {
         status: 400,
@@ -160,15 +158,16 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // PAYWALL: Check message allowance (with voice cost)
+    // PAYWALL: Pre-check at least 1 credit available
+    // Actual cost is determined after streaming (token-scaled)
     // ============================================
-    const usageCheck = await checkMessageAllowance(session.user.id, messageCost);
+    const usageCheck = await checkCreditAllowance(session.user.id, 1);
 
     if (!usageCheck.allowed) {
-      console.log("[API] User hit message limit:", session.user.id, "voiceMode:", voiceMode);
+      console.log("[API] User hit credit limit:", session.user.id, "voiceMode:", voiceMode);
       return new Response(
           JSON.stringify({
-            error: "MESSAGE_LIMIT_REACHED",
+            error: "CREDIT_LIMIT_REACHED",
             message: usageCheck.reason,
             usage: usageCheck.usage,
           }),
@@ -283,8 +282,24 @@ export async function POST(request: NextRequest) {
           });
 
           let chunkIndex = 0;
+          let tokenUsageData: { inputTokens: number; outputTokens: number } | null = null;
+
           for await (const chunk of responseStream) {
             chunkIndex++;
+
+            // Detect token usage sentinel from streamConversation
+            const sentinelMatch = chunk.match(
+                /^__TOKEN_USAGE__(.+?)__TOKEN_USAGE_END__$/
+            );
+            if (sentinelMatch) {
+              try {
+                tokenUsageData = JSON.parse(sentinelMatch[1]);
+              } catch {
+                console.error("[API] Failed to parse token usage sentinel");
+              }
+              continue; // Don't send sentinel to client
+            }
+
             fullResponse += chunk;
             console.log("[API] Sending chunk", chunkIndex, "length:", chunk.length);
             controller.enqueue(
@@ -318,20 +333,31 @@ export async function POST(request: NextRequest) {
           }
 
           // ============================================
-          // PAYWALL: Increment usage after successful response
+          // PAYWALL: Deduct token-scaled credits after streaming
           // ============================================
           try {
-            const updatedUsage = await incrementMessageUsage(session.user.id, messageCost);
-            console.log("[API] Usage incremented by", messageCost, ":", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable, voiceMode ? "(voice)" : "");
+            // Calculate credit cost from actual token usage
+            let creditCost = 1; // minimum
+            if (tokenUsageData) {
+              creditCost = calculateCreditCost(tokenUsageData.inputTokens, tokenUsageData.outputTokens);
+            }
+
+            // Voice mode floor: at least CREDIT_COST_MULTIPLIER credits
+            if (voiceMode) {
+              creditCost = Math.max(creditCost, VOICE_CONFIG.CREDIT_COST_MULTIPLIER);
+            }
+
+            const updatedUsage = await incrementCreditUsage(session.user.id, creditCost);
+            console.log("[API] Credits deducted:", creditCost, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable, voiceMode ? "(voice)" : "", tokenUsageData ? `(tokens: ${tokenUsageData.inputTokens}+${tokenUsageData.outputTokens})` : "");
 
             // Send updated usage info to client
             controller.enqueue(
                 encoder.encode(
-                    `data: ${JSON.stringify({ type: "usage", usage: updatedUsage, voiceMode, messageCost })}\n\n`
+                    `data: ${JSON.stringify({ type: "usage", usage: updatedUsage, voiceMode, creditCost })}\n\n`
                 )
             );
           } catch (usageError) {
-            console.error("[API] Failed to increment usage:", usageError);
+            console.error("[API] Failed to deduct credits:", usageError);
             // Don't fail the request if usage tracking fails
           }
 

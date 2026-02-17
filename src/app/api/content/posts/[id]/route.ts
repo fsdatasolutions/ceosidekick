@@ -58,6 +58,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 authorImageUrl: post.authorImageUrl,
                 publishedAt: post.publishedAt,
                 scheduledFor: post.scheduledFor,
+                schedulingMeta: post.schedulingMeta,
                 generatedFromPrompt: post.generatedFromPrompt,
                 aiModel: post.aiModel,
                 createdAt: post.createdAt,
@@ -79,6 +80,8 @@ interface UpdatePostBody {
     linkedinPostType?: string;
     heroImageId?: string | null;
     status?: "draft" | "published" | "archived";
+    scheduledFor?: string | null;
+    schedulingMeta?: Record<string, unknown> | null;
 }
 
 // PATCH - Update a post
@@ -117,6 +120,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             linkedinPostType,
             heroImageId,
             status,
+            scheduledFor,
+            schedulingMeta,
         } = body;
 
         // Build updates object (only include provided fields)
@@ -129,6 +134,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             if (status === "published") {
                 updates.publishedAt = new Date();
             }
+        }
+        if (scheduledFor !== undefined) {
+            updates.scheduledFor = scheduledFor ? new Date(scheduledFor) : null;
+        }
+        if (schedulingMeta !== undefined) {
+            updates.schedulingMeta = schedulingMeta;
         }
 
         const post = await updateContentItem(id, userId, updates);

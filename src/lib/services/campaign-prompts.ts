@@ -15,7 +15,10 @@ import type { CampaignOutputs } from "@/lib/services/content-campaigns";
 // ============================================
 
 /**
- * Message credits charged per content type.
+ * Credits charged per content type.
+ * These are fixed estimates used as pre-checks before generation.
+ * Actual credit cost for text content is token-scaled (1 credit = 3,000 tokens).
+ * Image credits remain fixed since DALL-E doesn't expose tokens.
  *
  * Rationale:
  *   - LinkedIn Post (1): short-form, single Claude call

@@ -38,7 +38,7 @@ export interface GenerationResult {
     style?: ImageStyle;
 }
 
-// Credit costs per generation (in message credits)
+// Credit costs per generation (fixed — DALL-E doesn't expose token counts)
 export const GENERATION_CREDITS: Record<DalleModel, Record<string, number>> = {
     "dall-e-2": {
         "256x256": 1,

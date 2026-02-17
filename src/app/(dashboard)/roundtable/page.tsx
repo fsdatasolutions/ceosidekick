@@ -53,7 +53,7 @@ interface RoundTableMessage {
     content: string;
     advisorResponses?: AdvisorResponse[];
     advisorsConsulted?: AdvisorInfo[];
-    messagesCharged?: number;
+    creditsCharged?: number;
     createdAt: Date;
 }
 
@@ -67,14 +67,14 @@ interface Conversation {
 interface UsageInfo {
     tier: string;
     tierName: string;
-    messagesUsed: number;
-    messagesLimit: number;
-    bonusMessages: number;
+    creditsUsed: number;
+    creditsLimit: number;
+    bonusCredits: number;
     totalAvailable: number;
     remaining: number;
     percentage: number;
     status: "ok" | "warning" | "critical" | "exceeded";
-    canSendMessage: boolean;
+    canUseCredits: boolean;
 }
 
 // ============================================
@@ -407,11 +407,11 @@ function RoundTableContent() {
                             const meta = m.metadata as {
                                 type?: string;
                                 advisors?: AdvisorResponse[];
-                                messagesCharged?: number;
+                                creditsCharged?: number;
                             };
                             if (meta.type === "roundtable" && meta.advisors) {
                                 msg.advisorResponses = meta.advisors;
-                                msg.messagesCharged = meta.messagesCharged;
+                                msg.creditsCharged = meta.creditsCharged;
                             }
                         }
 
@@ -484,7 +484,7 @@ function RoundTableContent() {
     async function handleSubmit(e?: React.FormEvent) {
         e?.preventDefault();
         if (!input.trim() || isLoading) return;
-        if (usage && !usage.canSendMessage) {
+        if (usage && !usage.canUseCredits) {
             setShowUpgradeModal(true);
             return;
         }
@@ -531,7 +531,7 @@ function RoundTableContent() {
             let synthesis = "";
             const advisorResponses: AdvisorResponse[] = [];
             const advisorsConsulted: AdvisorInfo[] = [];
-            let messagesCharged = 0;
+            let creditsCharged = 0;
 
             const assistantId = `msg-${Date.now() + 1}`;
             setMessages((prev) => [...prev, {
@@ -588,9 +588,9 @@ function RoundTableContent() {
                             ));
                             break;
                         case "synthesis_complete":
-                            try { const meta = JSON.parse(event.content as string); messagesCharged = meta.messagesCharged; } catch {}
+                            try { const meta = JSON.parse(event.content as string); creditsCharged = meta.creditsCharged; } catch {}
                             setMessages((prev) => prev.map((m) =>
-                                m.id === assistantId ? { ...m, content: synthesis, advisorsConsulted: [...advisorsConsulted], advisorResponses: [...advisorResponses], messagesCharged } : m
+                                m.id === assistantId ? { ...m, content: synthesis, advisorsConsulted: [...advisorsConsulted], advisorResponses: [...advisorResponses], creditsCharged } : m
                             ));
                             break;
                         case "usage_update":
@@ -618,7 +618,7 @@ function RoundTableContent() {
         }
     }
 
-    const isInputDisabled = isLoading || (usage !== null && !usage.canSendMessage);
+    const isInputDisabled = isLoading || (usage !== null && !usage.canUseCredits);
 
     // ============================================
     // PAYWALL / LOADING SCREENS
@@ -661,8 +661,8 @@ function RoundTableContent() {
                     isOpen={showUpgradeModal}
                     onClose={() => setShowUpgradeModal(false)}
                     currentTier={usage.tier}
-                    messagesUsed={usage.messagesUsed}
-                    messagesLimit={usage.totalAvailable}
+                    creditsUsed={usage.creditsUsed}
+                    creditsLimit={usage.totalAvailable}
                 />
             )}
 
@@ -862,9 +862,9 @@ function RoundTableContent() {
                                                         <span>Thinking...</span>
                                                     </div>
                                                 )}
-                                                {message.messagesCharged && message.messagesCharged > 0 && (
+                                                {message.creditsCharged && message.creditsCharged > 0 && (
                                                     <div className="mt-3 pt-3 border-t border-neutral-200">
-                                                        <span className="text-xs text-neutral-400">{message.messagesCharged} messages used</span>
+                                                        <span className="text-xs text-neutral-400">{message.creditsCharged} credits used</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -912,8 +912,8 @@ function RoundTableContent() {
                             <div className="flex items-start gap-3">
                                 <Zap className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    <p className="font-medium text-amber-800">Message limit reached</p>
-                                    <p className="text-sm text-amber-700 mt-1">You&apos;ve used all {usage.totalAvailable} messages this month.</p>
+                                    <p className="font-medium text-amber-800">Credit limit reached</p>
+                                    <p className="text-sm text-amber-700 mt-1">You&apos;ve used all {usage.totalAvailable} credits this month.</p>
                                 </div>
                                 <Button size="sm" onClick={() => setShowUpgradeModal(true)}>Upgrade</Button>
                             </div>
@@ -946,7 +946,7 @@ function RoundTableContent() {
 
                         <form onSubmit={handleSubmit} className="relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                        placeholder={usage && !usage.canSendMessage ? "Message limit reached — upgrade to continue" : "Ask your virtual C-suite anything..."}
+                        placeholder={usage && !usage.canUseCredits ? "Credit limit reached — upgrade to continue" : "Ask your virtual C-suite anything..."}
                         rows={1} disabled={isInputDisabled}
                         className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed" />
                             <Button type="submit" size="icon" disabled={!input.trim() || isInputDisabled}
@@ -955,7 +955,7 @@ function RoundTableContent() {
                             </Button>
                         </form>
                         <p className="text-xs text-neutral-400 text-center mt-2">
-                            Round Table consults multiple advisors per question. Each response uses multiple messages from your plan.
+                            Round Table consults multiple advisors per question. Each response uses multiple credits from your plan.
                         </p>
                     </div>
                 </div>

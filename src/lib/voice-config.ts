@@ -55,10 +55,10 @@ export const AGENT_VOICES: Record<string, AgentVoiceConfig> = {
     },
 };
 
-// Voice message pricing
+// Voice credit pricing
 export const VOICE_CONFIG = {
-    // Voice messages cost this many message credits (3x normal)
-    MESSAGE_COST_MULTIPLIER: 3,
+    // Voice interactions cost this many credits (3x normal)
+    CREDIT_COST_MULTIPLIER: 3,
 
     // OpenAI TTS model
     TTS_MODEL: "tts-1" as const, // or "tts-1-hd" for higher quality
@@ -81,7 +81,7 @@ export function getAgentVoice(agentId: string): AgentVoiceConfig {
     return AGENT_VOICES[agentId] || AGENT_VOICES.knowledge;
 }
 
-// Calculate message cost for voice
-export function getVoiceMessageCost(): number {
-    return VOICE_CONFIG.MESSAGE_COST_MULTIPLIER;
+// Calculate credit cost for voice
+export function getVoiceCreditCost(): number {
+    return VOICE_CONFIG.CREDIT_COST_MULTIPLIER;
 }

@@ -121,7 +121,7 @@ export async function getContentStats(userId: string): Promise<ContentStats> {
 export async function getContentStatusCounts(
   userId: string,
   type: "linkedin_article" | "linkedin_post" | "web_blog"
-): Promise<{ draft: number; published: number; archived: number }> {
+): Promise<{ draft: number; scheduled: number; published: number; failed: number; archived: number }> {
   try {
     const results = await db
       .select({
@@ -137,8 +137,8 @@ export async function getContentStatusCounts(
       )
       .groupBy(contentItems.status);
 
-    const counts = { draft: 0, published: 0, archived: 0 };
-    
+    const counts = { draft: 0, scheduled: 0, published: 0, failed: 0, archived: 0 };
+
     for (const row of results) {
       if (row.status in counts) {
         counts[row.status as keyof typeof counts] = row.count;
@@ -148,6 +148,6 @@ export async function getContentStatusCounts(
     return counts;
   } catch (error) {
     console.error("[ContentStats] Failed to fetch status counts:", error);
-    return { draft: 0, published: 0, archived: 0 };
+    return { draft: 0, scheduled: 0, published: 0, failed: 0, archived: 0 };
   }
 }

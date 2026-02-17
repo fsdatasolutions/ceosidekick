@@ -96,14 +96,14 @@ interface Conversation {
 interface UsageInfo {
   tier: string;
   tierName: string;
-  messagesUsed: number;
-  messagesLimit: number;
-  bonusMessages: number;
+  creditsUsed: number;
+  creditsLimit: number;
+  bonusCredits: number;
   totalAvailable: number;
   remaining: number;
   percentage: number;
   status: "ok" | "warning" | "critical" | "exceeded";
-  canSendMessage: boolean;
+  canUseCredits: boolean;
 }
 
 interface SaveStatus {
@@ -750,7 +750,7 @@ function ChatContent() {
     if (!text.trim() || isLoading) return;
 
     // Check usage
-    if (usage && !usage.canSendMessage) {
+    if (usage && !usage.canUseCredits) {
       setShowUpgradeModal(true);
       return;
     }
@@ -797,7 +797,7 @@ function ChatContent() {
 
       if (res.status === 403) {
         const errorData = await res.json();
-        if (errorData.error === "MESSAGE_LIMIT_REACHED") {
+        if (errorData.error === "CREDIT_LIMIT_REACHED") {
           if (errorData.usage) setUsage(errorData.usage);
           setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
           setShowUpgradeModal(true);
@@ -1038,8 +1038,8 @@ function ChatContent() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    // Check if user can send messages
-    if (usage && !usage.canSendMessage) {
+    // Check if user has credits remaining
+    if (usage && !usage.canUseCredits) {
       setShowUpgradeModal(true);
       return;
     }
@@ -1092,15 +1092,15 @@ function ChatContent() {
         }),
       });
 
-      // Handle message limit reached (403)
+      // Handle credit limit reached (403)
       if (res.status === 403) {
         const errorData = await res.json();
-        if (errorData.error === "MESSAGE_LIMIT_REACHED") {
+        if (errorData.error === "CREDIT_LIMIT_REACHED") {
           // Update usage from response
           if (errorData.usage) {
             setUsage(errorData.usage);
           }
-          // Remove the empty assistant message
+          // Remove the empty assistant response
           setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
           // Show upgrade modal
           setShowUpgradeModal(true);
@@ -1219,7 +1219,7 @@ function ChatContent() {
   };
 
   // Check if input should be disabled
-  const isInputDisabled = isLoading || (usage !== null && !usage.canSendMessage);
+  const isInputDisabled = isLoading || (usage !== null && !usage.canUseCredits);
 
   return (
       <div className="h-screen flex">
@@ -1229,8 +1229,8 @@ function ChatContent() {
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}
                 currentTier={usage.tier}
-                messagesUsed={usage.messagesUsed}
-                messagesLimit={usage.totalAvailable}
+                creditsUsed={usage.creditsUsed}
+                creditsLimit={usage.totalAvailable}
             />
         )}
 
@@ -1445,7 +1445,7 @@ function ChatContent() {
                     size="sm"
                     onClick={toggleVoiceMode}
                     className={voiceMode ? "bg-primary-red hover:bg-primary-red/90" : ""}
-                    title={voiceMode ? "Voice mode ON (3x message cost)" : "Enable voice mode"}
+                    title={voiceMode ? "Voice mode ON (3x credit cost)" : "Enable voice mode"}
                 >
                   {voiceMode ? (
                       <>
@@ -1546,16 +1546,16 @@ function ChatContent() {
               </div>
           )}
 
-          {/* Message Limit Warning */}
+          {/* Credit Limit Warning */}
           {usage && usage.status === "exceeded" && (
               <div className="px-6 pb-2">
                 <div className="max-w-3xl mx-auto p-4 bg-amber-50 border border-amber-200 rounded-xl">
                   <div className="flex items-start gap-3">
                     <Zap className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-medium text-amber-800">Message limit reached</p>
+                      <p className="font-medium text-amber-800">Credit limit reached</p>
                       <p className="text-sm text-amber-700 mt-1">
-                        You&apos;ve used all {usage.totalAvailable} messages this month.
+                        You&apos;ve used all {usage.totalAvailable} credits this month.
                       </p>
                     </div>
                     <Button
@@ -1599,7 +1599,7 @@ function ChatContent() {
                     ) : (
                         <div className="flex items-center gap-2 text-neutral-500">
                           <Mic className="w-4 h-4" />
-                          <span>Voice mode active (3x message cost)</span>
+                          <span>Voice mode active (3x credit cost)</span>
                           <button
                               onClick={() => setAudioEnabled(!audioEnabled)}
                               className="text-xs underline hover:no-underline"
@@ -1632,8 +1632,8 @@ function ChatContent() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={
-                      usage && !usage.canSendMessage
-                          ? "Message limit reached — upgrade to continue"
+                      usage && !usage.canUseCredits
+                          ? "Credit limit reached — upgrade to continue"
                           : isRecording
                               ? "Recording..."
                               : isTranscribing
@@ -1656,7 +1656,7 @@ function ChatContent() {
                         size="icon"
                         variant={isRecording ? "default" : "outline"}
                         onClick={toggleRecording}
-                        disabled={isLoading || isTranscribing || (usage !== null && !usage.canSendMessage)}
+                        disabled={isLoading || isTranscribing || (usage !== null && !usage.canUseCredits)}
                         className={`absolute right-12 bottom-2 h-9 w-9 ${
                             isRecording
                                 ? "bg-red-500 hover:bg-red-600 animate-pulse"
@@ -1688,7 +1688,7 @@ function ChatContent() {
               </form>
               <p className="text-xs text-neutral-400 text-center mt-2">
                 {voiceMode
-                    ? `Voice messages cost 3x. ${currentAgent.name} will speak responses.`
+                    ? `Voice mode costs 3x credits. ${currentAgent.name} will speak responses.`
                     : `${currentAgent.name} may make mistakes. Verify important information.`
                 }
               </p>

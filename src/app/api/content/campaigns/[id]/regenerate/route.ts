@@ -19,7 +19,8 @@ import {
     fetchUserSettings,
     CONTENT_CREDITS,
 } from "@/lib/services/campaign-prompts";
-import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
+import { checkCreditAllowance, incrementCreditUsage } from "@/lib/usage";
+import { calculateCreditCost } from "@/lib/credits";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -27,6 +28,12 @@ const anthropic = new Anthropic({
 
 interface RouteParams {
     params: Promise<{ id: string }>;
+}
+
+interface ClaudeResult {
+    text: string;
+    inputTokens: number;
+    outputTokens: number;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -62,18 +69,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const articleContent = campaign.generated.linkedinArticle?.content || '';
 
         // ============================================
-        // PAYWALL: Check message allowance before regeneration
+        // PAYWALL: Pre-check estimated credits before regeneration
         // ============================================
-        const creditCost = CONTENT_CREDITS[contentType] || 1;
-        const usageCheck = await checkMessageAllowance(userId, creditCost);
+        const estimatedCost = CONTENT_CREDITS[contentType] || 1;
+        const usageCheck = await checkCreditAllowance(userId, estimatedCost);
 
         if (!usageCheck.allowed) {
-            console.log("[Campaign Regenerate] User hit message limit:", userId, "needed:", creditCost, "remaining:", usageCheck.usage.remaining);
+            console.log("[Campaign Regenerate] User hit credit limit:", userId, "needed:", estimatedCost, "remaining:", usageCheck.usage.remaining);
             return NextResponse.json(
                 {
-                    error: `Regenerating this content requires ${creditCost} message credit${creditCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
+                    error: `Regenerating this content requires approximately ${estimatedCost} credit${estimatedCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a credit pack to continue.`,
                     usage: usageCheck.usage,
-                    creditsRequired: creditCost,
+                    creditsRequired: estimatedCost,
                 },
                 { status: 403 }
             );
@@ -83,16 +90,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         updateCampaignContent(id, contentType, { status: 'generating' });
 
         try {
+            let creditsCharged = 0;
+
             switch (contentType) {
                 case 'linkedinArticle': {
                     const prompt = customPrompt || `Create a LinkedIn article based on this brief:\n\n${briefContext}`;
                     const result = await generateWithClaude(SYSTEM_PROMPTS.linkedinArticle, prompt);
 
-                    const titleMatch = result.match(/^#\s+(.+)$/m);
+                    const titleMatch = result.text.match(/^#\s+(.+)$/m);
                     const title = titleMatch ? titleMatch[1] : brief.topic;
 
-                    // ES2017-compatible: Use line-by-line parsing instead of /s flag
-                    const lines = result.split('\n');
+                    const lines = result.text.split('\n');
                     let description = '';
                     for (const line of lines) {
                         const trimmedLine = line.trim();
@@ -102,10 +110,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         }
                     }
 
+                    creditsCharged = calculateCreditCost(result.inputTokens, result.outputTokens);
+
                     updateCampaignContent(id, 'linkedinArticle', {
                         status: 'completed',
                         title,
-                        content: result,
+                        content: result.text,
                         description,
                     });
                     break;
@@ -118,10 +128,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                     const prompt = customPrompt || basePrompt;
 
                     const result = await generateWithClaude(SYSTEM_PROMPTS.linkedinPost, prompt);
+                    creditsCharged = calculateCreditCost(result.inputTokens, result.outputTokens);
 
                     updateCampaignContent(id, 'linkedinPost', {
                         status: 'completed',
-                        content: result,
+                        content: result.text,
                     });
                     break;
                 }
@@ -133,9 +144,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                     const prompt = customPrompt || basePrompt;
 
                     const result = await generateWithClaude(SYSTEM_PROMPTS.webBlog, prompt);
+                    creditsCharged = calculateCreditCost(result.inputTokens, result.outputTokens);
 
                     // Parse frontmatter
-                    const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---/);
+                    const frontmatterMatch = result.text.match(/^---\n([\s\S]*?)\n---/);
                     let title = brief.topic;
                     let description = '';
                     let category = '';
@@ -157,7 +169,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                     updateCampaignContent(id, 'webBlog', {
                         status: 'completed',
                         title,
-                        content: result,
+                        content: result.text,
                         description,
                         category,
                         tags,
@@ -170,10 +182,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         ? `Article:\n${articleContent.substring(0, 1000)}\n\nBrief: ${briefContext}`
                         : briefContext;
 
-                    const imagePrompt = customPrompt || await generateWithClaude(
-                        SYSTEM_PROMPTS.imagePrompt,
-                        `Create an image prompt for:\n\n${contextForImage}`
-                    );
+                    let imagePrompt: string;
+                    if (customPrompt) {
+                        imagePrompt = customPrompt;
+                    } else {
+                        const promptResult = await generateWithClaude(
+                            SYSTEM_PROMPTS.imagePrompt,
+                            `Create an image prompt for:\n\n${contextForImage}`
+                        );
+                        imagePrompt = promptResult.text;
+                    }
 
                     const imageResult = await generateImage({
                         prompt: imagePrompt,
@@ -182,6 +200,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                         quality: 'standard',
                         style: 'vivid',
                     });
+
+                    // Fixed credit cost for images (DALL-E doesn't expose tokens)
+                    creditsCharged = CONTENT_CREDITS.image;
 
                     // Upload to GCS (non-fatal — image was already generated)
                     let regenUploadResult: any = null;
@@ -252,16 +273,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             }
 
             // ============================================
-            // PAYWALL: Deduct credits after successful regeneration
+            // PAYWALL: Deduct token-scaled credits after successful regeneration
             // ============================================
-            const updatedUsage = await incrementMessageUsage(userId, creditCost);
-            console.log("[Campaign Regenerate] Credits charged:", creditCost, "for", contentType, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+            const updatedUsage = await incrementCreditUsage(userId, creditsCharged);
+            console.log("[Campaign Regenerate] Credits charged:", creditsCharged, "for", contentType, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
 
             const updatedCampaign = getCampaignSession(id, userId);
             return NextResponse.json({
                 success: true,
                 campaign: updatedCampaign,
-                creditsCharged: creditCost,
+                creditsCharged,
                 usage: updatedUsage,
             });
         } catch (error: unknown) {
@@ -282,12 +303,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 }
 
-async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<string> {
+async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<ClaudeResult> {
     const message = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
     });
-    return message.content[0].type === "text" ? message.content[0].text : "";
+
+    const text = message.content[0].type === "text" ? message.content[0].text : "";
+    const inputTokens = message.usage?.input_tokens || 0;
+    const outputTokens = message.usage?.output_tokens || 0;
+
+    return { text, inputTokens, outputTokens };
 }

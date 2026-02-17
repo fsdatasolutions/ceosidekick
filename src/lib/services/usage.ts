@@ -1,6 +1,5 @@
 // src/lib/services/usage.ts
 // Usage tracking and credit deduction service
-// NOTE: Merge these functions with your existing usage service if you have one
 
 import { db } from "@/db";
 import { monthlyUsage, usageLogs } from "@/db/schema";
@@ -15,16 +14,16 @@ export function getCurrentPeriod(): string {
 }
 
 /**
- * Check if user has at least 1 message credit available
+ * Check if user has at least 1 credit available
  */
-export async function checkMessageCredits(userId: string): Promise<boolean> {
-    return checkMessageCreditsAmount(userId, 1);
+export async function checkCredits(userId: string): Promise<boolean> {
+    return checkCreditsAmount(userId, 1);
 }
 
 /**
  * Check if user has a specific amount of credits available
  */
-export async function checkMessageCreditsAmount(
+export async function checkCreditsAmount(
     userId: string,
     amount: number
 ): Promise<boolean> {
@@ -47,8 +46,8 @@ export async function checkMessageCreditsAmount(
         return true;
     }
 
-    const totalAvailable = usage.messagesLimit + usage.bonusMessages;
-    const remaining = totalAvailable - usage.messagesUsed;
+    const totalAvailable = usage.creditsLimit + usage.bonusCredits;
+    const remaining = totalAvailable - usage.creditsUsed;
 
     return remaining >= amount;
 }
@@ -84,13 +83,13 @@ export async function getRemainingCredits(userId: string): Promise<{
         };
     }
 
-    const totalAvailable = usage.messagesLimit + usage.bonusMessages;
+    const totalAvailable = usage.creditsLimit + usage.bonusCredits;
 
     return {
-        used: usage.messagesUsed,
-        limit: usage.messagesLimit,
-        bonus: usage.bonusMessages,
-        remaining: totalAvailable - usage.messagesUsed,
+        used: usage.creditsUsed,
+        limit: usage.creditsLimit,
+        bonus: usage.bonusCredits,
+        remaining: totalAvailable - usage.creditsUsed,
     };
 }
 
@@ -104,19 +103,19 @@ export interface UsageLogData {
 }
 
 /**
- * Deduct a single message credit
+ * Deduct a single credit
  */
-export async function deductMessageCredit(
+export async function deductCredit(
     userId: string,
     logData?: UsageLogData
 ): Promise<void> {
-    return deductMessageCredits(userId, 1, logData);
+    return deductCredits(userId, 1, logData);
 }
 
 /**
- * Deduct multiple message credits
+ * Deduct multiple credits
  */
-export async function deductMessageCredits(
+export async function deductCredits(
     userId: string,
     amount: number,
     logData?: UsageLogData
@@ -127,7 +126,7 @@ export async function deductMessageCredits(
     await db
         .update(monthlyUsage)
         .set({
-            messagesUsed: sql`${monthlyUsage.messagesUsed} + ${amount}`,
+            creditsUsed: sql`${monthlyUsage.creditsUsed} + ${amount}`,
             updatedAt: new Date(),
         })
         .where(
@@ -160,7 +159,7 @@ export async function deductMessageCredits(
  */
 export async function ensureMonthlyUsageRecord(
     userId: string,
-    messagesLimit: number
+    creditsLimit: number
 ): Promise<void> {
     const period = getCurrentPeriod();
 
@@ -181,9 +180,9 @@ export async function ensureMonthlyUsageRecord(
         await db.insert(monthlyUsage).values({
             userId,
             period,
-            messagesUsed: 0,
-            messagesLimit,
-            bonusMessages: 0,
+            creditsUsed: 0,
+            creditsLimit,
+            bonusCredits: 0,
         });
     }
 }

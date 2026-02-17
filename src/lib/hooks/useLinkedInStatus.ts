@@ -169,3 +169,68 @@ export function useLinkedInPost() {
 
     return { postToLinkedIn, posting, success, error, reconnectRequired, reset };
 }
+
+// ============================================
+// LinkedIn Schedule Hook
+// ============================================
+
+export function useLinkedInSchedule() {
+    const [scheduling, setScheduling] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const schedulePost = useCallback(async (
+        contentId: string,
+        scheduledFor: string, // ISO date string
+        options?: {
+            postAs?: string;
+            visibility?: string;
+            articleUrl?: string;
+            articleTitle?: string;
+            articleDescription?: string;
+        }
+    ) => {
+        setScheduling(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/content/${contentId}/schedule`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ scheduledFor, ...options }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to schedule");
+            }
+            return data;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to schedule";
+            setError(msg);
+            return null;
+        } finally {
+            setScheduling(false);
+        }
+    }, []);
+
+    const cancelSchedule = useCallback(async (contentId: string) => {
+        setScheduling(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/content/${contentId}/schedule`, {
+                method: "DELETE",
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to cancel schedule");
+            }
+            return data;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Failed to cancel";
+            setError(msg);
+            return null;
+        } finally {
+            setScheduling(false);
+        }
+    }, []);
+
+    return { schedulePost, cancelSchedule, scheduling, error };
+}

@@ -24,7 +24,8 @@ import {
     calculateCampaignCredits,
     CONTENT_CREDITS,
 } from "@/lib/services/campaign-prompts";
-import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
+import { checkCreditAllowance, incrementCreditUsage } from "@/lib/usage";
+import { calculateCreditCost } from "@/lib/credits";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -75,20 +76,21 @@ export async function POST(request: NextRequest) {
         });
 
         // ============================================
-        // PAYWALL: Check message allowance before generation
+        // PAYWALL: Pre-check estimated credits before generation
+        // Actual cost is token-scaled and deducted after generation
         // ============================================
-        const totalCredits = calculateCampaignCredits(outputs);
-        console.log("[Campaign Generate] Total credits required:", totalCredits);
+        const estimatedCredits = calculateCampaignCredits(outputs);
+        console.log("[Campaign Generate] Estimated credits:", estimatedCredits);
 
-        const usageCheck = await checkMessageAllowance(userId, totalCredits);
+        const usageCheck = await checkCreditAllowance(userId, estimatedCredits);
 
         if (!usageCheck.allowed) {
-            console.log("[Campaign Generate] User hit message limit:", userId, "needed:", totalCredits, "remaining:", usageCheck.usage.remaining);
+            console.log("[Campaign Generate] User hit credit limit:", userId, "needed:", estimatedCredits, "remaining:", usageCheck.usage.remaining);
             return NextResponse.json(
                 {
-                    error: `This campaign requires ${totalCredits} message credits, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
+                    error: `This campaign requires approximately ${estimatedCredits} credits, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a credit pack to continue.`,
                     usage: usageCheck.usage,
-                    creditsRequired: totalCredits,
+                    creditsRequired: estimatedCredits,
                 },
                 { status: 403 }
             );
@@ -124,13 +126,13 @@ export async function POST(request: NextRequest) {
                     `Create a LinkedIn article based on this brief:\n\n${briefContext}`
                 );
 
-                console.log("[Campaign Generate] Article generated, length:", result.length);
+                console.log("[Campaign Generate] Article generated, length:", result.text.length);
 
-                const titleMatch = result.match(/^#\s+(.+)$/m);
+                const titleMatch = result.text.match(/^#\s+(.+)$/m);
                 const title = titleMatch ? titleMatch[1] : brief.topic;
 
                 // Fixed: Use split instead of regex with /s flag
-                const lines = result.split('\n');
+                const lines = result.text.split('\n');
                 let description = '';
                 for (const line of lines) {
                     const trimmedLine = line.trim();
@@ -140,13 +142,14 @@ export async function POST(request: NextRequest) {
                     }
                 }
 
-                articleContent = result;
+                articleContent = result.text;
 
                 updateCampaignContent(campaign.id, 'linkedinArticle', {
                     status: 'completed',
                     title,
-                    content: result,
+                    content: result.text,
                     description,
+                    creditCost: calculateCreditCost(result.inputTokens, result.outputTokens),
                 });
 
                 console.log("[Campaign Generate] Article saved to campaign. Title:", title);
@@ -176,11 +179,12 @@ export async function POST(request: NextRequest) {
 
                     const result = await generateWithClaude(SYSTEM_PROMPTS.linkedinPost, prompt);
 
-                    console.log("[Campaign Generate] Post generated, length:", result.length);
+                    console.log("[Campaign Generate] Post generated, length:", result.text.length);
 
                     updateCampaignContent(campaign.id, 'linkedinPost', {
                         status: 'completed',
-                        content: result,
+                        content: result.text,
+                        creditCost: calculateCreditCost(result.inputTokens, result.outputTokens),
                     });
 
                     console.log("[Campaign Generate] Post saved to campaign");
@@ -208,10 +212,10 @@ export async function POST(request: NextRequest) {
 
                     const result = await generateWithClaude(SYSTEM_PROMPTS.webBlog, prompt);
 
-                    console.log("[Campaign Generate] Blog generated, length:", result.length);
+                    console.log("[Campaign Generate] Blog generated, length:", result.text.length);
 
                     // Parse frontmatter
-                    const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---/);
+                    const frontmatterMatch = result.text.match(/^---\n([\s\S]*?)\n---/);
                     let title = brief.topic;
                     let description = '';
                     let category = '';
@@ -233,10 +237,11 @@ export async function POST(request: NextRequest) {
                     updateCampaignContent(campaign.id, 'webBlog', {
                         status: 'completed',
                         title,
-                        content: result,
+                        content: result.text,
                         description,
                         category,
                         tags,
+                        creditCost: calculateCreditCost(result.inputTokens, result.outputTokens),
                     });
 
                     console.log("[Campaign Generate] Blog saved to campaign. Title:", title);
@@ -264,10 +269,11 @@ export async function POST(request: NextRequest) {
                         : briefContext;
 
                     console.log("[Campaign Generate] Generating image prompt...");
-                    const imagePrompt = await generateWithClaude(
+                    const imagePromptResult = await generateWithClaude(
                         SYSTEM_PROMPTS.imagePrompt,
                         `Create an image prompt for:\n\n${contextForImage}`
                     );
+                    const imagePrompt = imagePromptResult.text;
 
                     console.log("[Campaign Generate] Image prompt:", imagePrompt);
 
@@ -386,28 +392,30 @@ export async function POST(request: NextRequest) {
         }
 
         // ============================================
-        // PAYWALL: Deduct credits for successfully generated content only
+        // PAYWALL: Deduct token-scaled credits for text + fixed for images
         // ============================================
         let creditsCharged = 0;
         const generated = finalCampaign.generated;
 
+        // Text content: use actual token counts (token-scaled)
         if (generated.linkedinArticle?.status === 'completed') {
-            creditsCharged += CONTENT_CREDITS.linkedinArticle;
+            creditsCharged += generated.linkedinArticle.creditCost || CONTENT_CREDITS.linkedinArticle;
         }
         if (generated.linkedinPost?.status === 'completed') {
-            creditsCharged += CONTENT_CREDITS.linkedinPost;
+            creditsCharged += generated.linkedinPost.creditCost || CONTENT_CREDITS.linkedinPost;
         }
         if (generated.webBlog?.status === 'completed') {
-            creditsCharged += CONTENT_CREDITS.webBlog;
+            creditsCharged += generated.webBlog.creditCost || CONTENT_CREDITS.webBlog;
         }
+        // Image: fixed credits (DALL-E doesn't expose tokens)
         if (generated.image?.status === 'completed') {
             creditsCharged += CONTENT_CREDITS.image;
         }
 
         let updatedUsage = usageCheck.usage;
         if (creditsCharged > 0) {
-            updatedUsage = await incrementMessageUsage(userId, creditsCharged);
-            console.log("[Campaign Generate] Credits charged:", creditsCharged, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+            updatedUsage = await incrementCreditUsage(userId, creditsCharged);
+            console.log("[Campaign Generate] Credits charged:", creditsCharged, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
         }
 
         return NextResponse.json({
@@ -426,7 +434,13 @@ export async function POST(request: NextRequest) {
     }
 }
 
-async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<string> {
+interface ClaudeResult {
+    text: string;
+    inputTokens: number;
+    outputTokens: number;
+}
+
+async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<ClaudeResult> {
     console.log("[generateWithClaude] Calling Claude API...");
     console.log("[generateWithClaude] System prompt length:", systemPrompt.length);
     console.log("[generateWithClaude] User prompt length:", userPrompt.length);
@@ -439,10 +453,13 @@ async function generateWithClaude(systemPrompt: string, userPrompt: string): Pro
             messages: [{ role: "user", content: userPrompt }],
         });
 
-        const result = message.content[0].type === "text" ? message.content[0].text : "";
-        console.log("[generateWithClaude] Response received, length:", result.length);
+        const text = message.content[0].type === "text" ? message.content[0].text : "";
+        const inputTokens = message.usage?.input_tokens || 0;
+        const outputTokens = message.usage?.output_tokens || 0;
 
-        return result;
+        console.log("[generateWithClaude] Response received, length:", text.length, "tokens:", inputTokens, "+", outputTokens);
+
+        return { text, inputTokens, outputTokens };
     } catch (error) {
         console.error("[generateWithClaude] Claude API error:", error);
         throw error;

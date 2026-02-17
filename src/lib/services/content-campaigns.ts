@@ -30,6 +30,8 @@ export interface GeneratedContent {
         prompt?: string;
         status: 'pending' | 'generating' | 'completed' | 'error';
         error?: string;
+        warning?: string;
+        creditCost?: number;
     };
     linkedinArticle?: {
         id?: string;
@@ -38,12 +40,14 @@ export interface GeneratedContent {
         description?: string;
         status: 'pending' | 'generating' | 'completed' | 'error';
         error?: string;
+        creditCost?: number;
     };
     linkedinPost?: {
         id?: string;
         content?: string;
         status: 'pending' | 'generating' | 'completed' | 'error';
         error?: string;
+        creditCost?: number;
     };
     webBlog?: {
         id?: string;
@@ -54,6 +58,7 @@ export interface GeneratedContent {
         tags?: string[];
         status: 'pending' | 'generating' | 'completed' | 'error';
         error?: string;
+        creditCost?: number;
     };
 }
 

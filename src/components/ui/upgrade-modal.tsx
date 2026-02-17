@@ -4,22 +4,22 @@
 import { useState } from "react";
 import { X, Zap, Check, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "./button";
-import { TIERS, MESSAGE_PACKS, getAvailableTiers } from "@/lib/tiers";
+import { TIERS, CREDIT_PACKS, getAvailableTiers } from "@/lib/tiers";
 
 interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentTier: string;
-  messagesUsed: number;
-  messagesLimit: number;
+  creditsUsed: number;
+  creditsLimit: number;
 }
 
 export function UpgradeModal({
                                isOpen,
                                onClose,
                                currentTier,
-                               messagesUsed,
-                               messagesLimit
+                               creditsUsed,
+                               creditsLimit
                              }: UpgradeModalProps) {
   const [activeTab, setActiveTab] = useState<"upgrade" | "packs">("upgrade");
   const [loading, setLoading] = useState<string | null>(null);
@@ -98,10 +98,10 @@ export function UpgradeModal({
             <div>
               <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
                 <Zap className="w-5 h-5 text-primary-red" />
-                Need More Messages?
+                Need More Credits?
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                You&apos;ve used {messagesUsed.toLocaleString()} of {messagesLimit.toLocaleString()} messages this month
+                You&apos;ve used {creditsUsed.toLocaleString()} of {creditsLimit.toLocaleString()} credits this month
               </p>
             </div>
             <button
@@ -139,7 +139,7 @@ export function UpgradeModal({
                         : "text-neutral-500 hover:text-neutral-700"
                 }`}
             >
-              Buy Message Pack
+              Buy Credit Pack
             </button>
           </div>
 
@@ -148,7 +148,7 @@ export function UpgradeModal({
             {activeTab === "upgrade" ? (
                 <div className="space-y-4">
                   <p className="text-sm text-neutral-600 mb-4">
-                    Upgrade your plan for more messages every month and additional features.
+                    Upgrade your plan for more credits every month and additional features.
                   </p>
 
                   {availableTiers.map((tier) => (
@@ -210,10 +210,10 @@ export function UpgradeModal({
             ) : (
                 <div className="space-y-4">
                   <p className="text-sm text-neutral-600 mb-4">
-                    Need a quick boost? Purchase additional messages that are added to your current month.
+                    Need a quick boost? Purchase additional credits that are added to your current month.
                   </p>
 
-                  {MESSAGE_PACKS.map((pack) => (
+                  {CREDIT_PACKS.map((pack) => (
                       <div
                           key={pack.id}
                           className="border border-neutral-200 rounded-xl p-4 hover:border-neutral-300 transition-all"
@@ -225,7 +225,7 @@ export function UpgradeModal({
                               <h3 className="font-semibold text-neutral-900">{pack.name}</h3>
                             </div>
                             <p className="text-sm text-neutral-500 mt-1">
-                              {pack.messages.toLocaleString()} messages • {pack.perMessageCost}/message
+                              {pack.credits.toLocaleString()} credits • {pack.perCreditCost}/credit
                             </p>
                           </div>
                           <div className="text-right">
@@ -249,7 +249,7 @@ export function UpgradeModal({
                   ))}
 
                   <p className="text-xs text-neutral-400 text-center mt-4">
-                    Message packs are added to your current month&apos;s allowance.
+                    Credit packs are added to your current month&apos;s allowance.
                   </p>
                 </div>
             )}

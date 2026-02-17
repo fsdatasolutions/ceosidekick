@@ -33,7 +33,7 @@ interface UserStats {
     subscriptionStatus: string;
     currentMonthUsage: number;
     currentMonthLimit: number;
-    bonusMessages: number;
+    bonusCredits: number;
 }
 
 interface TierDistribution {
@@ -457,7 +457,7 @@ export default function AdminPage() {
                                     </div>
                                     <div className="flex items-center gap-4 mt-2 text-xs text-neutral-500">
                                         <span>{user.totalMessages.toLocaleString()} msgs</span>
-                                        <span>{user.currentMonthUsage}/{user.currentMonthLimit + user.bonusMessages} this mo</span>
+                                        <span>{user.currentMonthUsage}/{user.currentMonthLimit + user.bonusCredits} this mo</span>
                                         <span>{formatDate(user.createdAt)}</span>
                                     </div>
                                 </div>
@@ -594,14 +594,14 @@ export default function AdminPage() {
                         {user.currentMonthUsage}
                       </span>
                                         <span className="text-xs text-neutral-400">
-                        / {user.currentMonthLimit + user.bonusMessages}
+                        / {user.currentMonthLimit + user.bonusCredits}
                       </span>
                                     </div>
                                     <div className="w-20 h-1.5 bg-neutral-100 rounded-full mt-1">
                                         <div
                                             className="h-full bg-primary-red rounded-full"
                                             style={{
-                                                width: `${Math.min(100, (user.currentMonthUsage / (user.currentMonthLimit + user.bonusMessages)) * 100)}%`
+                                                width: `${Math.min(100, (user.currentMonthUsage / (user.currentMonthLimit + user.bonusCredits)) * 100)}%`
                                             }}
                                         />
                                     </div>

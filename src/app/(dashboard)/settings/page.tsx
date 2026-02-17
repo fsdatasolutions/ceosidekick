@@ -51,8 +51,8 @@ interface UserSettings {
 }
 
 interface UsageData {
-  messagesThisMonth: number;
-  messageLimit: number;
+  creditsThisMonth: number;
+  creditLimit: number;
   conversationCount: number;
   documentCount: number;
   plan: string;
@@ -204,8 +204,8 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [usage, setUsage] = useState<UsageData>({
-    messagesThisMonth: 0,
-    messageLimit: 500,
+    creditsThisMonth: 0,
+    creditLimit: 500,
     conversationCount: 0,
     documentCount: 0,
     plan: "starter",
@@ -577,7 +577,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-neutral-400 mb-1">Current Plan</p>
                 <h3 className="font-display text-2xl font-bold mb-1 capitalize">{usage.plan}</h3>
                 <p className="text-neutral-400">
-                  {usage.messagesThisMonth} of {usage.messageLimit} messages used this month
+                  {usage.creditsThisMonth} of {usage.creditLimit} credits used this month
                 </p>
               </div>
               <Link href="/pricing">
@@ -589,18 +589,18 @@ export default function SettingsPage() {
             <div className="mt-4 bg-white/10 rounded-full h-2">
               <div
                   className={`h-2 rounded-full transition-all ${
-                      usage.messagesThisMonth / usage.messageLimit > 0.9
+                      usage.creditsThisMonth / usage.creditLimit > 0.9
                           ? "bg-red-500"
-                          : usage.messagesThisMonth / usage.messageLimit > 0.7
+                          : usage.creditsThisMonth / usage.creditLimit > 0.7
                               ? "bg-amber-500"
                               : "bg-accent-gold"
                   }`}
-                  style={{ width: `${Math.min((usage.messagesThisMonth / usage.messageLimit) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((usage.creditsThisMonth / usage.creditLimit) * 100, 100)}%` }}
               />
             </div>
-            {usage.messagesThisMonth / usage.messageLimit > 0.9 && (
+            {usage.creditsThisMonth / usage.creditLimit > 0.9 && (
                 <p className="text-amber-400 text-sm mt-2">
-                  ⚠️ You&apos;re approaching your message limit. Consider upgrading for unlimited messages.
+                  ⚠️ You&apos;re approaching your credit limit. Consider upgrading for unlimited credits.
                 </p>
             )}
 

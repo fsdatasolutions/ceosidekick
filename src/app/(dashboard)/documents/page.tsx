@@ -111,8 +111,8 @@ const categories = ["All", "Business", "Finance", "HR", "Marketing"];
 
 interface UsageData {
     tier: string;
-    messagesUsed: number;
-    messageLimit: number;
+    creditsUsed: number;
+    creditLimit: number;
 }
 
 export default function DocumentsPage() {

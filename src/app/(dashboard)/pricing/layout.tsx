@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
     title: "Pricing & Plans",
     description:
-        "Choose your CEO Sidekick plan. Free, PowerUser ($29/mo), or Pro ($199/mo). Access 7 AI business advisors with flexible message packs.",
+        "Choose your CEO Sidekick plan. Free, PowerUser ($29/mo), or Pro ($199/mo). Access 7 AI business advisors with flexible credit packs.",
     robots: { index: false },
 };
 

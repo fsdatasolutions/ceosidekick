@@ -61,6 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 authorImageUrl: article.authorImageUrl,
                 publishedAt: article.publishedAt,
                 scheduledFor: article.scheduledFor,
+                schedulingMeta: article.schedulingMeta,
                 generatedFromPrompt: article.generatedFromPrompt,
                 aiModel: article.aiModel,
                 currentVersionId: article.currentVersionId,
@@ -117,10 +118,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             authorRole,
             authorImageUrl,
             status,
+            scheduledFor,
+            schedulingMeta,
         } = body;
 
         // Build updates object (only include provided fields)
-        const updates: Record<string, any> = {};
+        const updates: Record<string, unknown> = {};
         if (title !== undefined) updates.title = title;
         if (content !== undefined) updates.content = content;
         if (description !== undefined) updates.description = description;
@@ -129,6 +132,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         if (authorRole !== undefined) updates.authorRole = authorRole;
         if (authorImageUrl !== undefined) updates.authorImageUrl = authorImageUrl;
         if (status !== undefined) updates.status = status;
+        if (scheduledFor !== undefined) {
+            updates.scheduledFor = scheduledFor ? new Date(scheduledFor) : null;
+        }
+        if (schedulingMeta !== undefined) {
+            updates.schedulingMeta = schedulingMeta;
+        }
 
         const article = await updateContentItem(id, userId, updates);
 

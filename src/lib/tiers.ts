@@ -1,5 +1,5 @@
 // src/lib/tiers.ts
-// Subscription tiers and message pack configuration
+// Subscription tiers and credit pack configuration
 // Single source of truth for all pricing, limits, and feature gating
 
 export type TierType = "free" | "power" | "pro" | "team";
@@ -9,7 +9,7 @@ export interface TierConfig {
   name: string;
   price: number; // Monthly price in cents
   priceDisplay: string;
-  messagesPerMonth: number;
+  creditsPerMonth: number;
   companyLibraryStorageMB: number; // RAG document storage limit
   features: string[];
   description?: string; // For marketing/landing pages
@@ -18,13 +18,13 @@ export interface TierConfig {
   stripePriceId?: string; // Set in env vars for production
 }
 
-export interface MessagePackConfig {
+export interface CreditPackConfig {
   id: string;
   name: string;
-  messages: number;
+  credits: number;
   price: number; // Price in cents
   priceDisplay: string;
-  perMessageCost: string;
+  perCreditCost: string;
   stripePriceId?: string;
 }
 
@@ -50,11 +50,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Free",
     price: 0,
     priceDisplay: "$0",
-    messagesPerMonth: 30,
+    creditsPerMonth: 30,
     companyLibraryStorageMB: 0,
     description: "Perfect for trying out CEO Sidekick",
     features: [
-      "30 messages/month",
+      "30 credits/month",
       "All 7 AI advisors",
     ],
   },
@@ -63,11 +63,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "PowerUser",
     price: 2900, // $29.00
     priceDisplay: "$29",
-    messagesPerMonth: 250,
+    creditsPerMonth: 250,
     companyLibraryStorageMB: 100,
     description: "For solo entrepreneurs getting serious",
     features: [
-      "250 messages/month",
+      "250 credits/month",
       "All 7 AI advisors",
       "Company Library — 100MB document storage",
       "Business Document Templates",
@@ -80,11 +80,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Pro",
     price: 19900, // $199.00
     priceDisplay: "$199",
-    messagesPerMonth: 2500,
+    creditsPerMonth: 2500,
     companyLibraryStorageMB: 500,
     description: "For growing businesses that need more",
     features: [
-      "2,500 messages/month",
+      "2,500 credits/month",
       "All 7 AI advisors",
       "Company Library — 500MB document storage",
       "Business Document Templates",
@@ -96,11 +96,11 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Team",
     price: 50000, // $500.00
     priceDisplay: "$500",
-    messagesPerMonth: 15000,
+    creditsPerMonth: 15000,
     companyLibraryStorageMB: 2048, // 2GB
     description: "Custom solutions for teams",
     features: [
-      "15,000 messages/month",
+      "15,000 credits/month",
       "All 7 AI advisors",
       "Company Library — 2GB document storage",
       "Business Document Templates",
@@ -113,33 +113,33 @@ export const TIERS: Record<TierType, TierConfig> = {
 };
 
 // ===========================================
-// MESSAGE PACKS (One-time purchases)
+// CREDIT PACKS (One-time purchases)
 // ===========================================
 
-export const MESSAGE_PACKS: MessagePackConfig[] = [
+export const CREDIT_PACKS: CreditPackConfig[] = [
   {
     id: "boost",
     name: "Boost Pack",
-    messages: 250,
+    credits: 250,
     price: 1500, // $15.00
     priceDisplay: "$15",
-    perMessageCost: "$0.06",
+    perCreditCost: "$0.06",
   },
   {
     id: "power_pack",
     name: "Power Pack",
-    messages: 1000,
+    credits: 1000,
     price: 5000, // $50.00
     priceDisplay: "$50",
-    perMessageCost: "$0.05",
+    perCreditCost: "$0.05",
   },
   {
     id: "bulk",
     name: "Bulk Pack",
-    messages: 2500,
+    credits: 2500,
     price: 9000, // $90.00
     priceDisplay: "$90",
-    perMessageCost: "$0.036",
+    perCreditCost: "$0.036",
   },
 ];
 
@@ -151,8 +151,8 @@ export function getTier(tierId: TierType | string): TierConfig {
   return TIERS[tierId as TierType] || TIERS.free;
 }
 
-export function getMessagePack(packId: string): MessagePackConfig | undefined {
-  return MESSAGE_PACKS.find((pack) => pack.id === packId);
+export function getCreditPack(packId: string): CreditPackConfig | undefined {
+  return CREDIT_PACKS.find((pack) => pack.id === packId);
 }
 
 export function getTierByStripePriceId(priceId: string): TierConfig | undefined {
@@ -170,7 +170,7 @@ export function getStorageLimitBytes(tierId: TierType | string): number {
   return tier.companyLibraryStorageMB * 1024 * 1024;
 }
 
-export function formatMessageCount(count: number): string {
+export function formatCreditCount(count: number): string {
   if (count >= 1000) {
     return `${(count / 1000).toFixed(count % 1000 === 0 ? 0 : 1)}k`;
   }

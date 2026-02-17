@@ -98,7 +98,7 @@ export default async function ContentEnginePage() {
               </div>
               <div className="h-4 w-px bg-neutral-200" />
               <div className="text-sm text-neutral-500">
-                {usageData.messagesUsed} / {usageData.totalAvailable} used
+                {usageData.creditsUsed} / {usageData.totalAvailable} used
               </div>
             </div>
             <Link href="/pricing">
@@ -111,10 +111,10 @@ export default async function ContentEnginePage() {
           <div
               className="mt-3 w-full bg-neutral-100 rounded-full h-2"
               role="progressbar"
-              aria-valuenow={usageData.messagesUsed}
+              aria-valuenow={usageData.creditsUsed}
               aria-valuemin={0}
               aria-valuemax={usageData.totalAvailable}
-              aria-label={`Credit usage: ${usageData.messagesUsed} of ${usageData.totalAvailable}`}
+              aria-label={`Credit usage: ${usageData.creditsUsed} of ${usageData.totalAvailable}`}
           >
             <div
                 className={`h-2 rounded-full transition-all ${

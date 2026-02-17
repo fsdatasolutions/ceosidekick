@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        // Handle message pack purchase
-        if (session.metadata?.type === "message_pack") {
-          await handleMessagePackPurchase(session);
+        // Handle credit pack purchase
+        if (session.metadata?.type === "credit_pack" || session.metadata?.type === "message_pack") {
+          await handleCreditPackPurchase(session);
         }
         // Subscription handled by customer.subscription.created
         break;
@@ -186,22 +186,23 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
   console.log("[Webhook] User downgraded to free tier");
 }
 
-async function handleMessagePackPurchase(session: Stripe.Checkout.Session) {
+async function handleCreditPackPurchase(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   const packId = session.metadata?.packId;
-  const messages = parseInt(session.metadata?.messages || "0");
+  // Support both "credits" (new) and "messages" (legacy) metadata keys
+  const credits = parseInt(session.metadata?.credits || session.metadata?.messages || "0");
 
-  if (!userId || !packId || !messages) {
+  if (!userId || !packId || !credits) {
     console.error("[Webhook] Missing metadata in pack purchase session");
     return;
   }
 
-  console.log("[Webhook] Message pack purchase:", packId, "for user:", userId);
+  console.log("[Webhook] Credit pack purchase:", packId, "for user:", userId);
 
   const { db } = await import("@/db");
   const { messagePurchases } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
-  const { addBonusMessages } = await import("@/lib/usage");
+  const { addBonusCredits } = await import("@/lib/usage");
 
   // Update purchase record to completed
   await db
@@ -212,10 +213,10 @@ async function handleMessagePackPurchase(session: Stripe.Checkout.Session) {
       })
       .where(eq(messagePurchases.stripeSessionId, session.id));
 
-  // Add bonus messages to user's current period
-  await addBonusMessages(userId, messages);
+  // Add bonus credits to user's current period
+  await addBonusCredits(userId, credits);
 
-  console.log("[Webhook] Added", messages, "bonus messages for user:", userId);
+  console.log("[Webhook] Added", credits, "bonus credits for user:", userId);
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {

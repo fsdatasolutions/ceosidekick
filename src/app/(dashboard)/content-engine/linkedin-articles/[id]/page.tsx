@@ -25,9 +25,23 @@ import {
   Copy,
   Check,
   ExternalLink,
+  CalendarClock,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLinkedInStatus, useLinkedInOrgStatus, useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInStatus, useLinkedInOrgStatus, useLinkedInPost, useLinkedInSchedule } from "@/lib/hooks/useLinkedInStatus";
+
+interface SchedulingMeta {
+  postAs: string;
+  visibility: "PUBLIC" | "CONNECTIONS";
+  articleUrl?: string;
+  articleTitle?: string;
+  articleDescription?: string;
+  linkedinPostId?: string;
+  errorMessage?: string;
+  retryCount?: number;
+  lastAttemptAt?: string;
+}
 
 interface Article {
   id: string;
@@ -39,6 +53,8 @@ interface Article {
   authorName: string;
   authorRole: string;
   publishedAt: string | null;
+  scheduledFor: string | null;
+  schedulingMeta: SchedulingMeta | null;
   currentVersionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -83,8 +99,11 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
   const { status: linkedInOrgStatus } = useLinkedInOrgStatus();
   const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
+  const { schedulePost, cancelSchedule, scheduling, error: scheduleError } = useLinkedInSchedule();
   const [attachedUrl, setAttachedUrl] = useState("");
   const [postAs, setPostAs] = useState("personal");
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduledDateTime, setScheduledDateTime] = useState("");
 
   /**
    * Strip markdown formatting for plain-text sharing on LinkedIn.
@@ -393,11 +412,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   Edit Article
                 </h1>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  article.status === "published" 
-                    ? "bg-green-100 text-green-700" 
-                    : article.status === "archived"
-                      ? "bg-neutral-100 text-neutral-500"
-                      : "bg-amber-100 text-amber-700"
+                  article.status === "published"
+                    ? "bg-green-100 text-green-700"
+                    : article.status === "scheduled"
+                      ? "bg-blue-100 text-blue-700"
+                      : article.status === "failed"
+                        ? "bg-red-100 text-red-700"
+                        : article.status === "archived"
+                          ? "bg-neutral-100 text-neutral-500"
+                          : "bg-amber-100 text-amber-700"
                 }`}>
                   {article.status}
                 </span>
@@ -413,6 +436,28 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               <Button variant="outline" onClick={() => handleStatusChange("published")}>
                 <CheckCircle className="w-4 h-4" />
                 Publish
+              </Button>
+            )}
+            {article.status === "scheduled" && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const result = await cancelSchedule(id);
+                  if (result) {
+                    setArticle((prev) => prev ? { ...prev, status: "draft", scheduledFor: null, schedulingMeta: null } : null);
+                    setShowScheduler(false);
+                  }
+                }}
+                disabled={scheduling}
+              >
+                {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                Cancel Schedule
+              </Button>
+            )}
+            {article.status === "failed" && (
+              <Button variant="outline" onClick={() => handleStatusChange("draft")}>
+                <RotateCcw className="w-4 h-4" />
+                Revert to Draft
               </Button>
             )}
             {article.status === "published" && (
@@ -498,6 +543,47 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
         {/* Sidebar */}
         <div className="space-y-4">
+          {/* Article Info */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <h3 className="font-medium text-neutral-900 mb-3">Article Info</h3>
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-neutral-500">Status</dt>
+                <dd className={`font-medium ${
+                  article.status === "published" ? "text-green-600"
+                  : article.status === "scheduled" ? "text-blue-600"
+                  : article.status === "failed" ? "text-red-600"
+                  : article.status === "archived" ? "text-neutral-500"
+                  : "text-amber-600"
+                }`}>
+                  {article.status.charAt(0).toUpperCase() + article.status.slice(1)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-neutral-500">Created</dt>
+                <dd className="text-neutral-900">
+                  {new Date(article.createdAt).toLocaleDateString()}
+                </dd>
+              </div>
+              {article.scheduledFor && article.status === "scheduled" && (
+                <div className="flex justify-between">
+                  <dt className="text-neutral-500">Scheduled</dt>
+                  <dd className="text-blue-600 font-medium">
+                    {new Date(article.scheduledFor).toLocaleString()}
+                  </dd>
+                </div>
+              )}
+              {article.publishedAt && (
+                <div className="flex justify-between">
+                  <dt className="text-neutral-500">Published</dt>
+                  <dd className="text-neutral-900">
+                    {new Date(article.publishedAt).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
           {/* Version History */}
           <div className="bg-white rounded-xl border border-neutral-200 p-4">
             <button
@@ -606,114 +692,277 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               Share on LinkedIn
             </h3>
 
-            {linkedInLoading ? (
-              <div className="flex items-center gap-2 text-sm text-neutral-500">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Checking connection...
-              </div>
-            ) : linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? (
-              <div className="space-y-2">
-                {linkedInPostSuccess ? (
-                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
-                    <CheckCircle className="w-4 h-4" />
-                    Shared on LinkedIn!
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs text-neutral-500 mb-2">
-                      Share as a LinkedIn post. Attach a link to create a preview card.
-                    </p>
-                    {/* Post as selector (personal + org pages) */}
-                    {linkedInOrgStatus?.connected && linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
-                        <div>
-                          <label className="block text-xs text-neutral-500 mb-1">
-                            Post as
-                          </label>
-                          <select
-                              value={postAs}
-                              onChange={(e) => setPostAs(e.target.value)}
-                              className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
-                          >
-                            <option value="personal">
-                              {linkedInStatus?.profile?.name || "Personal Profile"}
-                            </option>
-                            {linkedInOrgStatus.orgs.map((org) => (
-                                <option key={org.id} value={org.id}>
-                                  {org.name}
-                                </option>
-                            ))}
-                          </select>
-                        </div>
-                    )}
-                    <div>
-                      <label className="block text-xs text-neutral-500 mb-1">
-                        Attach link (optional)
-                      </label>
-                      <input
-                        type="url"
-                        value={attachedUrl}
-                        onChange={(e) => setAttachedUrl(e.target.value)}
-                        placeholder="https://yourblog.com/article-slug"
-                        className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      />
-                      {attachedUrl && (
-                        <p className="text-xs text-neutral-400 mt-1">
-                          Post will include a link preview card
-                        </p>
-                      )}
+            {/* Failed status — show error + retry/reschedule options */}
+            {article.status === "failed" && article.schedulingMeta ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                    <div className="flex items-center gap-2 font-medium mb-1">
+                      <AlertTriangle className="w-4 h-4" />
+                      Publishing Failed
                     </div>
-                    <Button
+                    <p>{article.schedulingMeta.errorMessage || "Unknown error"}</p>
+                    {article.schedulingMeta.retryCount && (
+                        <p className="text-xs mt-1 text-red-500">
+                          Attempted {article.schedulingMeta.retryCount} time{article.schedulingMeta.retryCount > 1 ? "s" : ""}
+                        </p>
+                    )}
+                  </div>
+                  <Button
                       className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
                       onClick={handlePostToLinkedIn}
                       disabled={linkedInPosting || !content.trim()}
-                    >
-                      {linkedInPosting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                      {linkedInPosting ? "Posting..." : postAs !== "personal" ? `Post as ${linkedInOrgStatus?.orgs?.find(o => o.id === postAs)?.name || "Organization"}` : "Share on LinkedIn"}
-                    </Button>
-                  </>
-                )}
-                {linkedInPostError && (
-                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
-                    {linkedInPostError}
-                    {reconnectRequired && (
-                      <a href="/api/linkedin/authorize" className="block mt-1 text-[#0A66C2] hover:underline font-medium">
-                        Reconnect LinkedIn
-                      </a>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs text-neutral-500">
-                  Connected as {linkedInStatus.profile?.name || "LinkedIn User"}
-                </p>
-              </div>
-            ) : linkedInStatus?.tokenExpired ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-amber-600">
-                  <AlertTriangle className="w-4 h-4" />
-                  Token expired
+                  >
+                    {linkedInPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {linkedInPosting ? "Posting..." : "Retry Now"}
+                  </Button>
+                  <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => { setShowScheduler(true); handleStatusChange("draft"); }}
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    Reschedule
+                  </Button>
                 </div>
-                <a href="/api/linkedin/authorize">
-                  <Button size="sm" className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white">
-                    Reconnect LinkedIn
+            ) : article.status === "scheduled" ? (
+                /* Scheduled status — show scheduled time + cancel */
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <CalendarClock className="w-4 h-4" />
+                    <div>
+                      <p className="font-medium">Scheduled</p>
+                      <p className="text-xs">
+                        {article.scheduledFor
+                            ? new Date(article.scheduledFor).toLocaleString()
+                            : "Unknown time"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={async () => {
+                        const result = await cancelSchedule(id);
+                        if (result) {
+                          setArticle((prev) => prev ? { ...prev, status: "draft", scheduledFor: null, schedulingMeta: null } : null);
+                          setShowScheduler(false);
+                        }
+                      }}
+                      disabled={scheduling}
+                  >
+                    {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                    Cancel Schedule
                   </Button>
-                </a>
-              </div>
+                  <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setShowScheduler(true)}
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    Reschedule
+                  </Button>
+                  {showScheduler && (
+                      <div className="space-y-2 pt-2 border-t border-neutral-100">
+                        <div>
+                          <label className="block text-xs text-neutral-500 mb-1">New date &amp; time</label>
+                          <input
+                              type="datetime-local"
+                              value={scheduledDateTime}
+                              onChange={(e) => setScheduledDateTime(e.target.value)}
+                              className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                          />
+                        </div>
+                        <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={scheduling || !scheduledDateTime}
+                            onClick={async () => {
+                              const result = await cancelSchedule(id);
+                              if (result) {
+                                const schedResult = await schedulePost(id, new Date(scheduledDateTime).toISOString(), { postAs, ...(attachedUrl && { articleUrl: attachedUrl, articleTitle: title, articleDescription: description }) });
+                                if (schedResult) {
+                                  setArticle((prev) => prev ? { ...prev, ...schedResult.item } : null);
+                                  setShowScheduler(false);
+                                  setScheduledDateTime("");
+                                }
+                              }
+                            }}
+                        >
+                          {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
+                          Confirm Reschedule
+                        </Button>
+                      </div>
+                  )}
+                  {scheduleError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                        {scheduleError}
+                      </div>
+                  )}
+                </div>
+            ) : linkedInLoading ? (
+                <div className="flex items-center gap-2 text-sm text-neutral-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking connection...
+                </div>
+            ) : linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? (
+                <div className="space-y-2">
+                  {linkedInPostSuccess ? (
+                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                        <CheckCircle className="w-4 h-4" />
+                        Shared on LinkedIn!
+                      </div>
+                  ) : (
+                      <>
+                        <p className="text-xs text-neutral-500 mb-2">
+                          Share as a LinkedIn post. Attach a link to create a preview card.
+                        </p>
+                        {/* Post as selector (personal + org pages) */}
+                        {linkedInOrgStatus?.connected && linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">
+                                Post as
+                              </label>
+                              <select
+                                  value={postAs}
+                                  onChange={(e) => setPostAs(e.target.value)}
+                                  className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
+                              >
+                                <option value="personal">
+                                  {linkedInStatus?.profile?.name || "Personal Profile"}
+                                </option>
+                                {linkedInOrgStatus.orgs.map((org) => (
+                                    <option key={org.id} value={org.id}>
+                                      {org.name}
+                                    </option>
+                                ))}
+                              </select>
+                            </div>
+                        )}
+                        <div>
+                          <label className="block text-xs text-neutral-500 mb-1">
+                            Attach link (optional)
+                          </label>
+                          <input
+                              type="url"
+                              value={attachedUrl}
+                              onChange={(e) => setAttachedUrl(e.target.value)}
+                              placeholder="https://yourblog.com/article-slug"
+                              className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                          />
+                          {attachedUrl && (
+                              <p className="text-xs text-neutral-400 mt-1">
+                                Post will include a link preview card
+                              </p>
+                          )}
+                        </div>
+                        {/* Post Now button */}
+                        <Button
+                            className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
+                            onClick={handlePostToLinkedIn}
+                            disabled={linkedInPosting || !content.trim()}
+                        >
+                          {linkedInPosting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                              <Send className="w-4 h-4" />
+                          )}
+                          {linkedInPosting ? "Posting..." : postAs !== "personal" ? `Post as ${linkedInOrgStatus?.orgs?.find(o => o.id === postAs)?.name || "Organization"}` : "Share on LinkedIn"}
+                        </Button>
+                        {/* Schedule for Later */}
+                        {!showScheduler ? (
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setShowScheduler(true)}
+                            >
+                              <CalendarClock className="w-4 h-4" />
+                              Schedule for Later
+                            </Button>
+                        ) : (
+                            <div className="space-y-2 pt-2 border-t border-neutral-100">
+                              <div>
+                                <label className="block text-xs text-neutral-500 mb-1">
+                                  Date &amp; time
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={scheduledDateTime}
+                                    onChange={(e) => setScheduledDateTime(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                    disabled={scheduling || !scheduledDateTime || !content.trim()}
+                                    onClick={async () => {
+                                      const result = await schedulePost(id, new Date(scheduledDateTime).toISOString(), {
+                                        postAs,
+                                        ...(attachedUrl && { articleUrl: attachedUrl, articleTitle: title, articleDescription: description }),
+                                      });
+                                      if (result) {
+                                        setArticle((prev) => prev ? { ...prev, ...result.item } : null);
+                                        setShowScheduler(false);
+                                        setScheduledDateTime("");
+                                      }
+                                    }}
+                                >
+                                  {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
+                                  Schedule
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => { setShowScheduler(false); setScheduledDateTime(""); }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                              {scheduleError && (
+                                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                                    {scheduleError}
+                                  </div>
+                              )}
+                            </div>
+                        )}
+                      </>
+                  )}
+                  {linkedInPostError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                        {linkedInPostError}
+                        {reconnectRequired && (
+                            <a href="/api/linkedin/authorize" className="block mt-1 text-[#0A66C2] hover:underline font-medium">
+                              Reconnect LinkedIn
+                            </a>
+                        )}
+                      </div>
+                  )}
+                  <p className="text-xs text-neutral-500">
+                    Connected as {linkedInStatus.profile?.name || "LinkedIn User"}
+                  </p>
+                </div>
+            ) : linkedInStatus?.tokenExpired ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    Token expired
+                  </div>
+                  <a href="/api/linkedin/authorize">
+                    <Button size="sm" className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white">
+                      Reconnect LinkedIn
+                    </Button>
+                  </a>
+                </div>
             ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-neutral-500">
-                  Connect your LinkedIn account to share directly.
-                </p>
-                <Link href="/settings">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Linkedin className="w-4 h-4" />
-                    Connect in Settings
-                  </Button>
-                </Link>
-              </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-neutral-500">
+                    Connect your LinkedIn account to share directly.
+                  </p>
+                  <Link href="/settings">
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Linkedin className="w-4 h-4" />
+                      Connect in Settings
+                    </Button>
+                  </Link>
+                </div>
             )}
           </div>
 

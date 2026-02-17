@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { Check, Zap, TrendingUp, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { TIERS, MESSAGE_PACKS, TierType } from "@/lib/tiers";
+import { TIERS, CREDIT_PACKS, TierType } from "@/lib/tiers";
 import { useUsage } from "@/components/ui/usage-meter";
 
 export default function PricingPage() {
@@ -113,7 +113,7 @@ export default function PricingPage() {
                 </h1>
                 <p className="text-neutral-600">
                     {currentTier === "free"
-                        ? "Upgrade to unlock more messages and features."
+                        ? "Upgrade to unlock more credits and features."
                         : `You're currently on the ${currentTierConfig.name} plan.`
                     }
                 </p>
@@ -126,7 +126,7 @@ export default function PricingPage() {
                         <div>
                             <p className="text-sm text-neutral-500">Current Usage</p>
                             <p className="text-lg font-semibold text-neutral-900">
-                                {usage.messagesUsed} / {usage.totalAvailable} messages
+                                {usage.creditsUsed} / {usage.totalAvailable} credits
                             </p>
                         </div>
                         <div className="text-right">
@@ -285,17 +285,17 @@ export default function PricingPage() {
                 </div>
             </div>
 
-            {/* Message Packs */}
+            {/* Credit Packs */}
             <div id="packs">
                 <h2 className="text-xl font-semibold text-neutral-900 mb-2 flex items-center gap-2">
                     <Zap className="w-5 h-5 text-amber-500" />
-                    Message Packs
+                    Credit Packs
                 </h2>
                 <p className="text-neutral-600 mb-4">
-                    Need more messages? Buy a pack to instantly add messages to your current month.
+                    Need more credits? Buy a pack to instantly add credits to your current month.
                 </p>
                 <div className="grid md:grid-cols-3 gap-6">
-                    {MESSAGE_PACKS.map((pack) => (
+                    {CREDIT_PACKS.map((pack) => (
                         <div
                             key={pack.id}
                             className="rounded-xl border border-neutral-200 p-6 bg-white"
@@ -307,7 +307,7 @@ export default function PricingPage() {
                 </span>
                             </div>
                             <p className="text-sm text-neutral-500 mb-4">
-                                {pack.messages.toLocaleString()} messages • {pack.perMessageCost} each
+                                {pack.credits.toLocaleString()} credits • {pack.perCreditCost} each
                             </p>
                             <Button
                                 className="w-full"
