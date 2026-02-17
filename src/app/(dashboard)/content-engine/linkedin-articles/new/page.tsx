@@ -3,6 +3,8 @@
 
 "use client";
 
+import { getModel } from "@/lib/ai-models";
+
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -98,7 +100,7 @@ export default function NewArticlePage() {
           content: content.trim(),
           description: description.trim() || undefined,
           generatedFromPrompt: topic.trim() || undefined,
-          aiModel: topic.trim() ? "claude-sonnet-4-20250514" : undefined,
+          aiModel: topic.trim() ? getModel("contentArticle") : undefined,
         }),
       });
 

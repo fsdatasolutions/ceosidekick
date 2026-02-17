@@ -3,6 +3,8 @@
 
 "use client";
 
+import { getModel } from "@/lib/ai-models";
+
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -167,7 +169,7 @@ export default function NewBlogPage() {
                     category: category.trim() || undefined,
                     tags: tags.length > 0 ? tags : undefined,
                     generatedFromPrompt: topic.trim() || undefined,
-                    aiModel: topic.trim() ? "claude-sonnet-4-20250514" : undefined,
+                    aiModel: topic.trim() ? getModel("contentBlog") : undefined,
                 }),
             });
 

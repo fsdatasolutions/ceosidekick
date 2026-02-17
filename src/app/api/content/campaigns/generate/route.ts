@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/campaign-prompts";
 import { checkCreditAllowance, incrementCreditUsage } from "@/lib/usage";
 import { calculateCreditCost } from "@/lib/credits";
+import { getModel } from "@/lib/ai-models";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -447,7 +448,7 @@ async function generateWithClaude(systemPrompt: string, userPrompt: string): Pro
 
     try {
         const message = await anthropic.messages.create({
-            model: "claude-sonnet-4-20250514",
+            model: getModel("contentCampaign"),
             max_tokens: 4096,
             system: systemPrompt,
             messages: [{ role: "user", content: userPrompt }],

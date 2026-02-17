@@ -3,6 +3,8 @@
 
 "use client";
 
+import { getModel } from "@/lib/ai-models";
+
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -139,7 +141,7 @@ export default function NewPostPage() {
           content: content.trim(),
           linkedinPostType: postType,
           generatedFromPrompt: topic.trim() || undefined,
-          aiModel: topic.trim() ? "claude-sonnet-4-20250514" : undefined,
+          aiModel: topic.trim() ? getModel("contentPost") : undefined,
         }),
       });
 

@@ -23,6 +23,7 @@ import {
   ROUND_TABLE_ELIGIBLE_ADVISORS,
   ADVISOR_DISPLAY_NAMES,
 } from "./round-table";
+import { getModel } from "@/lib/ai-models";
 
 // User settings type
 export interface UserSettings {
@@ -213,7 +214,7 @@ function getAgentConfig(agent: string): AgentConfig {
 function createLLM(config: AgentConfig) {
   if (!config) config = technologyPartnerConfig;
   return new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: getModel("chat"),
     temperature: config.temperature ?? 0.7,
     maxTokens: config.maxTokens ?? 4096,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
@@ -361,7 +362,7 @@ async function classifyRelevantAdvisors(
     settings?: UserSettings
 ): Promise<Array<{ advisor: AgentType; relevance: number; reason: string }>> {
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: getModel("roundTable"),
     temperature: 0.2,
     maxTokens: 1024,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
@@ -433,7 +434,7 @@ async function callAdvisor(
 ): Promise<{ response: string; tokensUsed: number }> {
   const config = getAgentConfig(advisorId);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: getModel("roundTable"),
     temperature: config.temperature ?? 0.7,
     maxTokens: 2048, // Shorter for individual advisor responses in Round Table
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
@@ -633,7 +634,7 @@ export async function* streamRoundTableConversation(params: {
   }
 
   const synthesisLLM = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: getModel("roundTable"),
     temperature: 0.7,
     maxTokens: 4096,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,

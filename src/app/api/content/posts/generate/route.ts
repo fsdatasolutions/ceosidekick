@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
+import { getModel } from "@/lib/ai-models";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -102,7 +103,7 @@ Tone: ${tone}`;
 
         // Generate with Claude
         const message = await anthropic.messages.create({
-            model: "claude-sonnet-4-20250514",
+            model: getModel("contentPost"),
             max_tokens: 1024,
             system: SYSTEM_PROMPT,
             messages: [
@@ -129,7 +130,7 @@ Tone: ${tone}`;
                 isWithinLimit: charCount <= 3000,
                 postType,
                 prompt: topic || `From article: ${articleTitle}`,
-                model: "claude-sonnet-4-20250514",
+                model: getModel("contentPost"),
             },
         });
     } catch (error: unknown) {

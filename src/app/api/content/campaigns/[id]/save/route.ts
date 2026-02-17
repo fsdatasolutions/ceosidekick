@@ -10,6 +10,7 @@ import {
 } from "@/lib/services/content-campaigns";
 import { createContentItem } from "@/lib/services/content-items";
 import { resolveAuthor, fetchUserSettings } from "@/lib/services/campaign-prompts";
+import { getModel } from "@/lib/ai-models";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 authorRole: author.role,
                 authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
-                aiModel: 'claude-sonnet-4-20250514',
+                aiModel: getModel("contentCampaign"),
             });
             savedItems.linkedinArticle = article;
         }
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 authorRole: author.role,
                 authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
-                aiModel: 'claude-sonnet-4-20250514',
+                aiModel: getModel("contentCampaign"),
             });
             savedItems.linkedinPost = post;
         }
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 authorRole: author.role,
                 authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
-                aiModel: 'claude-sonnet-4-20250514',
+                aiModel: getModel("contentCampaign"),
             });
             savedItems.webBlog = blog;
         }
