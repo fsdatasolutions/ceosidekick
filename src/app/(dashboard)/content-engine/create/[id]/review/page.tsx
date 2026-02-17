@@ -25,8 +25,12 @@ import {
     X,
     ExternalLink,
     Globe,
+    Linkedin,
+    Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface GeneratedImage {
     id?: string;
@@ -150,6 +154,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
     const [blogPubDate, setBlogPubDate] = useState<string>(
         new Date().toISOString().split("T")[0]
     );
+
+    // LinkedIn API connection status
+    const { status: linkedInStatus } = useLinkedInStatus();
+    const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired, reset: resetLinkedInPost } = useLinkedInPost();
+    const [linkedInApiPosted, setLinkedInApiPosted] = useState<Record<string, boolean>>({});
 
     // Expanded sections
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -391,7 +400,7 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
             .trim();
     };
 
-    const handleLinkedInShare = (contentType: 'linkedinPost' | 'linkedinArticle') => {
+    const handleLinkedInShare = async (contentType: 'linkedinPost' | 'linkedinArticle') => {
         if (!campaign) return;
 
         let text = '';
@@ -419,6 +428,17 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
             }
         }
 
+        // If LinkedIn is connected via API, post directly
+        if (linkedInStatus?.connected && !linkedInStatus?.tokenExpired) {
+            resetLinkedInPost();
+            const result = await postToLinkedIn(text);
+            if (result) {
+                setLinkedInApiPosted(prev => ({ ...prev, [contentType]: true }));
+            }
+            return;
+        }
+
+        // Fallback: Open LinkedIn web share dialog
         const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
         window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
 
@@ -625,6 +645,25 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                 </div>
             )}
 
+            {/* LinkedIn API Error */}
+            {linkedInPostError && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-start gap-2">
+                    <Linkedin className="w-5 h-5 flex-shrink-0 text-amber-600" />
+                    <div>
+                        <p>{linkedInPostError}</p>
+                        {reconnectRequired && (
+                            <a
+                                href="/api/linkedin/authorize"
+                                className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-[#0A66C2] hover:underline"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                Reconnect LinkedIn
+                            </a>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Content Sections */}
             <div className="space-y-4">
                 {/* Hero Image */}
@@ -676,10 +715,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                         onEdit={() => startEditing('linkedinArticle')}
                         editing={editingType === 'linkedinArticle'}
                         onPublish={() => handleLinkedInShare('linkedinArticle')}
-                        publishLabel="Share on LinkedIn"
-                        publishIcon={ExternalLink}
-                        published={linkedinShared.linkedinArticle}
-                        publishedMessage="Opened in LinkedIn"
+                        publishLabel={linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? "Post to LinkedIn" : "Share on LinkedIn"}
+                        publishIcon={linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? Send : ExternalLink}
+                        publishing={linkedInPosting}
+                        published={linkedInApiPosted.linkedinArticle || linkedinShared.linkedinArticle}
+                        publishedMessage={linkedInApiPosted.linkedinArticle ? "Posted to LinkedIn!" : "Opened in LinkedIn"}
                     >
                         {editingType === 'linkedinArticle' ? (
                             <EditableArticleContent
@@ -725,10 +765,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                         onEdit={() => startEditing('linkedinPost')}
                         editing={editingType === 'linkedinPost'}
                         onPublish={() => handleLinkedInShare('linkedinPost')}
-                        publishLabel="Share on LinkedIn"
-                        publishIcon={ExternalLink}
-                        published={linkedinShared.linkedinPost}
-                        publishedMessage="Opened in LinkedIn"
+                        publishLabel={linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? "Post to LinkedIn" : "Share on LinkedIn"}
+                        publishIcon={linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? Send : ExternalLink}
+                        publishing={linkedInPosting}
+                        published={linkedInApiPosted.linkedinPost || linkedinShared.linkedinPost}
+                        publishedMessage={linkedInApiPosted.linkedinPost ? "Posted to LinkedIn!" : "Opened in LinkedIn"}
                     >
                         {editingType === 'linkedinPost' ? (
                             <EditablePostContent

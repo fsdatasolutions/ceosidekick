@@ -21,8 +21,13 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
+  Linkedin,
+  Send,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
+import { useLinkedInPost } from "@/lib/hooks/useLinkedInStatus";
 
 interface Post {
   id: string;
@@ -56,6 +61,10 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // LinkedIn API
+  const { status: linkedInStatus, loading: linkedInLoading } = useLinkedInStatus();
+  const { postToLinkedIn, posting: linkedInPosting, success: linkedInPostSuccess, error: linkedInPostError, reconnectRequired } = useLinkedInPost();
 
   // Load post
   useEffect(() => {
@@ -444,6 +453,80 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
               </p>
             </div>
           )}
+
+          {/* Post to LinkedIn */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <h3 className="font-medium text-neutral-900 mb-3 flex items-center gap-2">
+              <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+              Post to LinkedIn
+            </h3>
+
+            {linkedInLoading ? (
+                <div className="flex items-center gap-2 text-sm text-neutral-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking connection...
+                </div>
+            ) : linkedInStatus?.connected && !linkedInStatus?.tokenExpired ? (
+                <div className="space-y-2">
+                  {linkedInPostSuccess ? (
+                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                        <CheckCircle className="w-4 h-4" />
+                        Posted to LinkedIn!
+                      </div>
+                  ) : (
+                      <Button
+                          className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white"
+                          onClick={() => postToLinkedIn(content)}
+                          disabled={linkedInPosting || !content.trim() || isOverLimit}
+                      >
+                        {linkedInPosting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Send className="w-4 h-4" />
+                        )}
+                        {linkedInPosting ? "Posting..." : "Post to LinkedIn"}
+                      </Button>
+                  )}
+                  {linkedInPostError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                        {linkedInPostError}
+                        {reconnectRequired && (
+                            <a href="/api/linkedin/authorize" className="block mt-1 text-[#0A66C2] hover:underline font-medium">
+                              Reconnect LinkedIn
+                            </a>
+                        )}
+                      </div>
+                  )}
+                  <p className="text-xs text-neutral-500">
+                    Connected as {linkedInStatus.profile?.name || "LinkedIn User"}
+                  </p>
+                </div>
+            ) : linkedInStatus?.tokenExpired ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    Token expired
+                  </div>
+                  <a href="/api/linkedin/authorize">
+                    <Button size="sm" className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white">
+                      Reconnect LinkedIn
+                    </Button>
+                  </a>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-neutral-500">
+                    Connect your LinkedIn account to post directly.
+                  </p>
+                  <Link href="/settings">
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Linkedin className="w-4 h-4" />
+                      Connect in Settings
+                    </Button>
+                  </Link>
+                </div>
+            )}
+          </div>
 
           {/* Quick Actions */}
           <div className="bg-white rounded-xl border border-neutral-200 p-4">

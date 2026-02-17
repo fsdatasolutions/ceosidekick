@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   User,
@@ -18,7 +19,12 @@ import {
   Sparkles,
   MessageSquare,
   Globe,
+  Linkedin,
+  AlertTriangle,
+  ExternalLink,
+  Unlink,
 } from "lucide-react";
+import { useLinkedInStatus } from "@/lib/hooks/useLinkedInStatus";
 
 // Types
 interface UserSettings {
@@ -204,6 +210,47 @@ export default function SettingsPage() {
     documentCount: 0,
     plan: "starter",
   });
+
+  // LinkedIn connection
+  const { status: linkedInStatus, loading: linkedInLoading, refetch: refetchLinkedIn } = useLinkedInStatus();
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [linkedInMessage, setLinkedInMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const searchParams = useSearchParams();
+
+  // Handle LinkedIn callback query params
+  useEffect(() => {
+    const linkedInParam = searchParams.get("linkedin");
+    if (linkedInParam === "connected") {
+      setLinkedInMessage({ type: "success", text: "LinkedIn connected successfully!" });
+      refetchLinkedIn();
+      // Clean URL
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setLinkedInMessage(null), 5000);
+    } else if (linkedInParam === "error") {
+      const errorMsg = searchParams.get("linkedin_error") || "Failed to connect LinkedIn";
+      setLinkedInMessage({ type: "error", text: errorMsg });
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setLinkedInMessage(null), 8000);
+    }
+  }, [searchParams, refetchLinkedIn]);
+
+  async function disconnectLinkedIn() {
+    setDisconnecting(true);
+    try {
+      const response = await fetch("/api/linkedin/disconnect", { method: "POST" });
+      if (response.ok) {
+        setLinkedInMessage({ type: "success", text: "LinkedIn disconnected." });
+        refetchLinkedIn();
+        setTimeout(() => setLinkedInMessage(null), 3000);
+      } else {
+        setLinkedInMessage({ type: "error", text: "Failed to disconnect LinkedIn." });
+      }
+    } catch {
+      setLinkedInMessage({ type: "error", text: "Failed to disconnect LinkedIn." });
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   // Define which fields belong to which section
   const sectionFields: Record<string, (keyof UserSettings)[]> = {
@@ -944,6 +991,93 @@ export default function SettingsPage() {
                 <p className="text-sm text-neutral-500">
                   Configure where blog content is published and how it connects to your website.
                 </p>
+
+                {/* LinkedIn Connection Card */}
+                <div className="p-5 rounded-xl border border-neutral-200 bg-neutral-50">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-[#0A66C2]/10 flex items-center justify-center shrink-0">
+                      <Linkedin className="w-5 h-5 text-[#0A66C2]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-neutral-900 mb-1">LinkedIn Connection</h3>
+
+                      {/* LinkedIn status message banner */}
+                      {linkedInMessage && (
+                          <div
+                              className={`mb-3 px-3 py-2 rounded-lg text-sm ${
+                                  linkedInMessage.type === "success"
+                                      ? "bg-green-50 text-green-700 border border-green-200"
+                                      : "bg-red-50 text-red-700 border border-red-200"
+                              }`}
+                          >
+                            {linkedInMessage.text}
+                          </div>
+                      )}
+
+                      {linkedInLoading ? (
+                          <div className="flex items-center gap-2 text-sm text-neutral-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Checking connection...
+                          </div>
+                      ) : linkedInStatus?.connected ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              <span className="text-sm text-green-700 font-medium">
+                                Connected as {linkedInStatus.profile?.name || "LinkedIn User"}
+                              </span>
+                            </div>
+                            {linkedInStatus.tokenExpired && (
+                                <div className="flex items-center gap-2 mb-2 text-amber-600">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span className="text-sm">Token expired — reconnect to continue posting.</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                              {linkedInStatus.tokenExpired && (
+                                  <a href="/api/linkedin/authorize">
+                                    <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
+                                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                                      Reconnect
+                                    </Button>
+                                  </a>
+                              )}
+                              <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={disconnectLinkedIn}
+                                  disabled={disconnecting}
+                                  className="text-neutral-600"
+                              >
+                                {disconnecting ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                ) : (
+                                    <Unlink className="w-3.5 h-3.5 mr-1.5" />
+                                )}
+                                Disconnect
+                              </Button>
+                            </div>
+                          </>
+                      ) : linkedInStatus?.configured === false ? (
+                          <p className="text-sm text-neutral-500">
+                            LinkedIn integration is not configured. Add <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">LINKEDIN_CLIENT_ID</code> and <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">LINKEDIN_CLIENT_SECRET</code> to your environment variables.
+                          </p>
+                      ) : (
+                          <>
+                            <p className="text-sm text-neutral-500 mb-3">
+                              Connect your LinkedIn account to post content directly from the Content Engine.
+                            </p>
+                            <a href="/api/linkedin/authorize">
+                              <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
+                                <Linkedin className="w-3.5 h-3.5 mr-1.5" />
+                                Connect LinkedIn
+                              </Button>
+                            </a>
+                          </>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 <div className="grid gap-6">
                   <div>
