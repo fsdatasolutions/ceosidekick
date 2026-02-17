@@ -12,6 +12,14 @@ import { generateImage } from "@/lib/dalle";
 import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
+import {
+    SYSTEM_PROMPTS,
+    buildBriefContext,
+    resolveAuthor,
+    fetchUserSettings,
+    CONTENT_CREDITS,
+} from "@/lib/services/campaign-prompts";
+import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -19,13 +27,6 @@ const anthropic = new Anthropic({
 
 interface RouteParams {
     params: Promise<{ id: string }>;
-}
-
-interface ContentBrief {
-    topic: string;
-    targetAudience?: string;
-    keyPoints?: string[];
-    tone?: string;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -50,9 +51,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
         }
 
-        const brief = campaign.brief as ContentBrief;
-        const briefContext = buildBriefContext(brief);
+        const brief = campaign.brief;
+
+        // Resolve author and company settings
+        const settings = await fetchUserSettings(userId);
+        const author = resolveAuthor(brief.authorId, session, settings);
+
+        // Build context with author + company info
+        const briefContext = buildBriefContext(brief, author, settings);
         const articleContent = campaign.generated.linkedinArticle?.content || '';
+
+        // ============================================
+        // PAYWALL: Check message allowance before regeneration
+        // ============================================
+        const creditCost = CONTENT_CREDITS[contentType] || 1;
+        const usageCheck = await checkMessageAllowance(userId, creditCost);
+
+        if (!usageCheck.allowed) {
+            console.log("[Campaign Regenerate] User hit message limit:", userId, "needed:", creditCost, "remaining:", usageCheck.usage.remaining);
+            return NextResponse.json(
+                {
+                    error: `Regenerating this content requires ${creditCost} message credit${creditCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
+                    usage: usageCheck.usage,
+                    creditsRequired: creditCost,
+                },
+                { status: 403 }
+            );
+        }
 
         // Mark as generating
         updateCampaignContent(id, contentType, { status: 'generating' });
@@ -226,10 +251,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 }
             }
 
+            // ============================================
+            // PAYWALL: Deduct credits after successful regeneration
+            // ============================================
+            const updatedUsage = await incrementMessageUsage(userId, creditCost);
+            console.log("[Campaign Regenerate] Credits charged:", creditCost, "for", contentType, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+
             const updatedCampaign = getCampaignSession(id, userId);
             return NextResponse.json({
                 success: true,
                 campaign: updatedCampaign,
+                creditsCharged: creditCost,
+                usage: updatedUsage,
             });
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -249,17 +282,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 }
 
-// Helper functions
-function buildBriefContext(brief: ContentBrief): string {
-    let context = `Topic: ${brief.topic}\n`;
-    if (brief.targetAudience) context += `Target Audience: ${brief.targetAudience}\n`;
-    if (brief.keyPoints && brief.keyPoints.length > 0) {
-        context += `Key Points:\n${brief.keyPoints.map((p: string) => `- ${p}`).join('\n')}\n`;
-    }
-    if (brief.tone) context += `Tone: ${brief.tone}\n`;
-    return context;
-}
-
 async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<string> {
     const message = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
@@ -269,10 +291,3 @@ async function generateWithClaude(systemPrompt: string, userPrompt: string): Pro
     });
     return message.content[0].type === "text" ? message.content[0].text : "";
 }
-
-const SYSTEM_PROMPTS = {
-    linkedinArticle: `You are an expert LinkedIn content strategist. Create a professional, engaging LinkedIn article that establishes thought leadership. Format in Markdown with H1 title, H2 sections. Target 800-1500 words.`,
-    linkedinPost: `You are an expert LinkedIn content strategist. Create a compelling LinkedIn post (150-300 words). Plain text with line breaks, include hashtags. Start with a hook.`,
-    webBlog: `You are an expert content writer. Create an SEO-optimized blog post with frontmatter (title, description, category, tags). Target 1000-2000 words in Markdown.`,
-    imagePrompt: `Create a DALL-E image prompt. Professional, business-appropriate. Include style, composition, colors. Under 400 chars. Return ONLY the prompt.`,
-};

@@ -403,6 +403,12 @@ export const userSettings = pgTable("user_settings", {
     communicationStyle: varchar("communication_style", { length: 50 }),
     responseLength: varchar("response_length", { length: 50 }),
 
+    // Content & Publishing
+    blogContentDir: text("blog_content_dir"),
+    blogImagesDir: text("blog_images_dir"),
+    siteUrl: varchar("site_url", { length: 500 }),
+    linkedinProfileUrl: varchar("linkedin_profile_url", { length: 500 }),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

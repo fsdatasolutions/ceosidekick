@@ -70,6 +70,7 @@ interface Campaign {
         targetAudience?: string;
         keyPoints?: string[];
         tone?: string;
+        authorId?: string;
     };
     outputs: {
         generateImage: boolean;
@@ -87,6 +88,18 @@ interface Campaign {
 }
 
 type ContentType = 'image' | 'linkedinArticle' | 'linkedinPost' | 'webBlog';
+
+// Simple author name lookup for display (client-side)
+const AUTHOR_NAMES: Record<string, string> = {
+    "self": "You",
+    "shannon-mcgill": "Shannon McGill",
+    "technology-partner": "Technology Partner",
+    "executive-coach": "Executive Coach",
+    "marketing-partner": "Marketing Partner",
+    "sales-partner": "Sales Partner",
+    "legal-advisor": "Legal Advisor",
+    "hr-partner": "HR Partner",
+};
 
 interface EditedArticle {
     title?: string;
@@ -132,6 +145,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
     const [publishingBlog, setPublishingBlog] = useState(false);
     const [publishedBlogUrl, setPublishedBlogUrl] = useState<string | null>(null);
     const [linkedinShared, setLinkedinShared] = useState<Record<string, boolean>>({});
+
+    // Blog publication date (defaults to today)
+    const [blogPubDate, setBlogPubDate] = useState<string>(
+        new Date().toISOString().split("T")[0]
+    );
 
     // Expanded sections
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -338,6 +356,41 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
         }
     };
 
+    /**
+     * Strip markdown formatting for plain-text sharing on LinkedIn.
+     * Removes headers, bold, italic, links, images, horizontal rules, frontmatter, etc.
+     */
+    const stripMarkdown = (md: string): string => {
+        return md
+            // Remove frontmatter blocks (---...---)
+            .replace(/^---\n[\s\S]*?\n---\n*/m, '')
+            // Remove images ![alt](url)
+            .replace(/!\[.*?\]\(.*?\)/g, '')
+            // Convert links [text](url) to just text
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            // Remove headers (# ## ### etc) but keep the text
+            .replace(/^#{1,6}\s+/gm, '')
+            // Remove bold **text** or __text__
+            .replace(/\*\*(.+?)\*\*/g, '$1')
+            .replace(/__(.+?)__/g, '$1')
+            // Remove italic *text* or _text_
+            .replace(/\*(.+?)\*/g, '$1')
+            .replace(/_(.+?)_/g, '$1')
+            // Remove horizontal rules
+            .replace(/^[-*_]{3,}\s*$/gm, '')
+            // Remove bullet point markers (- or *)
+            .replace(/^\s*[-*]\s+/gm, '- ')
+            // Remove code blocks ```...```
+            .replace(/```[\s\S]*?```/g, '')
+            // Remove inline code `text`
+            .replace(/`(.+?)`/g, '$1')
+            // Remove [LINK: topic] placeholders
+            .replace(/\[LINK:\s*[^\]]+\]/g, '')
+            // Collapse 3+ consecutive newlines into 2
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    };
+
     const handleLinkedInShare = (contentType: 'linkedinPost' | 'linkedinArticle') => {
         if (!campaign) return;
 
@@ -352,15 +405,17 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
             const description = article?.description || '';
 
             if (publishedBlogUrl) {
-                // If blog was published, share with link
+                // If blog was published, share with a link to the published post
                 const siteUrl = window.location.origin;
                 text = `${title}\n\n${description}\n\nRead the full article: ${siteUrl}${publishedBlogUrl}`;
             } else {
-                // Share the article content directly (truncated for LinkedIn)
-                const content = article?.content || '';
-                text = content.length > 2500
-                    ? `${title}\n\n${content.substring(0, 2500)}...`
-                    : `${title}\n\n${content}`;
+                // Share the article content — strip markdown for clean LinkedIn text
+                const rawContent = article?.content || '';
+                const cleanContent = stripMarkdown(rawContent);
+                // LinkedIn post limit is ~3000 chars; truncate if needed
+                text = cleanContent.length > 2800
+                    ? `${cleanContent.substring(0, 2800)}...`
+                    : cleanContent;
             }
         }
 
@@ -392,6 +447,7 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                     category: blog.category || 'Technology',
                     tags: blog.tags || [],
                     heroImageId: campaign.generated.image?.id || undefined,
+                    pubDate: blogPubDate,
                 }),
             });
 
@@ -552,6 +608,11 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                 {campaign.brief.targetAudience && (
                     <p className="text-sm text-neutral-600 mt-1">
                         Audience: {campaign.brief.targetAudience}
+                    </p>
+                )}
+                {campaign.brief.authorId && (
+                    <p className="text-sm text-neutral-600 mt-1">
+                        Writer: {AUTHOR_NAMES[campaign.brief.authorId] || campaign.brief.authorId}
                     </p>
                 )}
             </div>
@@ -746,6 +807,24 @@ export default function CampaignReviewPage({ params }: { params: Promise<{ id: s
                                             ))}
                                         </div>
                                     )}
+
+                                    {/* Publication Date Picker */}
+                                    <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                        <label htmlFor="blog-pub-date" className="text-sm font-medium text-neutral-700 whitespace-nowrap">
+                                            Publication Date
+                                        </label>
+                                        <input
+                                            id="blog-pub-date"
+                                            type="date"
+                                            value={blogPubDate}
+                                            onChange={(e) => setBlogPubDate(e.target.value)}
+                                            className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white"
+                                        />
+                                        <span className="text-xs text-neutral-500">
+                                            Sets the date shown on the published blog post
+                                        </span>
+                                    </div>
+
                                     <div className="prose prose-sm max-w-none p-4 bg-neutral-50 rounded-lg max-h-96 overflow-y-auto">
                                         <pre className="whitespace-pre-wrap text-sm font-sans">
                                             {blogContent.content}

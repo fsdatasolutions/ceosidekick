@@ -3,9 +3,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
     ArrowLeft,
     ArrowRight,
@@ -16,6 +17,7 @@ import {
     Newspaper,
     Loader2,
     Check,
+    User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +28,7 @@ interface ContentBrief {
     targetAudience: string;
     keyPoints: string;
     tone: string;
+    authorId: string;
 }
 
 interface OutputSelection {
@@ -35,9 +38,60 @@ interface OutputSelection {
     webBlog: boolean;
 }
 
+interface AuthorOption {
+    id: string;
+    name: string;
+    role: string;
+    image: string;
+}
+
+// AI advisor personas available for content writing (excludes 'content-engine' which is the tool itself)
+const AI_AUTHOR_OPTIONS: AuthorOption[] = [
+    { id: "technology-partner", name: "Technology Partner", role: "AI Technology Advisor", image: "/images/avatars/technology-partner.png" },
+    { id: "executive-coach", name: "Executive Coach", role: "AI Executive Coach", image: "/images/avatars/executive-coach.png" },
+    { id: "marketing-partner", name: "Marketing Partner", role: "AI Marketing Advisor", image: "/images/avatars/marketing-partner.png" },
+    { id: "sales-partner", name: "Sales Partner", role: "AI Sales Advisor", image: "/images/avatars/sales-partner.png" },
+    { id: "legal-advisor", name: "Legal Advisor", role: "AI Legal Advisor", image: "/images/avatars/legal-advisor.png" },
+    { id: "hr-partner", name: "HR Partner", role: "AI HR Advisor", image: "/images/avatars/hr-partner.png" },
+];
+
 export default function CreateContentPage() {
     const router = useRouter();
     const [step, setStep] = useState<Step>('brief');
+
+    // User profile for "You" author option
+    const [userName, setUserName] = useState<string>("You");
+    const [userRole, setUserRole] = useState<string>("");
+    const [userImage, setUserImage] = useState<string>("");
+
+    // Fetch user settings for the "You" card
+    useEffect(() => {
+        async function loadUserProfile() {
+            try {
+                const response = await fetch("/api/settings");
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.settings?.userRole) {
+                        setUserRole(data.settings.userRole);
+                    }
+                }
+                // Also try to get user name from session
+                const sessionRes = await fetch("/api/auth/session");
+                if (sessionRes.ok) {
+                    const sessionData = await sessionRes.json();
+                    if (sessionData?.user?.name) {
+                        setUserName(sessionData.user.name);
+                    }
+                    if (sessionData?.user?.image) {
+                        setUserImage(sessionData.user.image);
+                    }
+                }
+            } catch {
+                // Silently fail — defaults are fine
+            }
+        }
+        loadUserProfile();
+    }, []);
 
     // Brief state
     const [brief, setBrief] = useState<ContentBrief>({
@@ -45,6 +99,7 @@ export default function CreateContentPage() {
         targetAudience: '',
         keyPoints: '',
         tone: 'professional',
+        authorId: 'self',
     });
 
     // Output selection state
@@ -94,6 +149,7 @@ export default function CreateContentPage() {
                             ? brief.keyPoints.split('\n').filter(p => p.trim())
                             : undefined,
                         tone: brief.tone,
+                        authorId: brief.authorId,
                     },
                     outputs: {
                         generateImage: outputs.image,
@@ -334,6 +390,68 @@ export default function CreateContentPage() {
                                         }`}
                                     >
                                         {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Writer Profile */}
+                        <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                Writer Profile
+                            </label>
+                            <p className="text-xs text-neutral-500 mb-3">
+                                Choose who writes the content. This shapes the voice, perspective, and expertise.
+                            </p>
+                            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                                {/* "You" option */}
+                                <button
+                                    onClick={() => setBrief({ ...brief, authorId: 'self' })}
+                                    className={`flex-shrink-0 w-32 p-3 rounded-xl border text-center transition-all ${
+                                        brief.authorId === 'self'
+                                            ? 'border-primary-red bg-primary-red/5 ring-1 ring-primary-red/20'
+                                            : 'border-neutral-200 hover:border-neutral-300'
+                                    }`}
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-neutral-200 mx-auto mb-2 overflow-hidden flex items-center justify-center">
+                                        {userImage ? (
+                                            <Image
+                                                src={userImage}
+                                                alt={userName}
+                                                width={40}
+                                                height={40}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <User className="w-5 h-5 text-neutral-500" />
+                                        )}
+                                    </div>
+                                    <p className="text-xs font-medium text-neutral-900 truncate">{userName}</p>
+                                    <p className="text-[10px] text-neutral-500 truncate">{userRole || "Your voice"}</p>
+                                </button>
+
+                                {/* AI Advisor options */}
+                                {AI_AUTHOR_OPTIONS.map((author) => (
+                                    <button
+                                        key={author.id}
+                                        onClick={() => setBrief({ ...brief, authorId: author.id })}
+                                        className={`flex-shrink-0 w-32 p-3 rounded-xl border text-center transition-all ${
+                                            brief.authorId === author.id
+                                                ? 'border-primary-red bg-primary-red/5 ring-1 ring-primary-red/20'
+                                                : 'border-neutral-200 hover:border-neutral-300'
+                                        }`}
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-neutral-100 mx-auto mb-2 overflow-hidden">
+                                            <Image
+                                                src={author.image}
+                                                alt={author.name}
+                                                width={40}
+                                                height={40}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <p className="text-xs font-medium text-neutral-900 truncate">{author.name}</p>
+                                        <p className="text-[10px] text-neutral-500 truncate">{author.role}</p>
                                     </button>
                                 ))}
                             </div>

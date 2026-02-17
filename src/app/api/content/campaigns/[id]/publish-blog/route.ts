@@ -9,15 +9,12 @@ import { auth } from "@/lib/auth";
 import { getCampaignSession } from "@/lib/services/content-campaigns";
 import { getContentImageById } from "@/lib/services/content-images";
 import { downloadFileFromGCS } from "@/lib/gcs";
-import { getAllSlugs } from "@/lib/blog";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
+import { resolveAuthor, fetchUserSettings, resolveBlogPaths } from "@/lib/services/campaign-prompts";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
-
-const CONTENT_DIR = path.join(process.cwd(), "src/content/blog");
-const BLOG_IMAGES_DIR = path.join(process.cwd(), "public/images/blog");
 
 function generateSlug(title: string): string {
     return title
@@ -47,13 +44,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
 
         const body = await request.json();
-        const { title, content, description, category, tags, heroImageId } = body as {
+        const { title, content, description, category, tags, heroImageId, pubDate: customPubDate } = body as {
             title: string;
             content: string;
             description?: string;
             category?: string;
             tags?: string[];
             heroImageId?: string;
+            pubDate?: string; // YYYY-MM-DD format, defaults to today
         };
 
         // Validate required fields
@@ -64,6 +62,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             );
         }
 
+        // Resolve publishing directories from user settings
+        const settings = await fetchUserSettings(userId);
+        const { contentDir: CONTENT_DIR, imagesDir: BLOG_IMAGES_DIR } = resolveBlogPaths(settings);
+
         // Generate slug and check for duplicates
         const slug = generateSlug(title);
         if (!slug) {
@@ -73,22 +75,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             );
         }
 
-        const existingSlugs = getAllSlugs();
-        if (existingSlugs.includes(slug)) {
-            return NextResponse.json(
-                { error: "A blog post with this title already exists", slug },
-                { status: 409 }
-            );
+        // Check for duplicate slugs in the target content directory
+        if (fs.existsSync(CONTENT_DIR)) {
+            const existingSlugs = fs.readdirSync(CONTENT_DIR)
+                .filter((f) => f.endsWith(".md") || f.endsWith(".mdx"))
+                .map((f) => f.replace(/\.mdx?$/, ""));
+
+            if (existingSlugs.includes(slug)) {
+                return NextResponse.json(
+                    { error: "A blog post with this title already exists", slug },
+                    { status: 409 }
+                );
+            }
         }
 
-        // Safety net: check filesystem directly
         const targetPath = path.join(CONTENT_DIR, `${slug}.md`);
-        if (fs.existsSync(targetPath)) {
-            return NextResponse.json(
-                { error: "A blog post file with this slug already exists", slug },
-                { status: 409 }
-            );
-        }
 
         // Handle hero image: download from GCS to public/images/blog/
         let heroImageRef = "";
@@ -128,8 +129,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const frontmatterRegex = /^---\n[\s\S]*?\n---\n*/;
         cleanContent = cleanContent.replace(frontmatterRegex, "").trim();
 
+        // Resolve author from campaign brief (settings already fetched above)
+        const author = resolveAuthor(campaign.brief.authorId, session, settings);
+
         // Build frontmatter matching the existing blog format
-        const pubDate = new Date().toISOString().split("T")[0];
+        // Use custom publication date if provided, otherwise default to today
+        const pubDate = customPubDate && /^\d{4}-\d{2}-\d{2}$/.test(customPubDate)
+            ? customPubDate
+            : new Date().toISOString().split("T")[0];
         const escapedTitle = title.replace(/"/g, '\\"');
         const escapedDescription = (description || "").replace(/"/g, '\\"');
         const blogCategory = category || "Technology";
@@ -142,9 +149,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             `heroImage: "${heroImageRef}"`,
             `category: "${blogCategory}"`,
             "author:",
-            '  name: "Shannon McGill"',
-            '  role: "Founder/CEO"',
-            '  image: "/images/founder.jpg"',
+            `  name: "${author.name.replace(/"/g, '\\"')}"`,
+            `  role: "${(author.role || "").replace(/"/g, '\\"')}"`,
+            `  image: "${author.image || "/images/founder.jpg"}"`,
             "featured: false",
             "---",
         ].join("\n");

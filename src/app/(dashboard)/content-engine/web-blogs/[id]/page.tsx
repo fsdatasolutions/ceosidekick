@@ -19,6 +19,7 @@ import {
     Sparkles,
     X,
     Plus,
+    Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -58,6 +59,13 @@ export default function EditBlogPage({ params }: { params: Promise<{ id: string 
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Blog publish to filesystem state
+    const [publishingToBlog, setPublishingToBlog] = useState(false);
+    const [publishedBlogUrl, setPublishedBlogUrl] = useState<string | null>(null);
+    const [blogPubDate, setBlogPubDate] = useState<string>(
+        new Date().toISOString().split("T")[0]
+    );
 
     // Load blog
     useEffect(() => {
@@ -217,6 +225,34 @@ export default function EditBlogPage({ params }: { params: Promise<{ id: string 
         }
     };
 
+    const handlePublishToBlog = async () => {
+        if (!blog) return;
+
+        setPublishingToBlog(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/content/blogs/${id}/publish`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pubDate: blogPubDate }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to publish blog post");
+            }
+
+            setPublishedBlogUrl(data.url);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : "Failed to publish";
+            setError(errorMessage);
+        } finally {
+            setPublishingToBlog(false);
+        }
+    };
+
     const addTag = () => {
         const tag = tagInput.trim();
         if (tag && !tags.includes(tag)) {
@@ -306,10 +342,36 @@ export default function EditBlogPage({ params }: { params: Promise<{ id: string 
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Publish to filesystem */}
+                        {publishedBlogUrl ? (
+                            <a
+                                href={publishedBlogUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100"
+                            >
+                                <Globe className="w-4 h-4" />
+                                Published: {publishedBlogUrl}
+                            </a>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                onClick={handlePublishToBlog}
+                                disabled={publishingToBlog || !title.trim() || !content.trim()}
+                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                            >
+                                {publishingToBlog ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Globe className="w-4 h-4" />
+                                )}
+                                Publish to Blog
+                            </Button>
+                        )}
                         {blog.status === "draft" && (
                             <Button variant="outline" onClick={() => handleStatusChange("published")}>
                                 <CheckCircle className="w-4 h-4" />
-                                Publish
+                                Mark Published
                             </Button>
                         )}
                         {blog.status === "published" && (
@@ -535,6 +597,58 @@ export default function EditBlogPage({ params }: { params: Promise<{ id: string 
                                 {description || "Add a meta description to improve click-through rates from search results."}
                             </p>
                         </div>
+                    </div>
+
+                    {/* Publish to Blog */}
+                    <div className="bg-white rounded-xl border border-neutral-200 p-4">
+                        <h3 className="font-medium text-neutral-900 mb-2 flex items-center gap-2">
+                            <Globe className="w-4 h-4 text-emerald-600" />
+                            Publish to Blog
+                        </h3>
+                        {publishedBlogUrl ? (
+                            <div className="text-sm text-green-700">
+                                <p className="mb-2">Published successfully!</p>
+                                <a
+                                    href={publishedBlogUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:text-green-800"
+                                >
+                                    {publishedBlogUrl}
+                                </a>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-sm text-neutral-500 mb-3">
+                                    Write this blog post as a .md file to your local content directory.
+                                </p>
+                                <div className="mb-3">
+                                    <label htmlFor="sidebar-pub-date" className="block text-xs font-medium text-neutral-600 mb-1">
+                                        Publication Date
+                                    </label>
+                                    <input
+                                        id="sidebar-pub-date"
+                                        type="date"
+                                        value={blogPubDate}
+                                        onChange={(e) => setBlogPubDate(e.target.value)}
+                                        className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                    />
+                                </div>
+                                <Button
+                                    onClick={handlePublishToBlog}
+                                    disabled={publishingToBlog || !title.trim() || !content.trim()}
+                                    className="w-full"
+                                    variant="outline"
+                                >
+                                    {publishingToBlog ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Globe className="w-4 h-4" />
+                                    )}
+                                    Publish to Blog
+                                </Button>
+                            </>
+                        )}
                     </div>
 
                     {/* Danger Zone */}

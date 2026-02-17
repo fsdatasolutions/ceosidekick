@@ -8,20 +8,7 @@ import type { GenerationOptions, DalleModel, ImageSize, ImageQuality, ImageStyle
 import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
-
-// TODO: Import your actual usage/credit functions
-// import { deductMessageCredits, checkMessageCreditsAmount } from "@/lib/services/usage";
-
-// Temporary mock functions until you integrate with your existing usage system
-async function checkMessageCreditsAmount(userId: string, amount: number): Promise<boolean> {
-    // Replace with your actual credit check logic
-    return true;
-}
-
-async function deductMessageCredits(userId: string, amount: number, logData?: any): Promise<void> {
-    // Replace with your actual credit deduction logic
-    console.log(`[Credits] Would deduct ${amount} credits from user ${userId}`);
-}
+import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
 
 export async function POST(request: NextRequest) {
     try {
@@ -78,14 +65,15 @@ export async function POST(request: NextRequest) {
         const creditCost = getGenerationCredits(options);
 
         // Check if user has enough credits
-        const hasCredits = await checkMessageCreditsAmount(userId, creditCost);
-        if (!hasCredits) {
+        const usageCheck = await checkMessageAllowance(userId, creditCost);
+        if (!usageCheck.allowed) {
             return NextResponse.json(
                 {
-                    error: "Insufficient message credits",
+                    error: `Image generation requires ${creditCost} message credit${creditCost > 1 ? 's' : ''}, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
                     required: creditCost,
+                    usage: usageCheck.usage,
                 },
-                { status: 402 }
+                { status: 403 }
             );
         }
 
@@ -173,19 +161,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Deduct credits (image was generated regardless of storage/DB outcome)
-        await deductMessageCredits(userId, creditCost, {
-            type: "content_image_generate",
-            agent: "content",
-            metadata: {
-                imageId: savedImage?.id,
-                model,
-                size,
-                quality: options.quality,
-                style: options.style,
-                creditCost,
-                hadWarnings: warnings.length > 0,
-            },
-        });
+        const updatedUsage = await incrementMessageUsage(userId, creditCost);
+        console.log("[Image Generate] Credits charged:", creditCost, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
 
         return NextResponse.json({
             success: true,
@@ -209,6 +186,7 @@ export async function POST(request: NextRequest) {
                 createdAt: savedImage?.createdAt || new Date().toISOString(),
             },
             creditsUsed: creditCost,
+            usage: updatedUsage,
             ...(warnings.length > 0 && { warnings }),
         });
     } catch (error: any) {

@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Sparkles,
   MessageSquare,
+  Globe,
 } from "lucide-react";
 
 // Types
@@ -37,6 +38,10 @@ interface UserSettings {
   teamStructure?: string;
   communicationStyle?: string;
   responseLength?: string;
+  blogContentDir?: string;
+  blogImagesDir?: string;
+  siteUrl?: string;
+  linkedinProfileUrl?: string;
 }
 
 interface UsageData {
@@ -53,6 +58,7 @@ type SettingSection =
     | "organization"
     | "ai-context"
     | "ai-preferences"
+    | "content-publishing"
     | "team"
     | "billing"
     | "notifications"
@@ -148,6 +154,13 @@ const settingsSections = [
     highlight: true,
   },
   {
+    id: "content-publishing" as const,
+    icon: Globe,
+    title: "Content & Publishing",
+    description: "Blog directories, site URL, and LinkedIn profile",
+    implemented: true,
+  },
+  {
     id: "team" as const,
     icon: Users,
     title: "Team Members",
@@ -198,10 +211,11 @@ export default function SettingsPage() {
     organization: ["companyName", "industry", "companySize", "annualRevenue", "productsServices", "targetMarket"],
     "ai-context": ["currentChallenges", "shortTermGoals", "longTermGoals", "techStack", "teamStructure"],
     "ai-preferences": ["communicationStyle", "responseLength"],
+    "content-publishing": ["blogContentDir", "blogImagesDir", "siteUrl", "linkedinProfileUrl"],
   };
 
   // Order of sections for navigation
-  const sectionOrder: SettingSection[] = ["profile", "organization", "ai-context", "ai-preferences"];
+  const sectionOrder: SettingSection[] = ["profile", "organization", "ai-context", "ai-preferences", "content-publishing"];
 
   // Check if a section has any data
   function isSectionPopulated(section: SettingSection, settingsData: UserSettings): boolean {
@@ -604,6 +618,7 @@ export default function SettingsPage() {
             {activeSection === "organization" && "Company Profile"}
             {activeSection === "ai-context" && "Business Context"}
             {activeSection === "ai-preferences" && "AI Preferences"}
+            {activeSection === "content-publishing" && "Content & Publishing"}
           </h1>
         </div>
 
@@ -918,6 +933,81 @@ export default function SettingsPage() {
                           </label>
                       ))}
                     </div>
+                  </div>
+                </div>
+              </div>
+          )}
+
+          {/* Content & Publishing Section */}
+          {activeSection === "content-publishing" && (
+              <div className="space-y-6">
+                <p className="text-sm text-neutral-500">
+                  Configure where blog content is published and how it connects to your website.
+                </p>
+
+                <div className="grid gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                      Blog Content Directory
+                    </label>
+                    <input
+                        type="text"
+                        value={settings.blogContentDir || ""}
+                        onChange={(e) => updateSetting("blogContentDir", e.target.value)}
+                        placeholder="e.g., /Users/me/Projects/myblog/src/content/blog"
+                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Absolute path where blog .md files are written. Leave blank to use the default project directory.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                      Blog Images Directory
+                    </label>
+                    <input
+                        type="text"
+                        value={settings.blogImagesDir || ""}
+                        onChange={(e) => updateSetting("blogImagesDir", e.target.value)}
+                        placeholder="e.g., /Users/me/Projects/myblog/public/images/blog"
+                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Absolute path where hero images are saved. Leave blank to use the default project directory.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                      Site URL
+                    </label>
+                    <input
+                        type="url"
+                        value={settings.siteUrl || ""}
+                        onChange={(e) => updateSetting("siteUrl", e.target.value)}
+                        placeholder="e.g., https://mysite.com"
+                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Your website base URL, used for blog post links when sharing on LinkedIn.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                      LinkedIn Profile URL
+                    </label>
+                    <input
+                        type="url"
+                        value={settings.linkedinProfileUrl || ""}
+                        onChange={(e) => updateSetting("linkedinProfileUrl", e.target.value)}
+                        placeholder="e.g., https://linkedin.com/in/yourprofile"
+                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Your LinkedIn profile URL for content previews and sharing.
+                    </p>
                   </div>
                 </div>
               </div>

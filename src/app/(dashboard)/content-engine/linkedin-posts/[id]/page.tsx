@@ -30,6 +30,9 @@ interface Post {
   status: string;
   linkedinPostType: string | null;
   heroImageId: string | null;
+  authorName: string | null;
+  authorRole: string | null;
+  authorImageUrl: string | null;
   publishedAt: string | null;
   scheduledFor: string | null;
   generatedFromPrompt: string | null;
@@ -369,10 +372,18 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
             <h3 className="text-sm font-medium text-neutral-700 mb-3">Preview</h3>
             <div className="p-4 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full bg-neutral-300" />
+                {post.authorImageUrl ? (
+                  <img
+                    src={post.authorImageUrl}
+                    alt={post.authorName || "Author"}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-neutral-300" />
+                )}
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">Your Name</p>
-                  <p className="text-xs text-neutral-500">Your headline • Now</p>
+                  <p className="text-sm font-medium text-neutral-900">{post.authorName || "Your Name"}</p>
+                  <p className="text-xs text-neutral-500">{post.authorRole || "Your headline"} • Now</p>
                 </div>
               </div>
               <div className="text-sm text-neutral-700 whitespace-pre-wrap leading-relaxed">

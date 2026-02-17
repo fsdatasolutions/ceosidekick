@@ -16,69 +16,19 @@ import { generateImage } from "@/lib/dalle";
 import { uploadImageFromUrl, refreshSignedUrl } from "@/lib/gcs";
 import { createContentImage } from "@/lib/services/content-images";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
+import {
+    SYSTEM_PROMPTS,
+    buildBriefContext,
+    resolveAuthor,
+    fetchUserSettings,
+    calculateCampaignCredits,
+    CONTENT_CREDITS,
+} from "@/lib/services/campaign-prompts";
+import { checkMessageAllowance, incrementMessageUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// System prompts for different content types
-const SYSTEM_PROMPTS = {
-    linkedinArticle: `You are an expert LinkedIn content strategist. Create a professional, engaging LinkedIn article that establishes thought leadership.
-
-Guidelines:
-- Start with a compelling hook
-- Use clear, accessible language
-- Include practical insights and actionable takeaways
-- Break content with subheadings for scanning
-- End with a call-to-action or thought-provoking question
-- Keep paragraphs short (2-3 sentences)
-- Target 800-1500 words
-
-Format in Markdown with H1 title, H2 sections, bullet points where appropriate, and bold for key points.`,
-
-    linkedinPost: `You are an expert LinkedIn content strategist. Create a compelling LinkedIn post that drives engagement.
-
-Guidelines:
-- Start with a hook in the first line (this shows in preview)
-- Keep it concise but valuable (150-300 words ideal)
-- Use line breaks for readability
-- Include a clear call-to-action
-- End with a question to encourage comments
-- Use 3-5 relevant hashtags at the end
-
-Do NOT use markdown formatting - LinkedIn posts are plain text with line breaks.`,
-
-    webBlog: `You are an expert content writer. Create an SEO-optimized blog post for a business website.
-
-Guidelines:
-- Compelling, keyword-rich title
-- Meta description (150-160 characters)
-- Clear introduction with the main value proposition
-- Structured with H2 and H3 subheadings
-- Include practical examples and data
-- Internal linking opportunities noted as [LINK: topic]
-- Strong conclusion with next steps
-- Target 1000-2000 words
-
-Format in Markdown. Start with frontmatter:
----
-title: "Your Title"
-description: "Meta description"
-category: "Category"
-tags: ["tag1", "tag2"]
----`,
-
-    imagePrompt: `You are an expert at creating DALL-E image prompts. Based on the content brief, create a professional, visually appealing image prompt.
-
-Guidelines:
-- Describe a professional, business-appropriate image
-- Include style details (modern, clean, corporate, etc.)
-- Specify composition and color palette
-- Avoid text in images (DALL-E struggles with text)
-- Keep prompt under 400 characters
-
-Return ONLY the image prompt, nothing else.`,
-};
 
 export async function POST(request: NextRequest) {
     console.log("[Campaign Generate] Starting campaign generation...");
@@ -124,14 +74,39 @@ export async function POST(request: NextRequest) {
             blog: outputs.generateWebBlog,
         });
 
+        // ============================================
+        // PAYWALL: Check message allowance before generation
+        // ============================================
+        const totalCredits = calculateCampaignCredits(outputs);
+        console.log("[Campaign Generate] Total credits required:", totalCredits);
+
+        const usageCheck = await checkMessageAllowance(userId, totalCredits);
+
+        if (!usageCheck.allowed) {
+            console.log("[Campaign Generate] User hit message limit:", userId, "needed:", totalCredits, "remaining:", usageCheck.usage.remaining);
+            return NextResponse.json(
+                {
+                    error: `This campaign requires ${totalCredits} message credits, but you have ${usageCheck.usage.remaining} remaining. Upgrade your plan or purchase a message pack to continue.`,
+                    usage: usageCheck.usage,
+                    creditsRequired: totalCredits,
+                },
+                { status: 403 }
+            );
+        }
+
+        // Resolve author and company settings
+        const settings = await fetchUserSettings(userId);
+        const author = resolveAuthor(brief.authorId, session, settings);
+        console.log("[Campaign Generate] Author:", author.name, "| Role:", author.role);
+
         // Create campaign session
         const campaign = createCampaignSession(userId, brief, outputs);
         console.log("[Campaign Generate] Campaign session created:", campaign.id);
 
         updateCampaignStatus(campaign.id, 'generating');
 
-        // Build the brief context for AI
-        const briefContext = buildBriefContext(brief);
+        // Build the brief context for AI (now includes author + company context)
+        const briefContext = buildBriefContext(brief, author, settings);
         console.log("[Campaign Generate] Brief context:", briefContext);
 
         // Generate content in parallel (but image depends on article for context)
@@ -410,9 +385,36 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ============================================
+        // PAYWALL: Deduct credits for successfully generated content only
+        // ============================================
+        let creditsCharged = 0;
+        const generated = finalCampaign.generated;
+
+        if (generated.linkedinArticle?.status === 'completed') {
+            creditsCharged += CONTENT_CREDITS.linkedinArticle;
+        }
+        if (generated.linkedinPost?.status === 'completed') {
+            creditsCharged += CONTENT_CREDITS.linkedinPost;
+        }
+        if (generated.webBlog?.status === 'completed') {
+            creditsCharged += CONTENT_CREDITS.webBlog;
+        }
+        if (generated.image?.status === 'completed') {
+            creditsCharged += CONTENT_CREDITS.image;
+        }
+
+        let updatedUsage = usageCheck.usage;
+        if (creditsCharged > 0) {
+            updatedUsage = await incrementMessageUsage(userId, creditsCharged);
+            console.log("[Campaign Generate] Credits charged:", creditsCharged, "| Used:", updatedUsage.messagesUsed, "/", updatedUsage.totalAvailable);
+        }
+
         return NextResponse.json({
             success: true,
             campaign: finalCampaign,
+            creditsCharged,
+            usage: updatedUsage,
         });
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Failed to generate campaign";
@@ -422,24 +424,6 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         );
     }
-}
-
-function buildBriefContext(brief: ContentBrief): string {
-    let context = `Topic: ${brief.topic}\n`;
-
-    if (brief.targetAudience) {
-        context += `Target Audience: ${brief.targetAudience}\n`;
-    }
-
-    if (brief.keyPoints && brief.keyPoints.length > 0) {
-        context += `Key Points:\n${brief.keyPoints.map(p => `- ${p}`).join('\n')}\n`;
-    }
-
-    if (brief.tone) {
-        context += `Tone: ${brief.tone}\n`;
-    }
-
-    return context;
 }
 
 async function generateWithClaude(systemPrompt: string, userPrompt: string): Promise<string> {

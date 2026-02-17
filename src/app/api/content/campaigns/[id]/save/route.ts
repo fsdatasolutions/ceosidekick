@@ -9,6 +9,7 @@ import {
     deleteCampaignSession,
 } from "@/lib/services/content-campaigns";
 import { createContentItem } from "@/lib/services/content-items";
+import { resolveAuthor, fetchUserSettings } from "@/lib/services/campaign-prompts";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -43,6 +44,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             heroImageId?: string;
         };
 
+        // Resolve author from campaign brief
+        const settings = await fetchUserSettings(userId);
+        const author = resolveAuthor(campaign.brief.authorId, session, settings);
+
         const savedItems: Record<string, any> = {};
 
         // Save LinkedIn Article
@@ -54,6 +59,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 content: linkedinArticle.content,
                 description: linkedinArticle.description,
                 heroImageId: heroImageId,
+                authorName: author.name,
+                authorRole: author.role,
+                authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
                 aiModel: 'claude-sonnet-4-20250514',
             });
@@ -67,6 +75,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 type: 'linkedin_post',
                 content: linkedinPost.content,
                 heroImageId: heroImageId,
+                authorName: author.name,
+                authorRole: author.role,
+                authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
                 aiModel: 'claude-sonnet-4-20250514',
             });
@@ -84,6 +95,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 category: webBlog.category,
                 tags: webBlog.tags,
                 heroImageId: heroImageId,
+                authorName: author.name,
+                authorRole: author.role,
+                authorImageUrl: author.image,
                 generatedFromPrompt: campaign.brief.topic,
                 aiModel: 'claude-sonnet-4-20250514',
             });

@@ -13,6 +13,7 @@ export interface ContentBrief {
     keyPoints?: string[];
     tone?: string;
     brandId?: string;
+    authorId?: string; // 'self' for user's own voice, or blog-authors.ts ID (e.g., 'marketing-partner')
 }
 
 export interface CampaignOutputs {
@@ -70,7 +71,19 @@ export interface Campaign {
 
 // In-memory store for active campaign sessions (before saving to DB)
 // In production, you might want to use Redis or persist to DB immediately
-const activeCampaigns = new Map<string, Campaign>();
+//
+// Persist across Next.js hot reloads (dev server only).
+// Without this, editing any file in the import chain clears all active campaigns,
+// causing "Campaign not found" 404 errors when saving.
+const globalForCampaigns = globalThis as typeof globalThis & {
+    activeCampaigns?: Map<string, Campaign>;
+};
+
+const activeCampaigns = globalForCampaigns.activeCampaigns ?? new Map<string, Campaign>();
+
+if (process.env.NODE_ENV !== "production") {
+    globalForCampaigns.activeCampaigns = activeCampaigns;
+}
 
 /**
  * Create a new campaign session

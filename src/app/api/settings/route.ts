@@ -27,6 +27,12 @@ export interface UserSettings {
     // Preferences
     communicationStyle?: string;
     responseLength?: string;
+
+    // Content & Publishing
+    blogContentDir?: string;
+    blogImagesDir?: string;
+    siteUrl?: string;
+    linkedinProfileUrl?: string;
 }
 
 // Lazy database imports
@@ -86,6 +92,10 @@ export async function GET() {
                     teamStructure: s.teamStructure,
                     communicationStyle: s.communicationStyle,
                     responseLength: s.responseLength,
+                    blogContentDir: s.blogContentDir,
+                    blogImagesDir: s.blogImagesDir,
+                    siteUrl: s.siteUrl,
+                    linkedinProfileUrl: s.linkedinProfileUrl,
                 }
             });
         }
@@ -133,6 +143,10 @@ export async function POST(request: NextRequest) {
             teamStructure: body.teamStructure || null,
             communicationStyle: body.communicationStyle || null,
             responseLength: body.responseLength || null,
+            blogContentDir: body.blogContentDir || null,
+            blogImagesDir: body.blogImagesDir || null,
+            siteUrl: body.siteUrl || null,
+            linkedinProfileUrl: body.linkedinProfileUrl || null,
         };
 
         const db = await getDb();
