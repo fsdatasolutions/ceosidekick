@@ -5,7 +5,7 @@
 
 import { getModel } from "@/lib/ai-models";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +17,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WriterProfileSelector } from "@/components/content-engine/writer-profile-selector";
 
 export default function NewArticlePage() {
   const router = useRouter();
@@ -33,12 +34,51 @@ export default function NewArticlePage() {
   const [targetAudience, setTargetAudience] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
   const [tone, setTone] = useState("professional");
+  const [authorId, setAuthorId] = useState("self");
+
+  // User profile for "You" author option
+  const [userName, setUserName] = useState<string>("You");
+  const [userRole, setUserRole] = useState<string>("");
+  const [userImage, setUserImage] = useState<string>("");
+
+  // Author info resolved after generation (for save)
+  const [authorName, setAuthorName] = useState<string>("");
+  const [authorRole, setAuthorRole] = useState<string>("");
+  const [authorImageUrl, setAuthorImageUrl] = useState<string>("");
 
   // UI state
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(mode === "manual");
+
+  // Load user profile for the "You" writer card
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.settings?.userRole) {
+            setUserRole(data.settings.userRole);
+          }
+        }
+        const sessionRes = await fetch("/api/auth/session");
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData?.user?.name) {
+            setUserName(sessionData.user.name);
+          }
+          if (sessionData?.user?.image) {
+            setUserImage(sessionData.user.image);
+          }
+        }
+      } catch {
+        // Silently fail — defaults are fine
+      }
+    }
+    loadUserProfile();
+  }, []);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -56,10 +96,11 @@ export default function NewArticlePage() {
         body: JSON.stringify({
           topic: topic.trim(),
           targetAudience: targetAudience.trim() || undefined,
-          keyPoints: keyPoints.trim() 
-            ? keyPoints.split("\n").filter(p => p.trim()) 
+          keyPoints: keyPoints.trim()
+            ? keyPoints.split("\n").filter(p => p.trim())
             : undefined,
           tone,
+          authorId,
           includeCallToAction: true,
         }),
       });
@@ -74,6 +115,9 @@ export default function NewArticlePage() {
       setTitle(data.generated.title);
       setContent(data.generated.content);
       setDescription(data.generated.description);
+      if (data.generated.authorName) setAuthorName(data.generated.authorName);
+      if (data.generated.authorRole) setAuthorRole(data.generated.authorRole);
+      if (data.generated.authorImageUrl) setAuthorImageUrl(data.generated.authorImageUrl);
       setShowEditor(true);
     } catch (err: any) {
       setError(err.message || "Failed to generate article");
@@ -99,6 +143,9 @@ export default function NewArticlePage() {
           title: title.trim(),
           content: content.trim(),
           description: description.trim() || undefined,
+          authorName: authorName || undefined,
+          authorRole: authorRole || undefined,
+          authorImageUrl: authorImageUrl || undefined,
           generatedFromPrompt: topic.trim() || undefined,
           aiModel: topic.trim() ? getModel("contentArticle") : undefined,
         }),
@@ -256,6 +303,14 @@ export default function NewArticlePage() {
                 ))}
               </div>
             </div>
+
+            <WriterProfileSelector
+              selectedAuthorId={authorId}
+              onSelect={setAuthorId}
+              userName={userName}
+              userRole={userRole}
+              userImage={userImage}
+            />
 
             <div className="pt-4">
               <Button

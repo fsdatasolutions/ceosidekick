@@ -20,6 +20,8 @@ import {
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WriterProfileSelector, getAuthorDisplayInfo } from "@/components/content-engine/writer-profile-selector";
+import Image from "next/image";
 
 const POST_TYPES = [
   { value: "insight", label: "Insight", description: "Industry observation or trend" },
@@ -52,6 +54,17 @@ export default function NewPostPage() {
   const [postType, setPostType] = useState("insight");
   const [targetAudience, setTargetAudience] = useState("");
   const [tone, setTone] = useState("professional");
+  const [authorId, setAuthorId] = useState("self");
+
+  // User profile for "You" author option
+  const [userName, setUserName] = useState<string>("You");
+  const [userRole, setUserRole] = useState<string>("");
+  const [userImage, setUserImage] = useState<string>("");
+
+  // Author info resolved after generation (for save)
+  const [authorName, setAuthorName] = useState<string>("");
+  const [authorRole, setAuthorRole] = useState<string>("");
+  const [authorImageUrl, setAuthorImageUrl] = useState<string>("");
 
   // Article state (if deriving from article)
   const [articleTitle, setArticleTitle] = useState("");
@@ -63,6 +76,34 @@ export default function NewPostPage() {
   const [error, setError] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(mode === "manual");
   const [copied, setCopied] = useState(false);
+
+  // Load user profile for the "You" writer card
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.settings?.userRole) {
+            setUserRole(data.settings.userRole);
+          }
+        }
+        const sessionRes = await fetch("/api/auth/session");
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData?.user?.name) {
+            setUserName(sessionData.user.name);
+          }
+          if (sessionData?.user?.image) {
+            setUserImage(sessionData.user.image);
+          }
+        }
+      } catch {
+        // Silently fail — defaults are fine
+      }
+    }
+    loadUserProfile();
+  }, []);
 
   // Load article if fromArticle is provided
   useEffect(() => {
@@ -103,6 +144,7 @@ export default function NewPostPage() {
           postType,
           targetAudience: targetAudience.trim() || undefined,
           tone,
+          authorId,
           articleContent: articleContent || undefined,
           articleTitle: articleTitle || undefined,
         }),
@@ -115,6 +157,9 @@ export default function NewPostPage() {
       }
 
       setContent(data.generated.content);
+      if (data.generated.authorName) setAuthorName(data.generated.authorName);
+      if (data.generated.authorRole) setAuthorRole(data.generated.authorRole);
+      if (data.generated.authorImageUrl) setAuthorImageUrl(data.generated.authorImageUrl);
       setShowEditor(true);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate post";
@@ -140,6 +185,9 @@ export default function NewPostPage() {
         body: JSON.stringify({
           content: content.trim(),
           linkedinPostType: postType,
+          authorName: authorName || undefined,
+          authorRole: authorRole || undefined,
+          authorImageUrl: authorImageUrl || undefined,
           generatedFromPrompt: topic.trim() || undefined,
           aiModel: topic.trim() ? getModel("contentPost") : undefined,
         }),
@@ -338,6 +386,14 @@ export default function NewPostPage() {
               </div>
             </div>
 
+            <WriterProfileSelector
+              selectedAuthorId={authorId}
+              onSelect={setAuthorId}
+              userName={userName}
+              userRole={userRole}
+              userImage={userImage}
+            />
+
             <div className="pt-4">
               <Button
                 onClick={handleGenerate}
@@ -403,13 +459,30 @@ export default function NewPostPage() {
             <div className="border-t border-neutral-200 pt-4">
               <h3 className="text-sm font-medium text-neutral-700 mb-2">Preview</h3>
               <div className="p-4 bg-neutral-50 rounded-lg">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-neutral-300" />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">Your Name</p>
-                    <p className="text-xs text-neutral-500">Your headline • Now</p>
-                  </div>
-                </div>
+                {(() => {
+                  const display = getAuthorDisplayInfo(authorId, userName, userRole, userImage);
+                  return (
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-neutral-300 overflow-hidden flex items-center justify-center">
+                        {display.image ? (
+                          <Image
+                            src={display.image}
+                            alt={display.name}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-neutral-300" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{display.name}</p>
+                        <p className="text-xs text-neutral-500">{display.role} • Now</p>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="text-sm text-neutral-700 whitespace-pre-wrap">
                   {content || "Your post content will appear here..."}
                 </div>

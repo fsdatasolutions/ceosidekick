@@ -55,6 +55,7 @@ export interface ResolvedAuthor {
     role: string;
     image: string;
     bio: string;
+    isAiAdvisor: boolean;
 }
 
 export interface CompanySettings {
@@ -72,6 +73,18 @@ export interface CompanySettings {
 // SYSTEM PROMPTS
 // ============================================
 
+// Guardrails for AI advisor content to prevent fabricated experiences
+const AI_ADVISOR_GUARDRAILS = `
+IMPORTANT — AI Advisor Honesty Rules:
+If the author is an AI advisor (not a real person), you MUST follow these rules:
+- NEVER fabricate personal anecdotes, client stories, or past experiences. The author is an AI and has no real clients or history.
+- NEVER use phrases like "I once worked with a client who..." or "In my experience at [company]..." or "I remember when..." or "One of my clients..."
+- NEVER invent case studies, testimonials, or success stories and attribute them to the author.
+- DO provide expert tips, practical advice, frameworks, and actionable strategies based on established knowledge.
+- DO use hypothetical examples clearly framed as such (e.g., "Consider a scenario where..." or "For example, a company might...").
+- DO cite well-known industry trends, published research, and general best practices.
+- The author's voice should be that of a knowledgeable advisor sharing expertise — not someone recounting a fabricated career.`;
+
 export const SYSTEM_PROMPTS = {
     linkedinArticle: `You are an expert LinkedIn content strategist. Create a professional, engaging LinkedIn article that establishes thought leadership.
 
@@ -85,6 +98,7 @@ Guidelines:
 - Keep paragraphs short (2-3 sentences)
 - Target 800-1500 words
 - Reference the company/industry context when relevant
+${AI_ADVISOR_GUARDRAILS}
 
 Format in Markdown with H1 title, H2 sections, bullet points where appropriate, and bold for key points.`,
 
@@ -99,6 +113,7 @@ Guidelines:
 - End with a question to encourage comments
 - Use 3-5 relevant hashtags at the end
 - Reference the company/industry context when relevant
+${AI_ADVISOR_GUARDRAILS}
 
 Do NOT use markdown formatting - LinkedIn posts are plain text with line breaks.`,
 
@@ -115,6 +130,7 @@ Guidelines:
 - Strong conclusion with next steps
 - Target 1000-2000 words
 - Reference the company/industry context when relevant
+${AI_ADVISOR_GUARDRAILS}
 
 Format in Markdown. Start with frontmatter:
 ---
@@ -157,6 +173,7 @@ export function resolveAuthor(
             role: "", // Will be enhanced with company context
             image: session.user?.image || "",
             bio: "",
+            isAiAdvisor: false,
         };
     }
 
@@ -168,6 +185,7 @@ export function resolveAuthor(
             role: author.role,
             image: author.image,
             bio: author.bio,
+            isAiAdvisor: true,
         };
     }
 
@@ -177,6 +195,7 @@ export function resolveAuthor(
         role: "",
         image: session.user?.image || "",
         bio: "",
+        isAiAdvisor: false,
     };
 }
 
@@ -264,6 +283,11 @@ export function buildBriefContext(
     if (author) {
         lines.push("");
         lines.push("--- Author ---");
+        if (author.isAiAdvisor) {
+            lines.push(`Author Type: AI Advisor (NOT a real person — do NOT fabricate personal stories or client experiences)`);
+        } else {
+            lines.push(`Author Type: Real person`);
+        }
         lines.push(`Author: ${author.name}${author.role ? `, ${author.role}` : ""}`);
         if (author.bio) {
             lines.push(`Author Bio: ${author.bio}`);

@@ -5,39 +5,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/ai-models";
+import {
+    resolveAuthor,
+    fetchUserSettings,
+    buildBriefContext,
+    SYSTEM_PROMPTS,
+} from "@/lib/services/campaign-prompts";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// System prompt for post generation
-const SYSTEM_PROMPT = `You are an expert LinkedIn content strategist. Create compelling LinkedIn posts that drive engagement.
-
-Guidelines:
-- Start with a powerful hook in the first line (this appears in the preview)
-- Keep it concise but valuable (150-300 words is ideal)
-- Use line breaks for readability (LinkedIn doesn't support markdown)
-- Include a clear call-to-action
-- End with a question to encourage comments
-- Add 3-5 relevant hashtags at the end
-- Use emojis sparingly and professionally (1-3 max)
-
-Post types you can create:
-- Story: Personal experience with a lesson
-- Insight: Industry observation or trend
-- Tips: Actionable advice list
-- Question: Thought-provoking engagement post
-- Celebration: Achievement or milestone
-- Behind-the-scenes: Authentic peek into work
-
-Do NOT use markdown formatting - LinkedIn posts are plain text with line breaks only.
-Do NOT use bullet points with dashes - use line breaks or emojis instead.`;
 
 interface GeneratePostBody {
     topic: string;
     postType?: string;
     targetAudience?: string;
     tone?: string;
+    authorId?: string;
     articleContent?: string; // Optional: derive post from an article
     articleTitle?: string;
 }
@@ -59,6 +43,7 @@ export async function POST(request: NextRequest) {
             postType = "insight",
             targetAudience,
             tone = "professional",
+            authorId,
             articleContent,
             articleTitle,
         } = body;
@@ -69,6 +54,22 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // Resolve author and company settings for voice context
+        const settings = await fetchUserSettings(session.user.id);
+        const author = resolveAuthor(authorId, session, settings);
+
+        // Build context from brief-like data
+        const briefContext = buildBriefContext(
+            {
+                topic: topic || `Promote article: ${articleTitle}`,
+                targetAudience: targetAudience || "",
+                keyPoints: [],
+                tone,
+            },
+            author,
+            settings
+        );
 
         // Build the generation prompt
         let userPrompt = "";
@@ -91,21 +92,17 @@ The post should:
             // Generate standalone post
             userPrompt = `Create a LinkedIn post about: ${topic}
 
-Post type: ${postType}
-Tone: ${tone}`;
-
-            if (targetAudience) {
-                userPrompt += `\nTarget audience: ${targetAudience}`;
-            }
+Post type: ${postType}`;
         }
 
+        userPrompt += `\n\n--- Brief Context ---\n${briefContext}`;
         userPrompt += `\n\nGenerate the post content only, no additional commentary.`;
 
         // Generate with Claude
         const message = await anthropic.messages.create({
             model: getModel("contentPost"),
             max_tokens: 1024,
-            system: SYSTEM_PROMPT,
+            system: SYSTEM_PROMPTS.linkedinPost,
             messages: [
                 {
                     role: "user",
@@ -115,8 +112,8 @@ Tone: ${tone}`;
         });
 
         // Extract the generated content
-        const generatedContent = message.content[0].type === "text" 
-            ? message.content[0].text 
+        const generatedContent = message.content[0].type === "text"
+            ? message.content[0].text
             : "";
 
         // Calculate character count (LinkedIn limit is 3000)
@@ -131,6 +128,9 @@ Tone: ${tone}`;
                 postType,
                 prompt: topic || `From article: ${articleTitle}`,
                 model: getModel("contentPost"),
+                authorName: author.name,
+                authorRole: author.role,
+                authorImageUrl: author.image,
             },
         });
     } catch (error: unknown) {

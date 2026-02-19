@@ -61,6 +61,9 @@ interface CreatePostBody {
     content: string;
     linkedinPostType?: string;
     heroImageId?: string;
+    authorName?: string;
+    authorRole?: string;
+    authorImageUrl?: string;
     generatedFromPrompt?: string;
     aiModel?: string;
 }
@@ -84,6 +87,9 @@ export async function POST(request: NextRequest) {
             content,
             linkedinPostType = "text",
             heroImageId,
+            authorName,
+            authorRole,
+            authorImageUrl,
             generatedFromPrompt,
             aiModel,
         } = body;
@@ -102,6 +108,9 @@ export async function POST(request: NextRequest) {
             content: content.trim(),
             linkedinPostType,
             heroImageId,
+            authorName: authorName || session.user.name || undefined,
+            authorRole,
+            authorImageUrl: authorImageUrl || session.user.image || undefined,
             generatedFromPrompt,
             aiModel,
         });

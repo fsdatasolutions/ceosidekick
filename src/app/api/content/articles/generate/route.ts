@@ -5,37 +5,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/ai-models";
+import {
+    resolveAuthor,
+    fetchUserSettings,
+    buildBriefContext,
+    SYSTEM_PROMPTS,
+} from "@/lib/services/campaign-prompts";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// System prompt for article generation
-const SYSTEM_PROMPT = `You are an expert LinkedIn content strategist and writer. Your task is to create professional, engaging LinkedIn articles that establish thought leadership and drive engagement.
-
-When writing LinkedIn articles:
-1. Start with a compelling hook that draws readers in
-2. Use clear, professional language that's accessible to a broad business audience
-3. Include practical insights and actionable takeaways
-4. Break up content with subheadings for easy scanning
-5. End with a clear call-to-action or thought-provoking question
-6. Keep paragraphs short (2-3 sentences) for mobile readability
-7. Use specific examples and data when possible
-8. Maintain a conversational yet professional tone
-
-Format the article in Markdown with:
-- A compelling title (H1)
-- Clear section headings (H2)
-- Bullet points where appropriate
-- Bold text for key points
-
-The article should be between 800-1500 words for optimal LinkedIn engagement.`;
 
 interface GenerateRequestBody {
     topic: string;
     targetAudience?: string;
     keyPoints?: string[];
     tone?: string;
+    authorId?: string;
     includeCallToAction?: boolean;
 }
 
@@ -56,6 +42,7 @@ export async function POST(request: NextRequest) {
             targetAudience,
             keyPoints,
             tone = "professional",
+            authorId,
             includeCallToAction = true,
         } = body;
 
@@ -66,30 +53,37 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Resolve author and company settings for voice context
+        const settings = await fetchUserSettings(session.user.id);
+        const author = resolveAuthor(authorId, session, settings);
+
+        // Build context from brief-like data
+        const briefContext = buildBriefContext(
+            {
+                topic,
+                targetAudience: targetAudience || "",
+                keyPoints: keyPoints || [],
+                tone,
+            },
+            author,
+            settings
+        );
+
         // Build the generation prompt
         let userPrompt = `Write a LinkedIn article about: ${topic}\n\n`;
-
-        if (targetAudience) {
-            userPrompt += `Target audience: ${targetAudience}\n\n`;
-        }
-
-        if (keyPoints && keyPoints.length > 0) {
-            userPrompt += `Key points to cover:\n${keyPoints.map((p) => `- ${p}`).join('\n')}\n\n`;
-        }
-
-        userPrompt += `Tone: ${tone}\n`;
 
         if (includeCallToAction) {
             userPrompt += `Include a call-to-action at the end.\n`;
         }
 
-        userPrompt += `\nPlease generate the complete article in Markdown format.`;
+        userPrompt += `\n--- Brief Context ---\n${briefContext}`;
+        userPrompt += `\n\nPlease generate the complete article in Markdown format.`;
 
         // Generate with Claude
         const message = await anthropic.messages.create({
             model: getModel("contentArticle"),
             max_tokens: 4096,
-            system: SYSTEM_PROMPT,
+            system: SYSTEM_PROMPTS.linkedinArticle,
             messages: [
                 {
                     role: "user",
@@ -108,7 +102,6 @@ export async function POST(request: NextRequest) {
         const title = titleMatch ? titleMatch[1] : topic;
 
         // Generate a description (first paragraph or summary)
-        // Using split instead of regex with /s flag for ES2017 compatibility
         const lines = generatedContent.split('\n');
         let description = `An article about ${topic}`;
 
@@ -129,6 +122,9 @@ export async function POST(request: NextRequest) {
                 description,
                 prompt: topic,
                 model: getModel("contentArticle"),
+                authorName: author.name,
+                authorRole: author.role,
+                authorImageUrl: author.image,
             },
         });
     } catch (error: unknown) {
