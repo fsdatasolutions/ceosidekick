@@ -8,11 +8,8 @@ import {
     Presentation,
     Sheet,
     File,
-    Download,
     Loader2,
-    Crown,
     Sparkles,
-    ArrowRight,
     Database,
     Eye,
 } from "lucide-react";
@@ -109,10 +106,17 @@ const templates = [
 
 const categories = ["All", "Business", "Finance", "HR", "Marketing"];
 
+interface FeatureUsageItem {
+    used: number;
+    limit: number;
+    label: string;
+}
+
 interface UsageData {
     tier: string;
     creditsUsed: number;
     creditLimit: number;
+    featureUsage?: Record<string, FeatureUsageItem>;
 }
 
 export default function DocumentsPage() {
@@ -142,7 +146,8 @@ export default function DocumentsPage() {
         }
     }
 
-    const isPaidUser = usage?.tier && usage.tier !== "free";
+    const isFreeTier = usage?.tier === "free";
+    const templateUsage = usage?.featureUsage?.templateGenerations;
 
     const filteredTemplates =
         selectedCategory === "All"
@@ -150,7 +155,6 @@ export default function DocumentsPage() {
             : templates.filter((t) => t.category === selectedCategory);
 
     function handleTemplateClick(template: typeof templates[0]) {
-        if (!isPaidUser) return;
         setSelectedTemplate(template);
         setIsPreviewOpen(true);
     }
@@ -182,51 +186,34 @@ export default function DocumentsPage() {
                 </p>
             </div>
 
-            {/* Upgrade Banner for Free Users */}
-            {!isPaidUser && !loading && (
-                <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200">
-                    <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Crown className="w-6 h-6 text-amber-600" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-amber-900 mb-1">
-                                Unlock Document Generation
-                            </h3>
-                            <p className="text-amber-700 mb-4">
-                                Upgrade to a paid plan to generate professional documents pre-filled with your company information.
-                                All documents are automatically personalized based on your settings.
+            {/* Free tier usage banner */}
+            {isFreeTier && !loading && templateUsage && (
+                <div className="mb-8 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Sparkles className="w-5 h-5 text-amber-600" />
+                            <p className="text-sm text-amber-800">
+                                <strong>Free plan:</strong> {templateUsage.used} / {templateUsage.limit} template generations used this month.
+                                {templateUsage.used >= templateUsage.limit && (
+                                    <span className="ml-1">
+                                        <Link href="/pricing" className="text-amber-700 underline hover:text-amber-900">Upgrade</Link> for unlimited access.
+                                    </span>
+                                )}
                             </p>
-                            <div className="flex flex-wrap gap-3">
-                                <Link href="/pricing">
-                                    <Button className="bg-amber-600 hover:bg-amber-700">
-                                        <Sparkles className="w-4 h-4" />
-                                        Upgrade Now
-                                    </Button>
-                                </Link>
-                                <Link href="/settings">
-                                    <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
-                                        Complete Profile First
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                </Link>
-                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Feature Highlight */}
-            {isPaidUser && (
-                <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                    <div className="flex items-center gap-3">
-                        <Database className="w-5 h-5 text-blue-600" />
-                        <p className="text-sm text-blue-800">
-                            <strong>New!</strong> Generated documents can now be saved directly to your Company Library for AI-powered search and retrieval.
-                        </p>
-                    </div>
+            <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <div className="flex items-center gap-3">
+                    <Database className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm text-blue-800">
+                        <strong>New!</strong> Generated documents can now be saved directly to your Company Library for AI-powered search and retrieval.
+                    </p>
                 </div>
-            )}
+            </div>
 
             {/* Category Filter */}
             <div className="flex flex-wrap gap-2 mb-6">
@@ -249,41 +236,16 @@ export default function DocumentsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredTemplates.map((template) => {
                     const Icon = template.icon;
-                    const isDisabled = !isPaidUser;
 
                     return (
                         <div
                             key={template.id}
                             onClick={() => handleTemplateClick(template)}
-                            className={`group relative p-6 bg-white rounded-xl border transition-all ${
-                                isDisabled
-                                    ? "border-neutral-200 opacity-60 cursor-not-allowed"
-                                    : "border-neutral-200 hover:border-primary-red hover:shadow-lg cursor-pointer"
-                            }`}
+                            className="group relative p-6 bg-white rounded-xl border border-neutral-200 hover:border-primary-red hover:shadow-lg cursor-pointer transition-all"
                         >
-                            {/* Lock overlay for free users */}
-                            {isDisabled && (
-                                <div className="absolute inset-0 bg-white/50 rounded-xl flex items-center justify-center z-10">
-                                    <div className="bg-neutral-900/80 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5">
-                                        <Crown className="w-3.5 h-3.5" />
-                                        Paid Feature
-                                    </div>
-                                </div>
-                            )}
-
                             <div className="flex items-start gap-4">
-                                <div
-                                    className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                                        isDisabled
-                                            ? "bg-neutral-100"
-                                            : "bg-primary-red/10 group-hover:bg-primary-red/20"
-                                    }`}
-                                >
-                                    <Icon
-                                        className={`w-6 h-6 ${
-                                            isDisabled ? "text-neutral-400" : "text-primary-red"
-                                        }`}
-                                    />
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors bg-primary-red/10 group-hover:bg-primary-red/20">
+                                    <Icon className="w-6 h-6 text-primary-red" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
@@ -305,12 +267,10 @@ export default function DocumentsPage() {
                             </div>
 
                             {/* Hover action hint */}
-                            {!isDisabled && (
-                                <div className="mt-4 flex items-center gap-2 text-sm text-primary-red opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Eye className="w-4 h-4" />
-                                    Click to preview & download
-                                </div>
-                            )}
+                            <div className="mt-4 flex items-center gap-2 text-sm text-primary-red opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Eye className="w-4 h-4" />
+                                Click to preview & generate
+                            </div>
                         </div>
                     );
                 })}

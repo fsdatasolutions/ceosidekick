@@ -153,25 +153,6 @@ export default function PricingPage() {
 
             {/* Subscription Plans */}
             <div className="mb-12">
-                {/* Round Table Highlight */}
-                {currentTier === "free" && (
-                    <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <Zap className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                                <p className="font-semibold text-amber-800">
-                                    Unlock the Round Table
-                                </p>
-                                <p className="text-sm text-amber-600">
-                                    Get multi-perspective guidance from your entire virtual C-suite in one conversation. Available on all paid plans.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 <h2 className="text-xl font-semibold text-neutral-900 mb-4 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary-red" />
                     Subscription Plans

@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { conversations, messages, documents } from "@/db/schema";
 import { eq, and, gt } from "drizzle-orm";
-import { getUserUsage } from "@/lib/usage";
+import { checkFeatureAllowance, incrementFeatureUsage } from "@/lib/usage";
 import { generateStorageKey, uploadFile } from "@/lib/storage";
 import { processDocument } from "@/lib/document-processor";
 
@@ -86,11 +86,11 @@ export async function POST(
             );
         }
 
-        // 2. Check if user is on paid tier
-        const usage = await getUserUsage(session.user.id);
-        if (usage.tier === "free") {
+        // 2. Check feature allowance (free users have limited saves)
+        const featureCheck = await checkFeatureAllowance(session.user.id, "knowledgeBaseSaves");
+        if (!featureCheck.allowed) {
             return NextResponse.json(
-                { error: "Saving conversations to Knowledge Base requires a paid subscription" },
+                { error: featureCheck.reason, upgradeRequired: true },
                 { status: 403 }
             );
         }
@@ -243,6 +243,9 @@ export async function POST(
                 updatedAt: new Date(),
             })
             .where(eq(conversations.id, conversationId));
+
+        // Increment feature usage for free-tier tracking
+        await incrementFeatureUsage(session.user.id, "knowledgeBaseSaves");
 
         return NextResponse.json({
             success: true,

@@ -57,7 +57,7 @@ export default async function DashboardLayout({
                 </div>
 
                 {/* Navigation - SidebarNav fetches tier client-side */}
-                <nav aria-label="Main navigation">
+                <nav aria-label="Main navigation" className="flex-1 overflow-y-auto min-h-0">
                     <SidebarNav isAdmin={isAdmin} />
                 </nav>
 

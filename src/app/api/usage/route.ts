@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getUserUsage } from "@/lib/usage";
+import { getUserUsage, getFeatureUsage } from "@/lib/usage";
 import { getTier } from "@/lib/tiers";
 
 async function getDb() {
@@ -47,7 +47,10 @@ export async function GET() {
             });
         }
 
-        const usage = await getUserUsage(userId);
+        const [usage, featureUsage] = await Promise.all([
+            getUserUsage(userId),
+            getFeatureUsage(userId),
+        ]);
         const tier = getTier(usage.tier);
 
         const { conversations, documents } = await import("@/db/schema");
@@ -79,6 +82,7 @@ export async function GET() {
                 documentCount: documentResult[0]?.count || 0,
                 tierPrice: tier.priceDisplay,
                 companyLibraryStorageMB: tier.companyLibraryStorageMB,
+                featureUsage,
             },
         });
     } catch (error) {

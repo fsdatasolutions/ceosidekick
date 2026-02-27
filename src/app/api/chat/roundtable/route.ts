@@ -11,6 +11,8 @@ import {
     getUserTier,
     checkCreditAllowance,
     incrementCreditUsage,
+    checkFeatureAllowance,
+    incrementFeatureUsage,
 } from "@/lib/usage";
 import { tokensToCredits } from "@/lib/credits";
 
@@ -79,16 +81,24 @@ export async function POST(req: NextRequest) {
 
         const userId = session.user.id;
 
-        // Tier check — Round Table is paid-only
-        const tier = await getUserTier(userId);
-        if (tier === "free") {
-            return NextResponse.json(
-                {
-                    error: "Round Table is available on PowerUser and Pro plans",
-                    upgradeRequired: true,
-                },
-                { status: 403 }
-            );
+        // Parse request early to check if this is a new session
+        // (we need conversationId to decide whether to count a session)
+        const bodyText = await req.text();
+        const body = JSON.parse(bodyText);
+        const isNewSession = !body.conversationId;
+
+        // Feature limit check — free users get limited Round Table sessions
+        if (isNewSession) {
+            const featureCheck = await checkFeatureAllowance(userId, "roundtableSessions");
+            if (!featureCheck.allowed) {
+                return NextResponse.json(
+                    {
+                        error: featureCheck.reason,
+                        upgradeRequired: true,
+                    },
+                    { status: 403 }
+                );
+            }
         }
 
         // Check credit allowance (pre-check with minimum 1 credit)
@@ -103,8 +113,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Parse request
-        const body = await req.json();
+        // Destructure parsed body (already parsed above for session check)
         const { messages: clientMessages, conversationId, selectedAdvisors } = body;
 
         if (!clientMessages || !Array.isArray(clientMessages) || clientMessages.length === 0) {
@@ -160,6 +169,9 @@ export async function POST(req: NextRequest) {
                     .returning();
 
                 currentConversationId = newConversation.id;
+
+                // Count this as a Round Table session for free-tier limits
+                await incrementFeatureUsage(userId, "roundtableSessions");
             }
 
             // Save the user message

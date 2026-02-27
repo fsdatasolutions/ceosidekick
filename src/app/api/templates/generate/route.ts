@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getUserUsage } from "@/lib/usage";
+import { checkFeatureAllowance, incrementFeatureUsage } from "@/lib/usage";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 2. Check if user is on paid tier
-        const usage = await getUserUsage(session.user.id);
-        if (usage.tier === "free") {
+        // 2. Check feature allowance (free users have limited generations)
+        const featureCheck = await checkFeatureAllowance(session.user.id, "templateGenerations");
+        if (!featureCheck.allowed) {
             return NextResponse.json(
-                { error: "Document generation requires a paid subscription" },
+                { error: featureCheck.reason, upgradeRequired: true },
                 { status: 403 }
             );
         }
@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
             settings
         );
 
-        // 6. Return the document as Uint8Array (compatible with NextResponse)
+        // 6. Increment feature usage for free-tier tracking
+        await incrementFeatureUsage(session.user.id, "templateGenerations");
+
+        // 7. Return the document as Uint8Array (compatible with NextResponse)
         return new NextResponse(new Uint8Array(result.buffer), {
             headers: {
                 "Content-Type": result.contentType,

@@ -4,7 +4,7 @@
 import { db } from "@/db";
 import { eq, and, sql } from "drizzle-orm";
 import { subscriptions, monthlyUsage } from "@/db/schema";
-import { getTier, TierType, getUsageStatus, getUsagePercentage } from "./tiers";
+import { getTier, TierType, getUsageStatus, getUsagePercentage, hasPaidFeatures, FREE_TIER_LIMITS, TRIAL_FEATURE_LABELS, type TrialFeature } from "./tiers";
 
 // ===========================================
 // TYPES
@@ -297,4 +297,116 @@ export async function upgradeTier(userId: string, newTier: TierType): Promise<vo
 export async function getUserTier(userId: string): Promise<string> {
     const subscription = await getUserSubscription(userId);
     return subscription?.tier || "free";
+}
+
+// ===========================================
+// FEATURE USAGE TRACKING (Free-tier trial limits)
+// ===========================================
+
+// Maps TrialFeature names to the corresponding monthly_usage column
+const FEATURE_COLUMN_MAP: Record<TrialFeature, "roundtableSessionsUsed" | "templateGenerationsUsed" | "knowledgeBaseSavesUsed"> = {
+    roundtableSessions: "roundtableSessionsUsed",
+    templateGenerations: "templateGenerationsUsed",
+    knowledgeBaseSaves: "knowledgeBaseSavesUsed",
+};
+
+export interface FeatureAllowanceResult {
+    allowed: boolean;
+    reason?: string;
+    used: number;
+    limit: number | null; // null = unlimited (paid tier)
+    upgradeRequired?: boolean;
+}
+
+export interface FeatureUsageSummary {
+    roundtableSessions: { used: number; limit: number | null };
+    templateGenerations: { used: number; limit: number | null };
+    knowledgeBaseSaves: { used: number; limit: number | null };
+}
+
+/**
+ * Check if a user can use a trial-limited feature.
+ * Paid users always pass. Free users are checked against monthly limits.
+ */
+export async function checkFeatureAllowance(
+    userId: string,
+    feature: TrialFeature
+): Promise<FeatureAllowanceResult> {
+    const tier = await getUserTier(userId);
+
+    // Paid users have unlimited access
+    if (hasPaidFeatures(tier)) {
+        return { allowed: true, used: 0, limit: null };
+    }
+
+    const usage = await getOrCreateMonthlyUsage(userId);
+    const column = FEATURE_COLUMN_MAP[feature];
+    const used = usage[column];
+    const limit = FREE_TIER_LIMITS[feature];
+    const label = TRIAL_FEATURE_LABELS[feature];
+
+    if (used >= limit) {
+        return {
+            allowed: false,
+            reason: `You've used all ${limit} free ${label} this month. Upgrade to a paid plan for unlimited access.`,
+            used,
+            limit,
+            upgradeRequired: true,
+        };
+    }
+
+    return { allowed: true, used, limit };
+}
+
+/**
+ * Increment the usage counter for a trial feature.
+ * Call this after a successful operation, not before.
+ */
+export async function incrementFeatureUsage(
+    userId: string,
+    feature: TrialFeature
+): Promise<void> {
+    const tier = await getUserTier(userId);
+
+    // Don't track for paid users (saves a DB write)
+    if (hasPaidFeatures(tier)) return;
+
+    const period = getCurrentPeriod();
+    const column = FEATURE_COLUMN_MAP[feature];
+
+    await db
+        .update(monthlyUsage)
+        .set({
+            [column]: sql`${monthlyUsage[column]} + 1`,
+            updatedAt: new Date(),
+        })
+        .where(and(
+            eq(monthlyUsage.userId, userId),
+            eq(monthlyUsage.period, period)
+        ));
+}
+
+/**
+ * Get feature usage summary for a user.
+ * Used by the /api/usage endpoint to inform the frontend.
+ */
+export async function getFeatureUsage(userId: string): Promise<FeatureUsageSummary> {
+    const tier = await getUserTier(userId);
+    const isPaid = hasPaidFeatures(tier);
+    const usage = await getOrCreateMonthlyUsage(userId);
+
+    return {
+        roundtableSessions: {
+            used: usage.roundtableSessionsUsed,
+            limit: isPaid ? null : FREE_TIER_LIMITS.roundtableSessions,
+        },
+        templateGenerations: {
+            used: usage.templateGenerationsUsed,
+            limit: isPaid ? null : FREE_TIER_LIMITS.templateGenerations,
+        },
+        knowledgeBaseSaves: {
+            used: usage.knowledgeBaseSavesUsed,
+            limit: isPaid ? null : FREE_TIER_LIMITS.knowledgeBaseSaves,
+        },
+    };
 }

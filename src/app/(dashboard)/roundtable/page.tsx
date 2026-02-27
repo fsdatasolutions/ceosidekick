@@ -17,7 +17,6 @@ import {
     ChevronRight,
     ChevronLeft,
     Users,
-    Crown,
     Sparkles,
     Check,
     AlertCircle,
@@ -286,7 +285,6 @@ function RoundTableContent() {
     const [loadingPhase, setLoadingPhase] = useState<string>("");
     const [selectedAdvisors, setSelectedAdvisors] = useState<string[]>([]);
     const [usage, setUsage] = useState<UsageInfo | null>(null);
-    const [isPaidUser, setIsPaidUser] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -300,7 +298,7 @@ function RoundTableContent() {
     const [showHistory, setShowHistory] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
-    // Check tier and usage on mount
+    // Check usage on mount
     useEffect(() => {
         async function checkUsage() {
             try {
@@ -308,11 +306,9 @@ function RoundTableContent() {
                 if (res.ok) {
                     const data = await res.json();
                     setUsage(data.usage);
-                    const tier = data.usage?.tier;
-                    setIsPaidUser(tier === "power" || tier === "pro" || tier === "team");
                 }
             } catch {
-                setIsPaidUser(false);
+                // Silent - usage will show as null
             }
         }
         checkUsage();
@@ -624,30 +620,6 @@ function RoundTableContent() {
     // PAYWALL / LOADING SCREENS
     // ============================================
 
-    if (isPaidUser === false) {
-        return (
-            <div className="h-screen flex items-center justify-center p-8">
-                <div className="max-w-md text-center">
-                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <Crown className="w-8 h-8 text-amber-600" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-neutral-900 mb-3">Round Table is a Premium Feature</h1>
-                    <p className="text-neutral-600 mb-6">
-                        Get multi-perspective guidance from your entire virtual C-suite. Available on PowerUser, Pro, and Team plans.
-                    </p>
-                    <Button onClick={() => router.push("/pricing")}>View Plans</Button>
-                </div>
-            </div>
-        );
-    }
-
-    if (isPaidUser === null) {
-        return (
-            <div className="h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
-            </div>
-        );
-    }
 
     // ============================================
     // RENDER

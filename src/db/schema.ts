@@ -159,6 +159,11 @@ export const monthlyUsage = pgTable(
         // Bonus credits (from packs, promotions, etc.)
         bonusCredits: integer("bonus_credits").default(0).notNull(),
 
+        // Feature usage counters (for free-tier trial limits)
+        roundtableSessionsUsed: integer("roundtable_sessions_used").default(0).notNull(),
+        templateGenerationsUsed: integer("template_generations_used").default(0).notNull(),
+        knowledgeBaseSavesUsed: integer("knowledge_base_saves_used").default(0).notNull(),
+
         // Timestamps
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),

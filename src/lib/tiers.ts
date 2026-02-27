@@ -29,15 +29,35 @@ export interface CreditPackConfig {
 }
 
 // ===========================================
-// FEATURE GATING
+// FREE TIER FEATURE LIMITS
 // ===========================================
-// Free:      Chat with all 7 AI advisors
-// Paid:      + Company Library (RAG), Business Document Templates, Round Table
+// Free users get trial access to all features with monthly limits.
+// Paid users have unlimited access (only credits are metered).
+
+export type TrialFeature = "roundtableSessions" | "templateGenerations" | "knowledgeBaseSaves";
+
+export const FREE_TIER_LIMITS: Record<TrialFeature, number> = {
+  roundtableSessions: 2,
+  templateGenerations: 2,
+  knowledgeBaseSaves: 3,
+};
+
+export const TRIAL_FEATURE_LABELS: Record<TrialFeature, string> = {
+  roundtableSessions: "Round Table sessions",
+  templateGenerations: "document template generations",
+  knowledgeBaseSaves: "Knowledge Base saves",
+};
+
+/** Get the monthly limit for a trial feature on the free tier */
+export function getFreeTierLimit(feature: TrialFeature): number {
+  return FREE_TIER_LIMITS[feature];
+}
 
 export const PAID_FEATURES = [
-  "Company Library — upload & search your documents",
-  "Business Document Templates",
-  "Round Table — multi-advisor boardroom",
+  "Unlimited Round Table sessions",
+  "Unlimited Document Templates",
+  "Unlimited Knowledge Base saves",
+  "Company Library — expanded storage",
 ] as const;
 
 // ===========================================
@@ -50,12 +70,16 @@ export const TIERS: Record<TierType, TierConfig> = {
     name: "Free",
     price: 0,
     priceDisplay: "$0",
-    creditsPerMonth: 30,
-    companyLibraryStorageMB: 0,
-    description: "Perfect for trying out CEO Sidekick",
+    creditsPerMonth: 15,
+    companyLibraryStorageMB: 5,
+    description: "Explore everything CEO Sidekick offers",
     features: [
-      "30 credits/month",
+      "15 credits/month",
       "All 7 AI advisors",
+      "Company Library — 5MB storage",
+      "Business Document Templates (2/month)",
+      "Round Table (2 sessions/month)",
+      "Knowledge Base saves (3/month)",
     ],
   },
   power: {
@@ -159,7 +183,7 @@ export function getTierByStripePriceId(priceId: string): TierConfig | undefined 
   return Object.values(TIERS).find((tier) => tier.stripePriceId === priceId);
 }
 
-/** Check if a tier has access to paid features (Company Library, Templates, Round Table) */
+/** Check if a tier has unlimited access to features (paid tiers skip trial limits) */
 export function hasPaidFeatures(tierId: TierType | string): boolean {
   return tierId !== "free";
 }
