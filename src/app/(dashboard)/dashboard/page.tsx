@@ -19,6 +19,7 @@ import {
   Crown,
   PenTool,
   ArrowUpRight,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentAvatar } from "@/components/ui/agent-avatar";
@@ -503,6 +504,28 @@ export default async function DashboardPage() {
               </p>
               <span className="text-xs text-purple-600 font-medium">
               Create Content →
+            </span>
+            </Link>
+
+            {/* Goals */}
+            <Link
+                href="/goals"
+                className="group relative bg-white rounded-xl border border-neutral-200 p-5 hover:border-green-300 hover:shadow-lg hover:shadow-green-500/5 transition-all"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-green-600" aria-hidden="true" />
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-green-600 transition-colors" aria-hidden="true" />
+              </div>
+              <h3 className="font-semibold text-neutral-900 mb-1 group-hover:text-green-700 transition-colors">
+                Goals
+              </h3>
+              <p className="text-sm text-neutral-500 mb-3">
+                Set business goals, generate AI action plans, and track your progress step by step.
+              </p>
+              <span className="text-xs text-green-600 font-medium">
+              Set a Goal →
             </span>
             </Link>
 

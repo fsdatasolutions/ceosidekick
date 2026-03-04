@@ -68,7 +68,7 @@ export default function SignupPage() {
       await signIn("credentials", {
         email: formData.email,
         password: formData.password,
-        callbackUrl: "/dashboard",
+        callbackUrl: "/onboarding",
         redirect: true,
       });
     } catch {
@@ -79,7 +79,7 @@ export default function SignupPage() {
 
   const handleOAuthSignIn = (provider: string) => {
     setIsLoading(true);
-    signIn(provider, { callbackUrl: "/dashboard" });
+    signIn(provider, { callbackUrl: "/onboarding" });
   };
 
   return (

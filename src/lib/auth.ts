@@ -157,7 +157,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         : []),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
       // For credentials login, user.id is already the database ID
       if (user && account?.provider === "credentials") {
         token.id = user.id;
@@ -171,11 +171,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
+      // On initial sign-in, fetch onboardingCompleted from DB
+      if (user && token.id) {
+        const db = await getDb();
+        if (db) {
+          const { users } = await getSchema();
+          const result = await db
+            .select({ onboardingCompleted: users.onboardingCompleted })
+            .from(users)
+            .where(eq(users.id, token.id as string))
+            .limit(1);
+          token.onboardingCompleted = result[0]?.onboardingCompleted ?? true;
+        } else {
+          token.onboardingCompleted = true; // Demo mode: skip onboarding
+        }
+      }
+
+      // When session is updated (e.g., after onboarding completes), re-fetch from DB
+      if (trigger === "update" && token.id) {
+        const db = await getDb();
+        if (db) {
+          const { users } = await getSchema();
+          const result = await db
+            .select({ onboardingCompleted: users.onboardingCompleted })
+            .from(users)
+            .where(eq(users.id, token.id as string))
+            .limit(1);
+          token.onboardingCompleted = result[0]?.onboardingCompleted ?? true;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        session.user.onboardingCompleted = (token.onboardingCompleted as boolean) ?? true;
       }
       return session;
     },

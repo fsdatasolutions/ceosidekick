@@ -47,6 +47,7 @@ export const users = pgTable(
         name: varchar("name", { length: 255 }),
         image: varchar("image", { length: 500 }),
         role: text("role").default("user"),  // <-- ADD THIS LINE
+        onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
         emailVerified: timestamp("email_verified"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -576,6 +577,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     feedback: many(feedback),
     contentItems: many(contentItems),
     contentImages: many(contentImages),
+    goals: many(goals),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -707,6 +709,76 @@ export const feedbackRelations = relations(feedback, ({ one }) => ({
     resolver: one(users, {
         fields: [feedback.resolvedBy],
         references: [users.id],
+    }),
+}));
+
+// ============================================
+// GOALS & GOAL STEPS
+// ============================================
+
+export const goals = pgTable(
+    "goals",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        title: varchar("title", { length: 255 }).notNull(),
+        description: text("description"), // User's original input
+        category: varchar("category", { length: 100 }), // revenue, product, team, operations, marketing
+        status: varchar("status", { length: 50 }).default("active").notNull(), // active, completed, archived
+        progress: integer("progress").default(0).notNull(), // 0-100 auto-calculated
+        targetDate: timestamp("target_date"),
+        aiModel: varchar("ai_model", { length: 100 }),
+        creditCost: integer("credit_cost"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("goals_user_id_idx").on(table.userId),
+        index("goals_status_idx").on(table.status),
+        index("goals_created_at_idx").on(table.createdAt),
+    ]
+);
+
+export const goalSteps = pgTable(
+    "goal_steps",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        goalId: uuid("goal_id")
+            .notNull()
+            .references(() => goals.id, { onDelete: "cascade" }),
+        stepNumber: integer("step_number").notNull(),
+        title: varchar("title", { length: 500 }).notNull(),
+        description: text("description"),
+        timeframe: varchar("timeframe", { length: 100 }), // "Week 1-2", "Month 1"
+        completed: boolean("completed").default(false).notNull(),
+        completedAt: timestamp("completed_at"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("goal_steps_goal_id_idx").on(table.goalId),
+        index("goal_steps_step_number_idx").on(table.stepNumber),
+    ]
+);
+
+// ============================================
+// GOALS RELATIONS
+// ============================================
+
+export const goalsRelations = relations(goals, ({ one, many }) => ({
+    user: one(users, {
+        fields: [goals.userId],
+        references: [users.id],
+    }),
+    steps: many(goalSteps),
+}));
+
+export const goalStepsRelations = relations(goalSteps, ({ one }) => ({
+    goal: one(goals, {
+        fields: [goalSteps.goalId],
+        references: [goals.id],
     }),
 }));
 
@@ -963,3 +1035,9 @@ export type NewContentVersion = typeof contentVersions.$inferInsert;
 
 export type ContentImage = typeof contentImages.$inferSelect;
 export type NewContentImage = typeof contentImages.$inferInsert;
+
+export type Goal = typeof goals.$inferSelect;
+export type NewGoal = typeof goals.$inferInsert;
+
+export type GoalStep = typeof goalSteps.$inferSelect;
+export type NewGoalStep = typeof goalSteps.$inferInsert;

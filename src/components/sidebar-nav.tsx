@@ -18,6 +18,7 @@ import {
     Sparkles,
     MessagesSquare,
     PenTool,
+    Target,
 } from "lucide-react";
 
 // Fields that should be populated for a complete profile
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
     { icon: FileText, label: "Templates", href: "/documents" },
     { icon: FolderOpen, label: "Company Library", href: "/knowledge-base" },
     { icon: Sparkles, label: "Content Engine", href: "/content-engine" },
+    { icon: Target, label: "Goals", href: "/goals" },
 ];
 
 interface SidebarNavProps {

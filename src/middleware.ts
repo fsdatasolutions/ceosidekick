@@ -2,10 +2,25 @@ import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedRoutes = ["/dashboard", "/chat", "/knowledge-base", "/settings"];
+const protectedRoutes = [
+  "/dashboard",
+  "/chat",
+  "/knowledge-base",
+  "/settings",
+  "/onboarding",
+  "/content-engine",
+  "/roundtable",
+  "/documents",
+  "/feedback",
+  "/pricing",
+  "/goals",
+];
 
 // Routes that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"];
+
+// Routes exempt from onboarding redirect (user needs access even if onboarding incomplete)
+const onboardingExemptRoutes = ["/onboarding", "/settings", "/api"];
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -15,6 +30,9 @@ export default auth((req) => {
     nextUrl.pathname.startsWith(route)
   );
   const isAuthRoute = authRoutes.some((route) =>
+    nextUrl.pathname.startsWith(route)
+  );
+  const isOnboardingExempt = onboardingExemptRoutes.some((route) =>
     nextUrl.pathname.startsWith(route)
   );
 
@@ -28,6 +46,17 @@ export default auth((req) => {
   // Redirect to dashboard if accessing auth routes while logged in
   if (isAuthRoute && isLoggedIn) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl.origin));
+  }
+
+  // Redirect to onboarding if logged in but hasn't completed onboarding
+  // Uses strict === false so existing tokens without the field aren't affected
+  if (
+    isLoggedIn &&
+    isProtectedRoute &&
+    !isOnboardingExempt &&
+    req.auth?.user?.onboardingCompleted === false
+  ) {
+    return NextResponse.redirect(new URL("/onboarding", nextUrl.origin));
   }
 
   return NextResponse.next();
