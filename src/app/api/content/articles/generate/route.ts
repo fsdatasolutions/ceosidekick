@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/ai-models";
+import { db } from "@/db";
+import { usageLogs } from "@/db/schema";
 import {
     resolveAuthor,
     fetchUserSettings,
@@ -96,6 +98,23 @@ export async function POST(request: NextRequest) {
         const generatedContent = message.content[0].type === "text"
             ? message.content[0].text
             : "";
+
+        // Log token usage for cost tracking
+        const inputTokens = message.usage?.input_tokens || 0;
+        const outputTokens = message.usage?.output_tokens || 0;
+        try {
+            await db.insert(usageLogs).values({
+                userId: session.user.id,
+                type: "content_article",
+                agent: "contentArticle",
+                inputTokens,
+                outputTokens,
+                model: getModel("contentArticle"),
+                metadata: { topic },
+            });
+        } catch (logErr) {
+            console.error("[Articles Generate] Failed to log usage:", logErr);
+        }
 
         // Parse title from the content (first H1)
         const titleMatch = generatedContent.match(/^#\s+(.+)$/m);

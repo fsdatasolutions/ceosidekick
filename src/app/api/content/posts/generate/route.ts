@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/ai-models";
+import { db } from "@/db";
+import { usageLogs } from "@/db/schema";
 import {
     resolveAuthor,
     fetchUserSettings,
@@ -115,6 +117,23 @@ Post type: ${postType}`;
         const generatedContent = message.content[0].type === "text"
             ? message.content[0].text
             : "";
+
+        // Log token usage for cost tracking
+        const inputTokens = message.usage?.input_tokens || 0;
+        const outputTokens = message.usage?.output_tokens || 0;
+        try {
+            await db.insert(usageLogs).values({
+                userId: session.user.id,
+                type: "content_post",
+                agent: "contentPost",
+                inputTokens,
+                outputTokens,
+                model: getModel("contentPost"),
+                metadata: { postType, topic },
+            });
+        } catch (logErr) {
+            console.error("[Posts Generate] Failed to log usage:", logErr);
+        }
 
         // Calculate character count (LinkedIn limit is 3000)
         const charCount = generatedContent.length;

@@ -417,6 +417,25 @@ export async function POST(request: NextRequest) {
         if (creditsCharged > 0) {
             updatedUsage = await incrementCreditUsage(userId, creditsCharged);
             console.log("[Campaign Generate] Credits charged:", creditsCharged, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
+
+            // Log to usageLogs for API cost tracking
+            try {
+                const { db: logDb } = await import("@/db");
+                const { usageLogs } = await import("@/db/schema");
+                // Estimate tokens from credits (3000 tokens/credit) since individual token counts are spread across multiple calls
+                const estimatedTokens = creditsCharged * 3000;
+                await logDb.insert(usageLogs).values({
+                    userId,
+                    type: "content_campaign",
+                    agent: "contentCampaign",
+                    inputTokens: 0,
+                    outputTokens: estimatedTokens,
+                    model: getModel("contentCampaign"),
+                    metadata: { creditsCharged, campaignId: campaign.id },
+                });
+            } catch (logErr) {
+                console.error("[Campaign Generate] Failed to log usage:", logErr);
+            }
         }
 
         return NextResponse.json({

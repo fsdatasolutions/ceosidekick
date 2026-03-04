@@ -350,6 +350,25 @@ export async function POST(request: NextRequest) {
             const updatedUsage = await incrementCreditUsage(session.user.id, creditCost);
             console.log("[API] Credits deducted:", creditCost, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable, voiceMode ? "(voice)" : "", tokenUsageData ? `(tokens: ${tokenUsageData.inputTokens}+${tokenUsageData.outputTokens})` : "");
 
+            // Log to usageLogs for API cost tracking
+            try {
+              const logDb = await getDb();
+              if (logDb && tokenUsageData) {
+                const { usageLogs } = await import("@/db/schema");
+                await logDb.insert(usageLogs).values({
+                  userId: session.user.id,
+                  type: "chat",
+                  agent: agent,
+                  inputTokens: tokenUsageData.inputTokens,
+                  outputTokens: tokenUsageData.outputTokens,
+                  model: (await import("@/lib/ai-models")).getModel("chat"),
+                  metadata: { creditCost, voiceMode },
+                });
+              }
+            } catch (logErr) {
+              console.error("[API] Failed to log usage:", logErr);
+            }
+
             // Send updated usage info to client
             controller.enqueue(
                 encoder.encode(

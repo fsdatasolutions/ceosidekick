@@ -164,6 +164,23 @@ export async function POST(request: NextRequest) {
         const updatedUsage = await incrementCreditUsage(userId, creditCost);
         console.log("[Image Generate] Credits charged:", creditCost, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
 
+        // Log to usageLogs for API cost tracking (DALL-E, not Anthropic)
+        try {
+            const { db } = await import("@/db");
+            const { usageLogs } = await import("@/db/schema");
+            await db.insert(usageLogs).values({
+                userId,
+                type: "image_generation",
+                agent: "dalle",
+                inputTokens: 0,
+                outputTokens: 0,
+                model: `dall-e-${options.model || "3"}`,
+                metadata: { creditCost, size: options.size, style: options.style },
+            });
+        } catch (logErr) {
+            console.error("[Image Generate] Failed to log usage:", logErr);
+        }
+
         return NextResponse.json({
             success: true,
             image: {

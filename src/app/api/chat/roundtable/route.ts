@@ -310,6 +310,24 @@ export async function POST(req: NextRequest) {
                                 `[RoundTable API] Charged ${creditsCharged} credits (${totalTokensUsed} tokens) for user ${userId}. Usage: ${updatedUsage.creditsUsed}/${updatedUsage.totalAvailable}`
                             );
 
+                            // Log to usageLogs for API cost tracking
+                            try {
+                                const { db } = await import("@/db");
+                                const { usageLogs } = await import("@/db/schema");
+                                const { getModel } = await import("@/lib/ai-models");
+                                await db.insert(usageLogs).values({
+                                    userId,
+                                    type: "roundtable",
+                                    agent: "roundTable",
+                                    inputTokens: 0,
+                                    outputTokens: totalTokensUsed,
+                                    model: getModel("roundTable"),
+                                    metadata: { creditsCharged, advisorCount: advisorResponsesMeta.length },
+                                });
+                            } catch (logErr) {
+                                console.error("[RoundTable API] Failed to log usage:", logErr);
+                            }
+
                             // Send usage update to client
                             const usageEvent = JSON.stringify({
                                 type: "usage_update",

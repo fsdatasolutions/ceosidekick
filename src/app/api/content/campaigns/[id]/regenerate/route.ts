@@ -279,6 +279,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             const updatedUsage = await incrementCreditUsage(userId, creditsCharged);
             console.log("[Campaign Regenerate] Credits charged:", creditsCharged, "for", contentType, "| Used:", updatedUsage.creditsUsed, "/", updatedUsage.totalAvailable);
 
+            // Log to usageLogs for API cost tracking
+            try {
+                const { db: logDb } = await import("@/db");
+                const { usageLogs } = await import("@/db/schema");
+                const estimatedTokens = creditsCharged * 3000;
+                await logDb.insert(usageLogs).values({
+                    userId,
+                    type: "content_regenerate",
+                    agent: "contentCampaign",
+                    inputTokens: 0,
+                    outputTokens: estimatedTokens,
+                    model: getModel("contentCampaign"),
+                    metadata: { creditsCharged, contentType, campaignId: id },
+                });
+            } catch (logErr) {
+                console.error("[Campaign Regenerate] Failed to log usage:", logErr);
+            }
+
             const updatedCampaign = getCampaignSession(id, userId);
             return NextResponse.json({
                 success: true,

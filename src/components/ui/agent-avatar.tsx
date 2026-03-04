@@ -28,6 +28,7 @@ interface AgentAvatarProps {
     style?: React.CSSProperties;
     showBorder?: boolean;
     showGlow?: boolean;
+    priority?: boolean;
 }
 
 // ============================================
@@ -108,6 +109,7 @@ export function AgentAvatar({
                                 style,
                                 showBorder = false,
                                 showGlow = false,
+                                priority = false,
                             }: AgentAvatarProps) {
     const [imageError, setImageError] = useState(false);
 
@@ -159,7 +161,7 @@ export function AgentAvatar({
                     height={sizeConfig.image}
                     className="w-full h-full object-cover"
                     onError={() => setImageError(true)}
-                    priority={size === "lg" || size === "xl" || size === "2xl"}
+                    priority={priority}
                 />
             ) : (
                 // Fallback: Colored background with initials

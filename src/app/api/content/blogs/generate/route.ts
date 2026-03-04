@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/ai-models";
+import { db } from "@/db";
+import { usageLogs } from "@/db/schema";
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -124,9 +126,26 @@ Tone: ${tone}`;
         });
 
         // Extract the generated content
-        const generatedContent = message.content[0].type === "text" 
-            ? message.content[0].text 
+        const generatedContent = message.content[0].type === "text"
+            ? message.content[0].text
             : "";
+
+        // Log token usage for cost tracking
+        const inputTokens = message.usage?.input_tokens || 0;
+        const outputTokens = message.usage?.output_tokens || 0;
+        try {
+            await db.insert(usageLogs).values({
+                userId: session.user.id,
+                type: "content_blog",
+                agent: "contentBlog",
+                inputTokens,
+                outputTokens,
+                model: getModel("contentBlog"),
+                metadata: { topic },
+            });
+        } catch (logErr) {
+            console.error("[Blogs Generate] Failed to log usage:", logErr);
+        }
 
         // Parse frontmatter
         const frontmatterMatch = generatedContent.match(/^---\n([\s\S]*?)\n---/);
