@@ -99,6 +99,28 @@ export const sessions = pgTable(
 );
 
 // ============================================
+// PASSWORD RESET TOKENS
+// ============================================
+
+export const passwordResetTokens = pgTable(
+    "password_reset_tokens",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: uuid("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        token: varchar("token", { length: 255 }).notNull().unique(),
+        expiresAt: timestamp("expires_at").notNull(),
+        usedAt: timestamp("used_at"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("password_reset_tokens_token_idx").on(table.token),
+        index("password_reset_tokens_user_id_idx").on(table.userId),
+    ]
+);
+
+// ============================================
 // SUBSCRIPTIONS & BILLING
 // ============================================
 
@@ -542,6 +564,7 @@ export const contentCampaigns = pgTable(
 export const usersRelations = relations(users, ({ one, many }) => ({
     accounts: many(accounts),
     sessions: many(sessions),
+    passwordResetTokens: many(passwordResetTokens),
     subscription: one(subscriptions),
     monthlyUsage: many(monthlyUsage),
     messagePurchases: many(messagePurchases),
@@ -565,6 +588,13 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const sessionsRelations = relations(sessions, ({ one }) => ({
     user: one(users, {
         fields: [sessions.userId],
+        references: [users.id],
+    }),
+}));
+
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+    user: one(users, {
+        fields: [passwordResetTokens.userId],
         references: [users.id],
     }),
 }));
@@ -743,6 +773,11 @@ export const contentItems = pgTable(
         // Current version reference (for quick access)
         currentVersionId: uuid("current_version_id"),
 
+        // Campaign link
+        campaignId: uuid("campaign_id").references(() => contentCampaigns.id, {
+            onDelete: "set null",
+        }),
+
         // Timestamps
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -755,6 +790,7 @@ export const contentItems = pgTable(
         index("content_items_created_at_idx").on(table.createdAt),
         index("content_items_hero_image_idx").on(table.heroImageId),
         index("content_items_scheduled_for_idx").on(table.scheduledFor),
+        index("content_items_campaign_id_idx").on(table.campaignId),
     ]
 );
 
@@ -847,6 +883,11 @@ export const contentImages = pgTable(
         // Usage tracking
         usageCount: integer("usage_count").default(0).notNull(),
 
+        // Campaign link
+        campaignId: uuid("campaign_id").references(() => contentCampaigns.id, {
+            onDelete: "set null",
+        }),
+
         // Timestamps
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -856,6 +897,7 @@ export const contentImages = pgTable(
         index("content_images_org_id_idx").on(table.organizationId),
         index("content_images_source_idx").on(table.source),
         index("content_images_created_at_idx").on(table.createdAt),
+        index("content_images_campaign_id_idx").on(table.campaignId),
     ]
 );
 
