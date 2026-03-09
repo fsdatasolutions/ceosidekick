@@ -24,6 +24,10 @@ import {
     Lightbulb,
     Save,
     Info,
+    Eye,
+    Globe,
+    Calendar,
+    BarChart3,
 } from "lucide-react";
 
 interface UserStats {
@@ -138,6 +142,38 @@ interface FeedbackCounts {
     closed: number;
 }
 
+// Page Views interfaces
+interface PageViewOverview {
+    totalViews: number;
+    uniqueVisitors: number;
+    todayViews: number;
+    weekViews: number;
+}
+
+interface TopPage {
+    path: string;
+    views: number;
+    uniqueVisitors: number;
+}
+
+interface DailyView {
+    date: string;
+    views: number;
+    uniqueVisitors: number;
+}
+
+interface TopReferrer {
+    referrer: string;
+    views: number;
+}
+
+interface PageViewsData {
+    overview: PageViewOverview;
+    topPages: TopPage[];
+    dailyViews: DailyView[];
+    topReferrers: TopReferrer[];
+}
+
 type SortField = "totalMessages" | "currentMonthUsage" | "conversationCount" | "createdAt" | "name";
 type SortDirection = "asc" | "desc";
 
@@ -208,10 +244,15 @@ export default function AdminPage() {
     const [editingStatus, setEditingStatus] = useState<Record<string, string>>({});
     const [savingFeedback, setSavingFeedback] = useState<string | null>(null);
 
+    // Page Views state
+    const [pageViewsData, setPageViewsData] = useState<PageViewsData | null>(null);
+    const [pageViewsLoading, setPageViewsLoading] = useState(true);
+
     useEffect(() => {
         fetchStats();
         fetchApiCosts();
         fetchFeedback();
+        fetchPageViews();
     }, []);
 
     async function fetchStats() {
@@ -306,6 +347,21 @@ export default function AdminPage() {
             alert("Failed to save feedback update");
         } finally {
             setSavingFeedback(null);
+        }
+    }
+
+    async function fetchPageViews() {
+        try {
+            setPageViewsLoading(true);
+            const res = await fetch("/api/admin/page-views");
+            if (res.ok) {
+                const data = await res.json();
+                setPageViewsData(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch page views:", err);
+        } finally {
+            setPageViewsLoading(false);
         }
     }
 
@@ -731,6 +787,117 @@ export default function AdminPage() {
                                 </p>
                             </div>
                         )}
+                    </>
+                )}
+            </div>
+
+            {/* Site Visits Section */}
+            <div className="bg-white rounded-xl border border-neutral-200 p-6 mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-100 text-indigo-600">
+                        <Eye className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h2 className="font-semibold text-neutral-900">Site Visits</h2>
+                        <p className="text-xs text-neutral-500">Page view analytics across your site</p>
+                    </div>
+                </div>
+
+                {pageViewsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
+                    </div>
+                ) : !pageViewsData || pageViewsData.overview.totalViews === 0 ? (
+                    <div className="text-center py-8">
+                        <Globe className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                        <p className="text-neutral-500 text-sm">No page view data yet</p>
+                        <p className="text-neutral-400 text-xs mt-1">Views will appear here as visitors browse your site</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Overview Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <StatCard icon={Eye} label="Total Views" value={pageViewsData.overview.totalViews} color="indigo" small />
+                            <StatCard icon={Users} label="Unique Visitors" value={pageViewsData.overview.uniqueVisitors} color="purple" small />
+                            <StatCard icon={Calendar} label="Today" value={pageViewsData.overview.todayViews} color="blue" small />
+                            <StatCard icon={BarChart3} label="This Week" value={pageViewsData.overview.weekViews} color="teal" small />
+                        </div>
+
+                        {/* Daily Views Chart (simple bar chart) */}
+                        {pageViewsData.dailyViews.length > 0 && (
+                            <div className="mb-6">
+                                <h3 className="text-sm font-medium text-neutral-700 mb-3">Daily Views (Last 30 Days)</h3>
+                                <div className="flex items-end gap-1 h-32 px-1">
+                                    {pageViewsData.dailyViews.map((day) => {
+                                        const maxViews = Math.max(...pageViewsData.dailyViews.map(d => d.views), 1);
+                                        const height = Math.max((day.views / maxViews) * 100, 2);
+                                        const date = new Date(day.date + "T00:00:00");
+                                        const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                        return (
+                                            <div
+                                                key={day.date}
+                                                className="flex-1 group relative"
+                                                title={`${label}: ${day.views} views, ${day.uniqueVisitors} unique`}
+                                            >
+                                                <div
+                                                    className="bg-indigo-400 hover:bg-indigo-500 rounded-t transition-colors w-full"
+                                                    style={{ height: `${height}%` }}
+                                                />
+                                                <div className="hidden group-hover:block absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                                                    {label}: {day.views} views
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex justify-between text-xs text-neutral-400 mt-1 px-1">
+                                    <span>
+                                        {pageViewsData.dailyViews.length > 0 &&
+                                            new Date(pageViewsData.dailyViews[0].date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                    </span>
+                                    <span>
+                                        {pageViewsData.dailyViews.length > 0 &&
+                                            new Date(pageViewsData.dailyViews[pageViewsData.dailyViews.length - 1].date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Top Pages & Top Referrers side by side */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Top Pages */}
+                            <div>
+                                <h3 className="text-sm font-medium text-neutral-700 mb-3">Top Pages</h3>
+                                <div className="space-y-2">
+                                    {pageViewsData.topPages.slice(0, 10).map((page) => (
+                                        <div key={page.path} className="flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-50">
+                                            <span className="text-sm text-neutral-700 truncate mr-3 font-mono">{page.path}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <span className="text-sm font-medium text-neutral-900">{page.views.toLocaleString()}</span>
+                                                <span className="text-xs text-neutral-400">{page.uniqueVisitors} unique</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Top Referrers */}
+                            <div>
+                                <h3 className="text-sm font-medium text-neutral-700 mb-3">Top Referrers</h3>
+                                {pageViewsData.topReferrers.length === 0 ? (
+                                    <p className="text-sm text-neutral-400 px-3 py-2">No referrer data yet</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {pageViewsData.topReferrers.slice(0, 10).map((ref) => (
+                                            <div key={ref.referrer} className="flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-50">
+                                                <span className="text-sm text-neutral-700 truncate mr-3">{ref.referrer}</span>
+                                                <span className="text-sm font-medium text-neutral-900 shrink-0">{ref.views.toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </>
                 )}
             </div>

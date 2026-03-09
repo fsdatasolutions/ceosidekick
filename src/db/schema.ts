@@ -783,6 +783,31 @@ export const goalStepsRelations = relations(goalSteps, ({ one }) => ({
 }));
 
 // ============================================
+// PAGE VIEWS (Site Visit Tracking)
+// ============================================
+
+export const pageViews = pgTable(
+    "page_views",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        path: varchar("path", { length: 500 }).notNull(),
+        referrer: varchar("referrer", { length: 1000 }),
+        userAgent: varchar("user_agent", { length: 500 }),
+        country: varchar("country", { length: 100 }),
+        // Anonymous visitor ID (hashed IP + user agent, no PII stored)
+        visitorId: varchar("visitor_id", { length: 64 }),
+        // Optional: logged-in user
+        userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("page_views_path_idx").on(table.path),
+        index("page_views_created_at_idx").on(table.createdAt),
+        index("page_views_visitor_id_idx").on(table.visitorId),
+    ]
+);
+
+// ============================================
 // CONTENT ENGINE SCHEMA
 // Add this to src/db/schema.ts
 // ============================================
