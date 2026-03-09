@@ -163,14 +163,20 @@ export default function OnboardingPage() {
     const handleComplete = async () => {
         setIsSaving(true);
         try {
-            await fetch("/api/onboarding", {
+            const res = await fetch("/api/onboarding", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ data: {}, complete: true }),
             });
+            if (!res.ok) {
+                console.error("[Onboarding] Failed to complete onboarding");
+                setIsSaving(false);
+                return;
+            }
             // Refresh the JWT token so middleware knows onboarding is done
             await update();
-            router.push("/dashboard");
+            // Use hard navigation to ensure middleware sees the fresh JWT cookie
+            window.location.href = "/dashboard";
         } catch (error) {
             console.error("[Onboarding] Error completing:", error);
             setIsSaving(false);
@@ -181,9 +187,16 @@ export default function OnboardingPage() {
     const handleSkip = async () => {
         setIsSaving(true);
         try {
-            await fetch("/api/onboarding/skip", { method: "POST" });
+            const res = await fetch("/api/onboarding/skip", { method: "POST" });
+            if (!res.ok) {
+                console.error("[Onboarding] Failed to skip onboarding");
+                setIsSaving(false);
+                return;
+            }
+            // Refresh the JWT token so middleware knows onboarding is done
             await update();
-            router.push("/dashboard");
+            // Use hard navigation to ensure middleware sees the fresh JWT cookie
+            window.location.href = "/dashboard";
         } catch (error) {
             console.error("[Onboarding] Error skipping:", error);
             setIsSaving(false);
