@@ -201,6 +201,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
+      // If the token still says onboarding is not completed, re-check the DB.
+      // This handles the case where the user completed/skipped onboarding but
+      // the JWT cookie was never refreshed (e.g., update() failed silently).
+      // Once the DB confirms completion, the token self-corrects and this
+      // check stops running on subsequent requests.
+      if (token.onboardingCompleted === false && token.id && !user) {
+        const db = await getDb();
+        if (db) {
+          const { users } = await getSchema();
+          const result = await db
+            .select({ onboardingCompleted: users.onboardingCompleted })
+            .from(users)
+            .where(eq(users.id, token.id as string))
+            .limit(1);
+          if (result[0]?.onboardingCompleted === true) {
+            token.onboardingCompleted = true;
+          }
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
