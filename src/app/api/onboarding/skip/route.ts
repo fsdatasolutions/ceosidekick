@@ -37,7 +37,20 @@ export async function POST() {
             .set({ onboardingCompleted: true, updatedAt: new Date() })
             .where(eq(users.id, session.user.id));
 
-        return NextResponse.json({ success: true });
+        const response = NextResponse.json({ success: true });
+
+        // Set a short-lived cookie so the middleware knows onboarding was just
+        // completed, even before the JWT cookie is refreshed. This prevents the
+        // redirect loop where the stale JWT still has onboardingCompleted=false.
+        response.cookies.set("onboarding_done", "1", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 60, // 60 seconds — just long enough for the redirect
+        });
+
+        return response;
     } catch (error) {
         console.error("[Onboarding] Skip error:", error);
         return NextResponse.json(

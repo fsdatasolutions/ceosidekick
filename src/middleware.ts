@@ -50,16 +50,26 @@ export default auth((req) => {
 
   // Redirect to onboarding if logged in but hasn't completed onboarding
   // Uses strict === false so existing tokens without the field aren't affected
+  // Also checks for the short-lived "onboarding_done" cookie set by the
+  // skip/complete API — this prevents a redirect loop when the JWT hasn't
+  // been refreshed yet but the DB already has onboardingCompleted=true.
+  const onboardingDone = req.cookies.get("onboarding_done")?.value === "1";
   if (
     isLoggedIn &&
     isProtectedRoute &&
     !isOnboardingExempt &&
-    req.auth?.user?.onboardingCompleted === false
+    req.auth?.user?.onboardingCompleted === false &&
+    !onboardingDone
   ) {
     return NextResponse.redirect(new URL("/onboarding", nextUrl.origin));
   }
 
-  return NextResponse.next();
+  // If the bypass cookie was used, clear it so it doesn't persist
+  const response = NextResponse.next();
+  if (onboardingDone) {
+    response.cookies.delete("onboarding_done");
+  }
+  return response;
 });
 
 export const config = {

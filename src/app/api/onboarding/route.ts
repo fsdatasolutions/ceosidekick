@@ -87,7 +87,23 @@ export async function POST(request: NextRequest) {
                 .where(eq(users.id, session.user.id));
         }
 
-        return NextResponse.json({ success: true });
+        const response = NextResponse.json({ success: true });
+
+        // When completing onboarding, set a short-lived cookie so the middleware
+        // knows onboarding was just finished, even before the JWT is refreshed.
+        // This prevents the redirect loop where the stale JWT still has
+        // onboardingCompleted=false.
+        if (complete) {
+            response.cookies.set("onboarding_done", "1", {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                path: "/",
+                maxAge: 60, // 60 seconds — just long enough for the redirect
+            });
+        }
+
+        return response;
     } catch (error) {
         console.error("[Onboarding] POST error:", error);
         return NextResponse.json(
