@@ -72,7 +72,7 @@ export const TIERS: Record<TierType, TierConfig> = {
     priceDisplay: "$0",
     creditsPerMonth: 15,
     companyLibraryStorageMB: 5,
-    description: "Explore everything CEO Sidekick offers",
+    description: "Explore the full suite of AI business tools",
     features: [
       "15 credits/month",
       "All 7 AI advisors",

@@ -64,7 +64,7 @@ const roadmap: RoadmapPhase[] = [
             {
                 title: "Round Table",
                 description:
-                    "Multi-advisor boardroom where you get synthesized perspectives from your entire virtual C-suite.",
+                    "Multi-advisor boardroom where you get synthesized perspectives from multiple AI advisors simultaneously.",
                 status: "shipped",
                 icon: Users,
             },
@@ -162,7 +162,7 @@ export default function RoadmapPage() {
                         Where we&apos;re headed
                     </h1>
                     <p className="text-lg sm:text-xl text-neutral-500 max-w-2xl mx-auto leading-relaxed">
-                        Our vision for building the most comprehensive AI advisory platform
+                        Our vision for building the most comprehensive AI-powered toolkit
                         for entrepreneurs and growing businesses.
                     </p>
                 </div>

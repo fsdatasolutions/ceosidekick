@@ -1,68 +1,68 @@
 "use client";
 
 import {
-  Clock,
-  DollarSign,
-  Brain,
-  Shield,
-  Zap,
-  Users
+  MessageSquare,
+  FileText,
+  FolderOpen,
+  PenTool,
+  Target,
+  MessagesSquare
 } from "lucide-react";
 
 const features = [
   {
-    icon: Clock,
-    title: "24/7 Availability",
+    icon: MessageSquare,
+    title: "AI Advisors",
     description:
-        "Get executive-level guidance whenever you need it. No waiting for appointments or callbacks.",
+        "Chat with 7 specialized AI advisors across strategy, technology, legal, HR, marketing, sales, and content. Context-aware guidance 24/7.",
   },
   {
-    icon: DollarSign,
-    title: "99% Cost Savings",
+    icon: FileText,
+    title: "Document Templates",
     description:
-        "Access C-suite expertise for less than $100/month vs. $500K+ for a traditional executive team.",
+        "Generate professional business documents — contracts, plans, reports, proposals — tailored to your company context in seconds.",
   },
   {
-    icon: Brain,
-    title: "Deep Business Context",
+    icon: FolderOpen,
+    title: "Company Library",
     description:
-        "Our AI learns your business, industry, and preferences to provide personalized strategic advice.",
+        "Upload your business documents and build a searchable knowledge base. Your AI advisors reference your data for personalized answers.",
   },
   {
-    icon: Shield,
-    title: "Confidential & Secure",
+    icon: PenTool,
+    title: "Content Engine",
     description:
-        "Enterprise-grade security with full data isolation. Your business information stays private.",
+        "Create blog posts, LinkedIn articles, social media content, newsletters, and marketing campaigns — all with AI assistance.",
   },
   {
-    icon: Zap,
-    title: "Instant Expertise",
+    icon: Target,
+    title: "Goals & Action Plans",
     description:
-        "From tech strategy to legal questions, get informed answers in seconds, not days.",
+        "Set business goals, get AI-generated action plans with milestones, and track your progress step by step.",
   },
   {
-    icon: Users,
-    title: "Team Collaboration",
+    icon: MessagesSquare,
+    title: "Round Table",
     description:
-        "Share conversations with your team and build a knowledge base of strategic decisions.",
+        "Bring multiple AI advisors together in a single conversation for cross-functional perspectives on complex business decisions.",
   },
 ];
 
 export function Features() {
   return (
-      <section id="features" className="py-24 bg-white">
+      <section id="tools" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
             <p className="text-primary-red font-semibold text-sm uppercase tracking-wide mb-3">
-              Why CEO Sidekick
+              Your Business Toolkit
             </p>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-neutral-900 mb-4">
-              Executive guidance without the executive price tag
+              Everything your business needs, powered by AI
             </h2>
             <p className="text-lg text-neutral-600">
-              Stop Googling business decisions. Get real strategic advice from AI advisors
-              trained on best practices across every business function.
+              Six integrated tools designed for small businesses and entrepreneurs.
+              From expert advice to content creation — stop cobbling together a dozen apps.
             </p>
           </div>
 
@@ -89,7 +89,7 @@ export function Features() {
           {/* Stats */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { value: "50+", label: "Business Functions Covered" },
+              { value: "6", label: "AI-Powered Tools" },
               { value: "24/7", label: "Always Available" },
               { value: "99%", label: "Cost Savings vs. Hiring" },
               { value: "<10s", label: "Average Response Time" },

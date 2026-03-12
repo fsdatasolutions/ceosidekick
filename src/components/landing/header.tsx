@@ -10,7 +10,7 @@ import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { href: "/#features", label: "Features" },
-  { href: "/#agents", label: "AI Advisors" },
+  { href: "/#tools", label: "Tools" },
   { href: "/#pricing", label: "Pricing" },
   { href: "/#testimonials", label: "Testimonials" },
   { href: "/about", label: "About" },
@@ -47,7 +47,7 @@ export function Header() {
               <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20 group-hover:shadow-xl group-hover:shadow-primary-red/30 transition-all duration-200">
                 <img
                     src="/images/robin-logo.png"
-                    alt="CEO Sidekick logo — AI-powered business advisory platform"
+                    alt="CEO Sidekick logo — AI-powered business tools for entrepreneurs"
                     className="w-6 h-6 object-contain"
                 />
               </div>
@@ -56,7 +56,7 @@ export function Header() {
                 CEO Sidekick
               </span>
                 <span className="text-[10px] text-neutral-500 font-medium tracking-wide uppercase">
-                AI-Powered C-Suite
+                AI-Powered Business Tools
               </span>
               </div>
             </Link>

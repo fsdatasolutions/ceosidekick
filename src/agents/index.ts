@@ -208,9 +208,9 @@ export const agentUIConfigs: Record<AgentType, AgentUIConfig> = {
     roundtable: {
         id: "roundtable",
         name: "Round Table",
-        subtitle: "C-Suite Boardroom",
+        subtitle: "Multi-Advisor Collaboration",
         description:
-            "Get multi-perspective guidance from your entire virtual C-suite in one conversation",
+            "Get multi-perspective guidance from multiple AI advisors in one conversation",
         color: "bg-accent-gold",
         lightColor: "bg-amber-50",
         textColor: "text-accent-gold",

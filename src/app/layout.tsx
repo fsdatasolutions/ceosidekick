@@ -7,20 +7,21 @@ import "./globals.css";
 export const metadata: Metadata = {
     metadataBase: new URL("https://ceosidekick.biz"),
     title: {
-        default: "CEO Sidekick — AI Business Advisors for Small Business",
+        default: "CEO Sidekick — AI-Powered Tools for Small Business",
         template: "%s | CEO Sidekick",
     },
     description:
-        "Get 24/7 access to 7 AI-powered C-suite advisors for strategy, legal, HR, marketing, sales, and more. Executive guidance at a fraction of the cost.",
+        "AI-powered business tools for small businesses and entrepreneurs. Expert advisors, document templates, content creation, goal tracking, and a company knowledge base — all in one platform.",
     keywords: [
-        "AI business advisor",
-        "virtual CTO",
+        "AI business tools",
         "small business AI",
-        "AI executive coach",
-        "business strategy AI",
-        "AI legal advisor",
-        "AI HR partner",
-        "AI marketing advisor",
+        "AI business advisor",
+        "AI content creation",
+        "business document templates",
+        "AI goal tracking",
+        "AI knowledge base",
+        "entrepreneur tools",
+        "virtual CTO",
         "CEO Sidekick",
     ],
     authors: [{ name: "CEO Sidekick" }],
@@ -30,23 +31,23 @@ export const metadata: Metadata = {
         locale: "en_US",
         url: "https://ceosidekick.biz",
         siteName: "CEO Sidekick",
-        title: "CEO Sidekick — AI Business Advisors for Small Business",
+        title: "CEO Sidekick — AI-Powered Tools for Small Business",
         description:
-            "Get 24/7 access to 7 AI business advisors for strategy, legal, HR, marketing, sales, and content creation. Expert guidance for small business — try it free.",
+            "AI-powered business tools for entrepreneurs: expert advisors, document templates, content engine, goal tracking, and a company knowledge base. Try it free.",
         images: [
             {
                 url: "/images/og-image.png",
                 width: 1200,
                 height: 630,
-                alt: "CEO Sidekick — Your AI-Powered C-Suite",
+                alt: "CEO Sidekick — AI-Powered Tools for Small Business",
             },
         ],
     },
     twitter: {
         card: "summary_large_image",
-        title: "CEO Sidekick — AI Business Advisors for Small Business",
+        title: "CEO Sidekick — AI-Powered Tools for Small Business",
         description:
-            "Get 24/7 access to 7 AI business advisors for strategy, legal, HR, marketing, sales, and content creation. Expert guidance for small business — try it free.",
+            "AI-powered business tools for entrepreneurs: expert advisors, document templates, content engine, goal tracking, and a company knowledge base. Try it free.",
         images: ["/images/og-image.png"],
     },
     robots: {
@@ -74,14 +75,14 @@ const jsonLd = {
     operatingSystem: "Web",
     url: "https://ceosidekick.biz",
     description:
-        "AI-powered business advisory platform with 7 virtual C-suite advisors for small businesses.",
+        "AI-powered business toolkit for small businesses — expert advisors, document templates, content creation, goal tracking, and a company knowledge base.",
     offers: [
         {
             "@type": "Offer",
             name: "Free",
             price: "0",
             priceCurrency: "USD",
-            description: "30 messages/month with all 7 AI advisors",
+            description: "15 credits/month with all AI-powered tools and advisors",
         },
         {
             "@type": "Offer",

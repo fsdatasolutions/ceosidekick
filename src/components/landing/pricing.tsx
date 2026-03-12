@@ -21,7 +21,7 @@ export function Pricing() {
               Choose the plan that fits your business
             </h2>
             <p className="text-lg text-neutral-600">
-              Start free, upgrade when you&apos;re ready. All plans include access to every AI advisor.
+              Start free, upgrade when you&apos;re ready. All plans include every tool in the suite.
             </p>
           </div>
 

@@ -9,7 +9,7 @@ const footerLinks = {
     title: "Product",
     links: [
       { label: "Features", href: "#features" },
-      { label: "AI Advisors", href: "#agents" },
+      { label: "Tools", href: "#tools" },
       { label: "Pricing", href: "#pricing" },
       { label: "Roadmap", href: "/roadmap" },
     ],
@@ -50,7 +50,7 @@ export function Footer() {
                   <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary-red/20">
                     <img
                         src="/images/robin-logo.png"
-                        alt="CEO Sidekick logo — AI-powered business advisory platform"
+                        alt="CEO Sidekick logo — AI-powered business tools for entrepreneurs"
                         className="w-6 h-6 object-contain"
                     />
                   </div>
@@ -61,8 +61,8 @@ export function Footer() {
                   </div>
                 </Link>
                 <p className="text-neutral-400 text-sm leading-relaxed mb-6 max-w-xs">
-                  Your AI-powered C-suite. On-demand access to executive-level
-                  guidance across strategy, technology, legal, HR, and more.
+                  AI-powered tools for small businesses and entrepreneurs. Expert advisors,
+                  document templates, content creation, goal tracking, and more — all in one platform.
                 </p>
                 <div className="flex gap-4">
                   {socialLinks

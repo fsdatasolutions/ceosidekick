@@ -19,14 +19,15 @@ export function Agents() {
           {/* Section Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
             <p className="text-primary-red font-semibold text-sm uppercase tracking-wide mb-3">
-              Meet Your AI Advisors
+              AI Advisors
             </p>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-neutral-900 mb-4">
-              A complete C-suite at your fingertips
+              Expert guidance across every business function
             </h2>
             <p className="text-lg text-neutral-600">
-              Seven specialized AI advisors, each trained on best practices in their domain.
-              Switch between advisors seamlessly based on your current challenge.
+              One of six tools in the CEO Sidekick suite. Seven specialized AI advisors,
+              each trained on best practices in their domain. Switch between them seamlessly
+              based on your current challenge.
             </p>
           </div>
 

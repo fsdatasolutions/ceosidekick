@@ -31,7 +31,7 @@ const organizationJsonLd = {
     url: "https://ceosidekick.biz",
     logo: "https://ceosidekick.biz/images/robin-logo.png",
     description:
-        "AI-powered business advisory platform providing entrepreneurs and small businesses access to specialized AI C-suite advisors.",
+        "AI-powered business toolkit providing entrepreneurs and small businesses a complete suite of tools — expert advisors, document templates, content creation, goal tracking, and a company knowledge base.",
     founder: {
         "@type": "Person",
         name: "Shannon",
@@ -141,15 +141,15 @@ export default function AboutPage() {
                             Building the future of business advisory
                         </p>
                         <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-neutral-900 mb-6">
-                            Your AI-Powered{" "}
+                            AI-Powered Tools for{" "}
                             <span className="bg-gradient-to-r from-[#C8102E] via-[#FFB81C] to-[#00778B] bg-clip-text text-transparent">
-                C-Suite
+                Every Entrepreneur
               </span>
                         </h1>
                         <p className="text-lg sm:text-xl text-neutral-500 max-w-2xl mx-auto leading-relaxed">
-                            CEO Sidekick gives entrepreneurs and small business owners 24/7
-                            access to AI-powered executive advisors — so you can make smarter
-                            decisions, faster.
+                            CEO Sidekick gives entrepreneurs and small businesses a complete suite
+                            of AI-powered tools — from expert advisors to document templates, content
+                            creation, goal tracking, and more — so you can make smarter decisions, faster.
                         </p>
                     </div>
                 </section>
@@ -214,7 +214,7 @@ export default function AboutPage() {
                         {/* Stats bar */}
                         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 p-8 rounded-2xl bg-white border border-neutral-200 shadow-sm">
                             {[
-                                { value: "7", label: "AI Advisors" },
+                                { value: "6", label: "AI-Powered Tools" },
                                 { value: "33M+", label: "Small Businesses Underserved" },
                                 { value: "24/7", label: "Availability" },
                                 { value: "< $1", label: "Per Consultation" },
@@ -291,8 +291,8 @@ export default function AboutPage() {
                                         actually afford — became the spark for CEO Sidekick. By
                                         combining deep expertise in AI, cloud architecture, and
                                         business operations, Shannon set out to build an advisory
-                                        platform that puts a full C-suite in every entrepreneur&#39;s
-                                        pocket.
+                                        platform that puts a complete AI-powered business toolkit in every
+                                        entrepreneur&#39;s pocket.
                                     </p>
                                     <p>
                                         CEO Sidekick is bootstrapped and self-funded, reflecting
@@ -322,9 +322,10 @@ export default function AboutPage() {
                                 id="advisors-heading"
                                 className="font-display text-3xl sm:text-4xl font-bold text-neutral-900 mb-4"
                             >
-                                Seven specialized AI advisors, one unified platform
+                                Seven specialized AI advisors — one key part of the toolkit
                             </h2>
                             <p className="text-neutral-500 text-lg max-w-2xl mx-auto">
+                                AI advisors are one of six tools in the CEO Sidekick suite.
                                 Each advisor brings deep domain expertise to help you navigate
                                 the challenges of running and growing your business.
                             </p>
@@ -386,7 +387,7 @@ export default function AboutPage() {
                                 </div>
                                 <p className="text-neutral-600 text-sm leading-relaxed">
                                     Bring multiple advisors together in a single conversation.
-                                    Get synthesized perspectives from your entire virtual C-suite
+                                    Get synthesized perspectives from multiple AI advisors
                                     on complex, cross-functional decisions.
                                 </p>
                             </article>
@@ -456,11 +457,11 @@ export default function AboutPage() {
                             id="cta-heading"
                             className="font-display text-3xl sm:text-4xl font-bold text-neutral-900 mb-6"
                         >
-                            Ready to meet your advisory team?
+                            Ready to try the full toolkit?
                         </h2>
                         <p className="text-neutral-600 text-lg mb-10 max-w-xl mx-auto">
-                            Start with 30 free messages per month. No credit card required.
-                            Get answers from 7 specialized AI advisors in seconds.
+                            Start with 15 free credits per month. No credit card required.
+                            Access all 6 AI-powered tools in seconds.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <Link

@@ -418,7 +418,7 @@ export default async function DashboardPage() {
                 Chat with Advisors
               </h3>
               <p className="text-sm text-neutral-500 mb-3">
-                Get expert guidance from your AI C-suite on strategy, tech, legal, HR, and more.
+                Get expert guidance from 7 specialized AI advisors on strategy, tech, legal, HR, and more.
               </p>
               {/* Mini advisor avatars */}
               <div className="flex items-center gap-1">

@@ -7,8 +7,8 @@ import { AgentAvatar } from "@/components/ui/agent-avatar";
 
 const benefits = [
   "No credit card required",
-  "30 free messages/month",
-  "Access all AI advisors",
+  "15 free credits/month",
+  "All tools included",
 ];
 
 export function Hero() {
@@ -36,14 +36,14 @@ export function Hero() {
 
               {/* Headline */}
               <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-neutral-900 leading-tight mb-6 animate-fade-up stagger-1">
-                Your AI-Powered{" "}
-                <span className="gradient-text">C-Suite</span>
+                AI-Powered Tools for{" "}
+                <span className="gradient-text">Your Business</span>
               </h1>
 
               {/* Subheadline */}
               <p className="text-lg sm:text-xl text-neutral-600 leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0 animate-fade-up stagger-2">
-                On-demand access to AI executive advisors across strategy, technology,
-                legal, HR, and more. Enterprise-grade guidance at a fraction of the cost.
+                Expert AI advisors, document templates, content creation, goal tracking,
+                and a company knowledge base — everything your small business needs to grow, in one platform.
               </p>
 
               {/* CTA Buttons */}

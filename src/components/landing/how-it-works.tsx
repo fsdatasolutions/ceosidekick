@@ -7,17 +7,17 @@ const steps = [
   {
     number: "01",
     icon: MessageSquare,
-    title: "Ask Any Business Question",
+    title: "Tell Us About Your Business",
     description:
-        "Type your question in plain English. Whether it\u2019s about hiring, technology, legal matters, or strategy \u2014 just ask like you would a trusted advisor.",
+        "Set up your business profile in minutes. CEO Sidekick learns your industry, goals, and challenges to personalize every tool in the suite.",
     color: "bg-primary-red",
   },
   {
     number: "02",
     icon: Sparkles,
-    title: "Get Expert-Level Guidance",
+    title: "Pick the Right Tool",
     description:
-        "Our AI advisors analyze your question using best practices from top consultants, executives, and industry experts. Get actionable advice in seconds.",
+        "Need strategic advice? Chat with an AI advisor. Creating content? Fire up the Content Engine. Drafting a contract? Use Templates. Every tool is purpose-built for a specific business need.",
     color: "bg-accent-gold",
   },
   {
@@ -25,7 +25,7 @@ const steps = [
     icon: TrendingUp,
     title: "Grow Your Business",
     description:
-        "Make confident decisions backed by strategic analysis. Build a knowledge base of your key decisions and continue the conversation as your business evolves.",
+        "Set goals, track progress, build your company knowledge base, and keep iterating. CEO Sidekick grows with you as your business evolves.",
     color: "bg-accent-teal",
   },
 ];
@@ -43,8 +43,8 @@ export function HowItWorks() {
               How CEO Sidekick works
             </h2>
             <p className="text-lg text-neutral-600">
-              Get strategic business guidance in three simple steps.
-              No complex setup, no learning curve.
+              From setup to results in minutes.
+              No complex onboarding, no learning curve.
             </p>
           </div>
 
@@ -90,18 +90,19 @@ export function HowItWorks() {
               {/* Left Content */}
               <div>
                 <h3 className="font-display text-2xl lg:text-3xl font-bold text-white mb-4">
-                  Real conversations, real results
+                  Built for how you actually work
                 </h3>
                 <p className="text-neutral-400 text-lg mb-6 leading-relaxed">
-                  Our AI advisors don&apos;t just give generic answers. They ask clarifying
-                  questions, consider your specific context, and provide actionable recommendations.
+                  Every tool in CEO Sidekick understands your business context. Your company profile,
+                  uploaded documents, and conversation history inform every response — whether you&apos;re
+                  chatting with an advisor, generating content, or building a template.
                 </p>
                 <div className="space-y-4">
                   {[
-                    "Context-aware responses based on your industry",
-                    "Follow-up questions to understand your needs",
-                    "Actionable next steps, not just information",
-                    "Conversation history for ongoing projects",
+                    "Context-aware across all tools, not just chat",
+                    "Documents and templates tailored to your business",
+                    "AI-generated action plans you can actually execute",
+                    "Everything connected through your Company Library",
                   ].map((item, index) => (
                       <div key={index} className="flex items-center gap-3">
                         <div className="w-5 h-5 rounded-full bg-accent-gold flex items-center justify-center flex-shrink-0" aria-hidden="true">

@@ -8,7 +8,7 @@ import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 const benefits = [
   "50 free messages/month",
-  "Access all 7 AI advisors",
+  "All AI-powered tools included",
   "10MB document storage",
   "No credit card required",
 ];
@@ -106,7 +106,7 @@ export default function SignupPage() {
             Start your free trial
           </h1>
           <p className="text-neutral-600">
-            Get instant access to your AI-powered C-suite
+            Get instant access to AI-powered business tools
           </p>
         </div>
 

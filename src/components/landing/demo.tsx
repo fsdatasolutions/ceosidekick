@@ -10,11 +10,11 @@ export function Demo() {
             See It In Action
           </span>
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-neutral-900 mb-4">
-            Your AI Advisory Board at Work
+            See the Full Toolkit in Action
           </h2>
           <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
-            Watch how CEO Sidekick personalizes advice to your specific business context 
-            and provides expert guidance across multiple domains.
+            Watch how CEO Sidekick helps you get expert advice, create content,
+            track goals, and manage your business — all from one platform.
           </p>
         </div>
 

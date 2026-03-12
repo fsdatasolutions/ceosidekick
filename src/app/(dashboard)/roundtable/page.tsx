@@ -730,7 +730,7 @@ function RoundTableContent() {
                             </div>
                             <div>
                                 <h1 className="text-lg font-semibold text-neutral-900">Round Table</h1>
-                                <p className="text-sm text-neutral-500">Your virtual C-suite boardroom</p>
+                                <p className="text-sm text-neutral-500">Multi-advisor collaboration</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -759,7 +759,7 @@ function RoundTableContent() {
                                 </div>
                                 <h2 className="text-xl font-semibold text-neutral-800 mb-3">Welcome to the Round Table</h2>
                                 <p className="text-neutral-500 mb-8">
-                                    Ask any business question and get synthesized perspectives from your virtual C-suite.
+                                    Ask any business question and get synthesized perspectives from multiple AI advisors.
                                     The most relevant advisors will automatically weigh in, or you can choose specific ones.
                                 </p>
                                 <div className="flex items-center justify-center gap-3 mb-8">
@@ -918,7 +918,7 @@ function RoundTableContent() {
 
                         <form onSubmit={handleSubmit} className="relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                        placeholder={usage && !usage.canUseCredits ? "Credit limit reached — upgrade to continue" : "Ask your virtual C-suite anything..."}
+                        placeholder={usage && !usage.canUseCredits ? "Credit limit reached — upgrade to continue" : "Ask your AI advisors anything..."}
                         rows={1} disabled={isInputDisabled}
                         className="w-full resize-none rounded-xl border border-neutral-200 pl-4 pr-14 py-3 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed" />
                             <Button type="submit" size="icon" disabled={!input.trim() || isInputDisabled}
