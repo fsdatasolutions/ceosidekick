@@ -24,63 +24,60 @@ function authorSlug(name: string): string {
 
 function PostCard({ post }: { post: BlogPostMeta }) {
   return (
-    <article className="group">
-      <Link href={`/blog/${post.slug}`} className="block">
-        <div className="rounded-2xl border border-neutral-200 bg-white overflow-hidden transition-all duration-200 hover:border-neutral-300 hover:shadow-sm">
-          {post.heroImage && (
-            <div className="aspect-video overflow-hidden">
-              <Image
-                src={post.heroImage}
-                alt={post.title}
-                width={600}
-                height={338}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-            </div>
+    <article className="group relative rounded-2xl border border-neutral-200 bg-white overflow-hidden transition-all duration-200 hover:border-neutral-300 hover:shadow-sm">
+      {post.heroImage && (
+        <div className="aspect-video overflow-hidden">
+          <Image
+            src={post.heroImage}
+            alt={post.title}
+            width={600}
+            height={338}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        </div>
+      )}
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <Link
+            href={`/blog/category/${categorySlug(post.category)}`}
+            className="relative z-10 text-xs font-semibold uppercase tracking-wider text-primary-red hover:text-primary-red-hover transition-colors duration-200"
+          >
+            {post.category}
+          </Link>
+          <span className="text-neutral-300">|</span>
+          <span className="text-xs text-neutral-400">
+            {post.readingTime}
+          </span>
+        </div>
+        <h3 className="font-display text-lg font-bold text-neutral-900 mb-2 line-clamp-2 transition-colors duration-200 group-hover:text-primary-red">
+          <Link href={`/blog/${post.slug}`} className="after:absolute after:inset-0">
+            {post.title}
+          </Link>
+        </h3>
+        <p className="text-neutral-500 text-sm leading-relaxed line-clamp-2 mb-4">
+          {post.description}
+        </p>
+        <div className="flex items-center gap-3">
+          {post.author.image && (
+            <Image
+              src={post.author.image}
+              alt={post.author.name}
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-full object-cover"
+            />
           )}
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <Link
-                href={`/blog/category/${categorySlug(post.category)}`}
-                onClick={(e) => e.stopPropagation()}
-                className="text-xs font-semibold uppercase tracking-wider text-primary-red hover:text-primary-red-hover transition-colors duration-200"
-              >
-                {post.category}
-              </Link>
-              <span className="text-neutral-300">|</span>
-              <span className="text-xs text-neutral-400">
-                {post.readingTime}
-              </span>
-            </div>
-            <h3 className="font-display text-lg font-bold text-neutral-900 mb-2 line-clamp-2 transition-colors duration-200 group-hover:text-primary-red">
-              {post.title}
-            </h3>
-            <p className="text-neutral-500 text-sm leading-relaxed line-clamp-2 mb-4">
-              {post.description}
-            </p>
-            <div className="flex items-center gap-3">
-              {post.author.image && (
-                <Image
-                  src={post.author.image}
-                  alt={post.author.name}
-                  width={32}
-                  height={32}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              )}
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium text-neutral-700">
-                  {post.author.name}
-                </span>
-                <span className="text-neutral-300">&middot;</span>
-                <span className="text-neutral-400">
-                  {formatDate(post.pubDate)}
-                </span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-neutral-700">
+              {post.author.name}
+            </span>
+            <span className="text-neutral-300">&middot;</span>
+            <span className="text-neutral-400">
+              {formatDate(post.pubDate)}
+            </span>
           </div>
         </div>
-      </Link>
+      </div>
     </article>
   );
 }
