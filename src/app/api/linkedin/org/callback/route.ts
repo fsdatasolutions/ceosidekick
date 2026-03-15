@@ -85,8 +85,19 @@ export async function GET(request: NextRequest) {
             )
             .limit(1);
 
+        if (existing.length > 0 && existing[0].userId !== userId) {
+            const force = request.cookies.get("linkedin_org_oauth_force")?.value === "true";
+            if (!force) {
+                const redirectUrl = new URL("/settings", process.env.NEXTAUTH_URL || "http://localhost:3000");
+                redirectUrl.searchParams.set("linkedin_org", "confirm_reassign");
+                const response = NextResponse.redirect(redirectUrl);
+                response.cookies.delete("linkedin_org_oauth_state");
+                return response;
+            }
+        }
+
         if (existing.length > 0) {
-            // Update existing org account (reassign to current user)
+            // Update existing org account (reassign to current user if needed)
             await db
                 .update(accounts)
                 .set({
@@ -123,6 +134,7 @@ export async function GET(request: NextRequest) {
 
         const response = NextResponse.redirect(redirectUrl);
         response.cookies.delete("linkedin_org_oauth_state");
+        response.cookies.delete("linkedin_org_oauth_force");
 
         return response;
     } catch (error) {

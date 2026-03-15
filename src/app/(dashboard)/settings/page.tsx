@@ -166,12 +166,14 @@ export default function SettingsPage() {
   const { status: linkedInStatus, loading: linkedInLoading, refetch: refetchLinkedIn } = useLinkedInStatus();
   const [disconnecting, setDisconnecting] = useState(false);
   const [linkedInMessage, setLinkedInMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showLinkedInReassign, setShowLinkedInReassign] = useState(false);
   const searchParams = useSearchParams();
 
   // LinkedIn org connection
   const { status: linkedInOrgStatus, loading: linkedInOrgLoading, refetch: refetchLinkedInOrg } = useLinkedInOrgStatus();
   const [disconnectingOrg, setDisconnectingOrg] = useState(false);
   const [linkedInOrgMessage, setLinkedInOrgMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showLinkedInOrgReassign, setShowLinkedInOrgReassign] = useState(false);
 
   // Handle LinkedIn callback query params (personal + org)
   useEffect(() => {
@@ -181,6 +183,10 @@ export default function SettingsPage() {
       refetchLinkedIn();
       window.history.replaceState({}, "", "/settings");
       setTimeout(() => setLinkedInMessage(null), 5000);
+    } else if (linkedInParam === "confirm_reassign") {
+      setLinkedInMessage({ type: "error", text: "This LinkedIn account is already connected to another account. It will be unlinked from that account if you continue." });
+      setShowLinkedInReassign(true);
+      window.history.replaceState({}, "", "/settings");
     } else if (linkedInParam === "error") {
       const errorMsg = searchParams.get("linkedin_error") || "Failed to connect LinkedIn";
       setLinkedInMessage({ type: "error", text: errorMsg });
@@ -194,6 +200,10 @@ export default function SettingsPage() {
       refetchLinkedInOrg();
       window.history.replaceState({}, "", "/settings");
       setTimeout(() => setLinkedInOrgMessage(null), 5000);
+    } else if (linkedInOrgParam === "confirm_reassign") {
+      setLinkedInOrgMessage({ type: "error", text: "This LinkedIn organization is already connected to another account. It will be unlinked from that account if you continue." });
+      setShowLinkedInOrgReassign(true);
+      window.history.replaceState({}, "", "/settings");
     } else if (linkedInOrgParam === "error") {
       const errorMsg = searchParams.get("linkedin_org_error") || "Failed to connect organization pages";
       setLinkedInOrgMessage({ type: "error", text: errorMsg });
@@ -997,6 +1007,18 @@ export default function SettingsPage() {
                               }`}
                           >
                             {linkedInMessage.text}
+                            {showLinkedInReassign && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <a href="/api/linkedin/authorize?force=true">
+                                    <Button size="sm" variant="outline" className="text-red-700 border-red-300 hover:bg-red-100">
+                                      Connect Anyway
+                                    </Button>
+                                  </a>
+                                  <Button size="sm" variant="ghost" className="text-neutral-600" onClick={() => { setLinkedInMessage(null); setShowLinkedInReassign(false); }}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                            )}
                           </div>
                       )}
 
@@ -1085,6 +1107,18 @@ export default function SettingsPage() {
                               }`}
                           >
                             {linkedInOrgMessage.text}
+                            {showLinkedInOrgReassign && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <a href="/api/linkedin/org/authorize?force=true">
+                                    <Button size="sm" variant="outline" className="text-red-700 border-red-300 hover:bg-red-100">
+                                      Connect Anyway
+                                    </Button>
+                                  </a>
+                                  <Button size="sm" variant="ghost" className="text-neutral-600" onClick={() => { setLinkedInOrgMessage(null); setShowLinkedInOrgReassign(false); }}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                            )}
                           </div>
                       )}
 
