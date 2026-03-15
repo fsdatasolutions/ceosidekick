@@ -437,6 +437,13 @@ export const userSettings = pgTable("user_settings", {
     siteUrl: varchar("site_url", { length: 500 }),
     linkedinProfileUrl: varchar("linkedin_profile_url", { length: 500 }),
 
+    // GitHub Publishing
+    githubRepo: varchar("github_repo", { length: 255 }),       // e.g. "fsdatasolutions/redesign"
+    githubBranch: varchar("github_branch", { length: 100 }),    // e.g. "main"
+    githubToken: text("github_token"),                          // fine-grained PAT
+    githubBlogPath: varchar("github_blog_path", { length: 500 }),   // e.g. "src/content/blog"
+    githubImagesPath: varchar("github_images_path", { length: 500 }), // e.g. "public/images/blog"
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

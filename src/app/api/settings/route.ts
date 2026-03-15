@@ -33,6 +33,13 @@ export interface UserSettings {
     blogImagesDir?: string;
     siteUrl?: string;
     linkedinProfileUrl?: string;
+
+    // GitHub Publishing
+    githubRepo?: string;
+    githubBranch?: string;
+    githubToken?: string;
+    githubBlogPath?: string;
+    githubImagesPath?: string;
 }
 
 // Lazy database imports
@@ -96,6 +103,11 @@ export async function GET() {
                     blogImagesDir: s.blogImagesDir,
                     siteUrl: s.siteUrl,
                     linkedinProfileUrl: s.linkedinProfileUrl,
+                    githubRepo: s.githubRepo,
+                    githubBranch: s.githubBranch,
+                    githubToken: s.githubToken,
+                    githubBlogPath: s.githubBlogPath,
+                    githubImagesPath: s.githubImagesPath,
                 }
             });
         }
@@ -147,6 +159,11 @@ export async function POST(request: NextRequest) {
             blogImagesDir: body.blogImagesDir || null,
             siteUrl: body.siteUrl || null,
             linkedinProfileUrl: body.linkedinProfileUrl || null,
+            githubRepo: body.githubRepo || null,
+            githubBranch: body.githubBranch || null,
+            githubToken: body.githubToken || null,
+            githubBlogPath: body.githubBlogPath || null,
+            githubImagesPath: body.githubImagesPath || null,
         };
 
         const db = await getDb();

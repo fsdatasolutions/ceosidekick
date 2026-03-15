@@ -184,3 +184,15 @@ export async function downloadFileFromGCS(gcsPath: string, destination: string):
     const file = bucket.file(gcsPath);
     await file.download({ destination });
 }
+
+/**
+ * Download a file from GCS as a Buffer (no filesystem write).
+ * Used for GitHub API publishing where we commit the binary directly.
+ */
+export async function downloadBufferFromGCS(gcsPath: string): Promise<Buffer> {
+    const storage = getStorageClient();
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file(gcsPath);
+    const [contents] = await file.download();
+    return contents;
+}

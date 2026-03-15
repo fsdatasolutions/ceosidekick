@@ -67,6 +67,12 @@ export interface CompanySettings {
     blogImagesDir?: string | null;
     siteUrl?: string | null;
     linkedinProfileUrl?: string | null;
+    // GitHub publishing
+    githubRepo?: string | null;
+    githubBranch?: string | null;
+    githubToken?: string | null;
+    githubBlogPath?: string | null;
+    githubImagesPath?: string | null;
 }
 
 // ============================================
@@ -219,6 +225,11 @@ export async function fetchUserSettings(userId: string): Promise<CompanySettings
                 blogImagesDir: userSettings.blogImagesDir,
                 siteUrl: userSettings.siteUrl,
                 linkedinProfileUrl: userSettings.linkedinProfileUrl,
+                githubRepo: userSettings.githubRepo,
+                githubBranch: userSettings.githubBranch,
+                githubToken: userSettings.githubToken,
+                githubBlogPath: userSettings.githubBlogPath,
+                githubImagesPath: userSettings.githubImagesPath,
             })
             .from(userSettings)
             .where(eq(userSettings.userId, userId))
@@ -246,6 +257,32 @@ export function resolveBlogPaths(settings: CompanySettings): {
     return {
         contentDir: settings.blogContentDir?.trim() || path.join(process.cwd(), "src/content/blog"),
         imagesDir: settings.blogImagesDir?.trim() || path.join(process.cwd(), "public/images/blog"),
+    };
+}
+
+export interface GitHubPublishConfig {
+    repo: string;
+    branch: string;
+    token: string;
+    blogPath: string;
+    imagesPath: string;
+}
+
+/**
+ * If the user has GitHub publishing configured, return the config.
+ * Returns null if any required field is missing (falls back to local filesystem).
+ */
+export function resolveGitHubConfig(settings: CompanySettings): GitHubPublishConfig | null {
+    const repo = settings.githubRepo?.trim();
+    const token = settings.githubToken?.trim();
+    if (!repo || !token) return null;
+
+    return {
+        repo,
+        branch: settings.githubBranch?.trim() || "main",
+        token,
+        blogPath: settings.githubBlogPath?.trim() || "src/content/blog",
+        imagesPath: settings.githubImagesPath?.trim() || "public/images/blog",
     };
 }
 

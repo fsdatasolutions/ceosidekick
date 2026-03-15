@@ -56,6 +56,11 @@ interface UserSettings {
   blogImagesDir?: string;
   siteUrl?: string;
   linkedinProfileUrl?: string;
+  githubRepo?: string;
+  githubBranch?: string;
+  githubToken?: string;
+  githubBlogPath?: string;
+  githubImagesPath?: string;
 }
 
 interface UsageData {
@@ -1198,36 +1203,106 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="grid gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
-                      Blog Content Directory
-                    </label>
-                    <input
-                        type="text"
-                        value={settings.blogContentDir || ""}
-                        onChange={(e) => updateSetting("blogContentDir", e.target.value)}
-                        placeholder="e.g., /Users/me/Projects/myblog/src/content/blog"
-                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
-                    />
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Absolute path where blog .md files are written. Leave blank to use the default project directory.
+                  {/* GitHub Publishing */}
+                  <div className="p-4 rounded-lg border border-neutral-200 bg-white space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-5 h-5 text-neutral-700" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                      <h4 className="font-medium text-neutral-900">GitHub Publishing</h4>
+                    </div>
+                    <p className="text-xs text-neutral-500 -mt-2">
+                      Publish blog posts as commits to your website&apos;s GitHub repository. Create a <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener noreferrer" className="text-[#0A66C2] underline">fine-grained personal access token</a> with &quot;Contents&quot; read/write access to your repo.
                     </p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Repository</label>
+                        <input
+                            type="text"
+                            value={settings.githubRepo || ""}
+                            onChange={(e) => updateSetting("githubRepo", e.target.value)}
+                            placeholder="owner/repo"
+                            className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Branch</label>
+                        <input
+                            type="text"
+                            value={settings.githubBranch || ""}
+                            onChange={(e) => updateSetting("githubBranch", e.target.value)}
+                            placeholder="main"
+                            className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1">Personal Access Token</label>
+                      <input
+                          type="password"
+                          value={settings.githubToken || ""}
+                          onChange={(e) => updateSetting("githubToken", e.target.value)}
+                          placeholder="github_pat_..."
+                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Blog Content Path</label>
+                        <input
+                            type="text"
+                            value={settings.githubBlogPath || ""}
+                            onChange={(e) => updateSetting("githubBlogPath", e.target.value)}
+                            placeholder="src/content/blog"
+                            className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">Blog Images Path</label>
+                        <input
+                            type="text"
+                            value={settings.githubImagesPath || ""}
+                            onChange={(e) => updateSetting("githubImagesPath", e.target.value)}
+                            placeholder="public/images/blog"
+                            className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">
-                      Blog Images Directory
-                    </label>
-                    <input
-                        type="text"
-                        value={settings.blogImagesDir || ""}
-                        onChange={(e) => updateSetting("blogImagesDir", e.target.value)}
-                        placeholder="e.g., /Users/me/Projects/myblog/public/images/blog"
-                        className="w-full px-4 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
-                    />
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Absolute path where hero images are saved. Leave blank to use the default project directory.
+                  {/* Local Filesystem (Dev) */}
+                  <div className="p-4 rounded-lg border border-neutral-100 bg-neutral-50 space-y-4">
+                    <h4 className="font-medium text-neutral-700 text-sm">Local Filesystem (Development Only)</h4>
+                    <p className="text-xs text-neutral-400 -mt-2">
+                      These paths are used when GitHub publishing is not configured. Only works in local development.
                     </p>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1">
+                        Blog Content Directory
+                      </label>
+                      <input
+                          type="text"
+                          value={settings.blogContentDir || ""}
+                          onChange={(e) => updateSetting("blogContentDir", e.target.value)}
+                          placeholder="e.g., /Users/me/Projects/myblog/src/content/blog"
+                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1">
+                        Blog Images Directory
+                      </label>
+                      <input
+                          type="text"
+                          value={settings.blogImagesDir || ""}
+                          onChange={(e) => updateSetting("blogImagesDir", e.target.value)}
+                          placeholder="e.g., /Users/me/Projects/myblog/public/images/blog"
+                          className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:outline-none focus:border-primary-red focus:ring-1 focus:ring-primary-red font-mono text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div>

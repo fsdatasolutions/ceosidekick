@@ -1,7 +1,8 @@
 // src/app/api/content/blogs/[id]/publish/route.ts
-// Standalone endpoint for publishing a saved blog to the local filesystem.
-// Unlike the campaign publish-blog route, this works from a saved contentItem
-// in the database — no in-memory campaign session required.
+// Standalone endpoint for publishing a saved blog post.
+// Supports two modes:
+//   1. GitHub API — commits .md + hero image to the user's website repo (production)
+//   2. Local filesystem — writes to disk (development fallback)
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -10,8 +11,9 @@ import path from "path";
 import { auth } from "@/lib/auth";
 import { getContentItemById } from "@/lib/services/content-items";
 import { getContentImageById } from "@/lib/services/content-images";
-import { downloadFileFromGCS } from "@/lib/gcs";
-import { fetchUserSettings, resolveBlogPaths } from "@/lib/services/campaign-prompts";
+import { downloadFileFromGCS, downloadBufferFromGCS } from "@/lib/gcs";
+import { fetchUserSettings, resolveBlogPaths, resolveGitHubConfig } from "@/lib/services/campaign-prompts";
+import { commitFilesToGitHub, listExistingSlugs } from "@/lib/github";
 import { logErrorToFeedback } from "@/lib/services/error-logger";
 
 interface RouteParams {
@@ -60,19 +62,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             ? body.pubDate
             : new Date().toISOString().split("T")[0];
 
-        // 3. Fetch user settings and resolve paths
+        // 3. Fetch user settings
         const settings = await fetchUserSettings(userId);
-        const { contentDir, imagesDir } = resolveBlogPaths(settings);
+        const ghConfig = resolveGitHubConfig(settings);
 
-        // 4. Validate content directory exists
-        if (!fs.existsSync(contentDir)) {
-            return NextResponse.json(
-                { error: `Blog content directory does not exist: ${contentDir}. Please create it or update your Content & Publishing settings.` },
-                { status: 400 }
-            );
-        }
-
-        // 5. Generate slug and check for duplicates
+        // 4. Generate slug
         const slug = generateSlug(item.title);
         if (!slug) {
             return NextResponse.json(
@@ -81,6 +75,127 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             );
         }
 
+        // 5. Strip any AI-generated frontmatter from content
+        let cleanContent = item.content;
+        const frontmatterRegex = /^---\n[\s\S]*?\n---\n*/;
+        cleanContent = cleanContent.replace(frontmatterRegex, "").trim();
+
+        // 6. Resolve author
+        const authorName = item.authorName || session.user?.name || "Author";
+        const authorRole = item.authorRole || "";
+        const authorImage = item.authorImageUrl || "/images/founder.jpg";
+
+        // 7. Build frontmatter
+        const escapedTitle = item.title.replace(/"/g, '\\"');
+        const escapedDescription = (item.description || "").replace(/"/g, '\\"');
+        const blogCategory = item.category || "Technology";
+
+        // =============================================
+        // GITHUB PUBLISHING
+        // =============================================
+        if (ghConfig) {
+            console.log(`[Publish Blog] Publishing via GitHub to ${ghConfig.repo}/${ghConfig.branch}`);
+
+            // Check for duplicate slug in GitHub repo
+            const existingSlugs = await listExistingSlugs(
+                ghConfig.token, ghConfig.repo, ghConfig.branch, ghConfig.blogPath
+            );
+            if (existingSlugs.includes(slug)) {
+                return NextResponse.json(
+                    { error: "A blog post with this title already exists", slug },
+                    { status: 409 }
+                );
+            }
+
+            // Prepare files to commit
+            const filesToCommit: { path: string; content: string | Buffer }[] = [];
+
+            // Handle hero image — download from GCS as buffer
+            let heroImageRef = "";
+            if (item.heroImageId) {
+                try {
+                    const image = await getContentImageById(item.heroImageId, userId);
+                    if (image && image.gcsPath) {
+                        const extension = image.gcsPath.match(/\.(png|jpg|jpeg|webp|gif)$/i)?.[0] || ".png";
+                        const imageFileName = `${slug}${extension}`;
+                        const imageBuffer = await downloadBufferFromGCS(image.gcsPath);
+
+                        filesToCommit.push({
+                            path: `${ghConfig.imagesPath}/${imageFileName}`,
+                            content: imageBuffer,
+                        });
+                        heroImageRef = `/images/blog/${imageFileName}`;
+                        console.log(`[Publish Blog] Hero image queued for commit: ${imageFileName}`);
+                    }
+                } catch (imageError: unknown) {
+                    console.error("[Publish Blog] Hero image download failed:", imageError);
+                    logErrorToFeedback({
+                        userId,
+                        source: "blog-publish-image",
+                        error: imageError,
+                        metadata: { blogId: id, heroImageId: item.heroImageId },
+                    });
+                }
+            }
+
+            // Build the markdown file
+            const frontmatter = [
+                "---",
+                `title: "${escapedTitle}"`,
+                `description: "${escapedDescription}"`,
+                `pubDate: ${pubDate}`,
+                `heroImage: "${heroImageRef}"`,
+                `category: "${blogCategory}"`,
+                "author:",
+                `  name: "${authorName.replace(/"/g, '\\"')}"`,
+                `  role: "${authorRole.replace(/"/g, '\\"')}"`,
+                `  image: "${authorImage}"`,
+                "featured: false",
+                "---",
+            ].join("\n");
+
+            const fileContent = `${frontmatter}\n\n${cleanContent}\n`;
+
+            filesToCommit.push({
+                path: `${ghConfig.blogPath}/${slug}.md`,
+                content: fileContent,
+            });
+
+            // Commit all files in a single commit
+            const commitResult = await commitFilesToGitHub(
+                ghConfig.token,
+                ghConfig.repo,
+                ghConfig.branch,
+                filesToCommit,
+                `publish: ${item.title}`
+            );
+
+            console.log(`[Publish Blog] GitHub commit created: ${commitResult.sha}`);
+
+            return NextResponse.json({
+                success: true,
+                slug,
+                url: `/blog/${slug}`,
+                heroImagePath: heroImageRef,
+                publishedVia: "github",
+                commitSha: commitResult.sha,
+            });
+        }
+
+        // =============================================
+        // LOCAL FILESYSTEM FALLBACK (development)
+        // =============================================
+        const { contentDir, imagesDir } = resolveBlogPaths(settings);
+
+        // Validate content directory exists
+        if (!fs.existsSync(contentDir)) {
+            return NextResponse.json(
+                { error: `Blog content directory does not exist: ${contentDir}. Configure GitHub Publishing in Settings for production use, or create this directory for local development.` },
+                { status: 400 }
+            );
+        }
+
+        // Check for duplicate slug
         const existingSlugs = fs.readdirSync(contentDir)
             .filter((f) => f.endsWith(".md") || f.endsWith(".mdx"))
             .map((f) => f.replace(/\.mdx?$/, ""));
@@ -94,7 +209,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         const targetPath = path.join(contentDir, `${slug}.md`);
 
-        // 6. Handle hero image
+        // Handle hero image — download from GCS to local filesystem
         let heroImageRef = "";
         if (item.heroImageId) {
             try {
@@ -123,21 +238,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             }
         }
 
-        // 7. Strip any AI-generated frontmatter from content
-        let cleanContent = item.content;
-        const frontmatterRegex = /^---\n[\s\S]*?\n---\n*/;
-        cleanContent = cleanContent.replace(frontmatterRegex, "").trim();
-
-        // 8. Resolve author from the content item's saved fields
-        const authorName = item.authorName || session.user?.name || "Author";
-        const authorRole = item.authorRole || "";
-        const authorImage = item.authorImageUrl || "/images/founder.jpg";
-
-        // 9. Build frontmatter
-        const escapedTitle = item.title.replace(/"/g, '\\"');
-        const escapedDescription = (item.description || "").replace(/"/g, '\\"');
-        const blogCategory = item.category || "Technology";
-
+        // Build frontmatter and write file
         const frontmatter = [
             "---",
             `title: "${escapedTitle}"`,
@@ -155,11 +256,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         const fileContent = `${frontmatter}\n\n${cleanContent}\n`;
 
-        // 10. Write the file
         fs.writeFileSync(targetPath, fileContent, "utf-8");
         console.log(`[Publish Blog] Blog post published: ${targetPath}`);
 
-        // 11. Revalidate blog pages
+        // Revalidate blog pages
         revalidatePath("/blog");
         revalidatePath(`/blog/${slug}`);
 
@@ -168,6 +268,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             slug,
             url: `/blog/${slug}`,
             heroImagePath: heroImageRef,
+            publishedVia: "filesystem",
         });
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Failed to publish blog post";
