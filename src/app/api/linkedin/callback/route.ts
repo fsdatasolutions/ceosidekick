@@ -71,9 +71,7 @@ export async function GET(request: NextRequest) {
         });
 
         // 9. Upsert into accounts table
-        // Check by provider + providerAccountId to match the unique index,
-        // so we update rather than conflict if this LinkedIn account was
-        // previously linked (even to a different user).
+        // Check by provider + providerAccountId to match the unique index.
         const existing = await db
             .select()
             .from(accounts)
@@ -85,8 +83,22 @@ export async function GET(request: NextRequest) {
             )
             .limit(1);
 
+        if (existing.length > 0 && existing[0].userId !== userId) {
+            // This LinkedIn account is linked to a different user.
+            // Check if the user confirmed they want to reassign it.
+            const force = request.cookies.get("linkedin_oauth_force")?.value === "true";
+            if (!force) {
+                // Redirect back with a confirmation prompt
+                const redirectUrl = new URL("/settings", process.env.NEXTAUTH_URL || "http://localhost:3000");
+                redirectUrl.searchParams.set("linkedin", "confirm_reassign");
+                const response = NextResponse.redirect(redirectUrl);
+                response.cookies.delete("linkedin_oauth_state");
+                return response;
+            }
+        }
+
         if (existing.length > 0) {
-            // Update existing LinkedIn account (reassign to current user)
+            // Update existing LinkedIn account (reassign to current user if needed)
             await db
                 .update(accounts)
                 .set({
@@ -123,6 +135,7 @@ export async function GET(request: NextRequest) {
 
         const response = NextResponse.redirect(redirectUrl);
         response.cookies.delete("linkedin_oauth_state");
+        response.cookies.delete("linkedin_oauth_force");
 
         return response;
     } catch (error) {

@@ -2,12 +2,12 @@
 // Initiates LinkedIn OAuth flow. Generates a random state, stores it in
 // an httpOnly cookie, then redirects the user to LinkedIn's authorization page.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAuthorizationUrl, getRedirectUri } from "@/lib/linkedin";
 import crypto from "crypto";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         // 1. Verify user is logged in
         const session = await auth();
@@ -40,6 +40,17 @@ export async function GET() {
             sameSite: "lax",
             path: "/",
             maxAge: 600, // 10 minutes
+        });
+
+        // Pass force flag through a cookie so the callback knows the user
+        // confirmed they want to reassign this LinkedIn account.
+        const force = new URL(request.url).searchParams.get("force") === "true";
+        response.cookies.set("linkedin_oauth_force", force ? "true" : "false", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 600,
         });
 
         console.log("[LinkedIn Auth] Redirect URI:", getRedirectUri());
