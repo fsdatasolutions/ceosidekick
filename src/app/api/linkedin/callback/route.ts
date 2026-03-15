@@ -71,28 +71,31 @@ export async function GET(request: NextRequest) {
         });
 
         // 9. Upsert into accounts table
+        // Check by provider + providerAccountId to match the unique index,
+        // so we update rather than conflict if this LinkedIn account was
+        // previously linked (even to a different user).
         const existing = await db
             .select()
             .from(accounts)
             .where(
                 and(
-                    eq(accounts.userId, userId),
-                    eq(accounts.provider, "linkedin")
+                    eq(accounts.provider, "linkedin"),
+                    eq(accounts.providerAccountId, profile.sub)
                 )
             )
             .limit(1);
 
         if (existing.length > 0) {
-            // Update existing LinkedIn account
+            // Update existing LinkedIn account (reassign to current user)
             await db
                 .update(accounts)
                 .set({
+                    userId,
                     accessToken: tokens.access_token,
                     refreshToken: tokens.refresh_token || null,
                     expiresAt,
                     scope: tokens.scope,
                     tokenType: tokens.token_type,
-                    providerAccountId: profile.sub,
                     idToken: profileJson,
                 })
                 .where(eq(accounts.id, existing[0].id));

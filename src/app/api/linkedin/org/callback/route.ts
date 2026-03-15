@@ -72,28 +72,30 @@ export async function GET(request: NextRequest) {
         const providerAccountId = orgs.length > 0 ? `org_${orgs[0].id}` : `org_user_${userId.slice(0, 8)}`;
 
         // 10. Upsert into accounts table
+        // Check by provider + providerAccountId to match the unique index,
+        // so we update rather than conflict if this org was previously linked.
         const existing = await db
             .select()
             .from(accounts)
             .where(
                 and(
-                    eq(accounts.userId, userId),
-                    eq(accounts.provider, "linkedin_org")
+                    eq(accounts.provider, "linkedin_org"),
+                    eq(accounts.providerAccountId, providerAccountId)
                 )
             )
             .limit(1);
 
         if (existing.length > 0) {
-            // Update existing org account
+            // Update existing org account (reassign to current user)
             await db
                 .update(accounts)
                 .set({
+                    userId,
                     accessToken: tokens.access_token,
                     refreshToken: tokens.refresh_token || null,
                     expiresAt,
                     scope: tokens.scope,
                     tokenType: tokens.token_type,
-                    providerAccountId,
                     idToken: orgDataJson,
                 })
                 .where(eq(accounts.id, existing[0].id));

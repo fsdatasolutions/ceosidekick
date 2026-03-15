@@ -15,36 +15,53 @@ import {
   Upload,
   Search,
   Check,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { AgentAvatar, AgentAvatarGroup } from "@/components/ui/agent-avatar";
+import { useDemoAudio } from "@/hooks/use-demo-audio";
 
-// Screen duration in milliseconds
-const SCREEN_DURATION = 6000;
-
-// Demo screens configuration
-const screens = [
-  { id: "dashboard", title: "Your Business Toolkit" },
-  { id: "advisor-chat", title: "Get Expert Advice Instantly" },
-  { id: "content-engine", title: "Create Content with AI" },
-  { id: "documents", title: "Generate Professional Documents" },
-  { id: "company-library", title: "Build Your Knowledge Base" },
-  { id: "goals", title: "Set Goals & Track Progress" },
-  { id: "roundtable", title: "Multi-Advisor Collaboration" },
+// Per-screen duration in ms — matched to audio clip length + 1.5s buffer
+// Audio lengths: dashboard 8.1s, advisor-chat 7.8s, content-engine 7.5s,
+// documents 7.4s, company-library 7.6s, goals 7.7s, roundtable 8.3s
+export const screens = [
+  { id: "dashboard", title: "Your Business Toolkit", duration: 9500 },
+  { id: "advisor-chat", title: "Get Expert Advice Instantly", duration: 9500 },
+  { id: "content-engine", title: "Create Content with AI", duration: 9000 },
+  { id: "documents", title: "Generate Professional Documents", duration: 9000 },
+  { id: "company-library", title: "Build Your Knowledge Base", duration: 9000 },
+  { id: "goals", title: "Set Goals & Track Progress", duration: 9000 },
+  { id: "roundtable", title: "Multi-Advisor Collaboration", duration: 10000 },
 ];
 
-export default function ProductDemo() {
+export default function ProductDemo({
+  recordingMode = false,
+}: {
+  recordingMode?: boolean;
+}) {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
+
+  const {
+    isMuted,
+    toggleMute,
+    playScreenAudio,
+    pauseAudio,
+    resumeAudio,
+    markInteracted,
+  } = useDemoAudio();
 
   const nextScreen = useCallback(() => {
     setCurrentScreen((prev) => (prev + 1) % screens.length);
     setProgress(0);
   }, []);
 
-  // Auto-advance screens
+  // Auto-advance screens — duration varies per screen
   useEffect(() => {
     if (!isPlaying) return;
+
+    const screenDuration = screens[currentScreen].duration;
 
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
@@ -52,17 +69,57 @@ export default function ProductDemo() {
           nextScreen();
           return 0;
         }
-        return prev + (100 / (SCREEN_DURATION / 50));
+        return prev + (100 / (screenDuration / 50));
       });
     }, 50);
 
     return () => clearInterval(progressInterval);
-  }, [isPlaying, nextScreen]);
+  }, [isPlaying, nextScreen, currentScreen]);
 
-  const goToScreen = (index: number) => {
-    setCurrentScreen(index);
-    setProgress(0);
-  };
+  // In recording mode, mark as interacted + unmute immediately so audio auto-plays
+  useEffect(() => {
+    if (recordingMode) {
+      markInteracted();
+      if (isMuted) toggleMute();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingMode]);
+
+  // Play audio when screen changes
+  useEffect(() => {
+    if (isPlaying) {
+      playScreenAudio(currentScreen);
+    }
+  }, [currentScreen, isPlaying, playScreenAudio]);
+
+  // When unmuting while playing, start current screen's audio
+  useEffect(() => {
+    if (!isMuted && isPlaying) {
+      playScreenAudio(currentScreen);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMuted]);
+
+  const togglePlayPause = useCallback(() => {
+    markInteracted();
+    setIsPlaying((prev) => {
+      if (prev) {
+        pauseAudio();
+      } else {
+        resumeAudio(currentScreen);
+      }
+      return !prev;
+    });
+  }, [currentScreen, markInteracted, pauseAudio, resumeAudio]);
+
+  const goToScreen = useCallback(
+    (index: number) => {
+      markInteracted();
+      setCurrentScreen(index);
+      setProgress(0);
+    },
+    [markInteracted]
+  );
 
   return (
       <div className="w-full max-w-4xl mx-auto">
@@ -79,18 +136,33 @@ export default function ProductDemo() {
             {currentScreen === 6 && <RoundTableScreen />}
           </div>
 
-          {/* Controls Overlay */}
+          {/* Controls Overlay — hidden in recording mode */}
+          {!recordingMode && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
             <div className="flex items-center gap-4">
               {/* Play/Pause Button */}
               <button
-                  onClick={() => setIsPlaying(!isPlaying)}
+                  onClick={togglePlayPause}
                   className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
+                  aria-label={isPlaying ? "Pause demo" : "Play demo"}
               >
                 {isPlaying ? (
                     <Pause className="w-5 h-5 text-white" />
                 ) : (
                     <Play className="w-5 h-5 text-white ml-0.5" />
+                )}
+              </button>
+
+              {/* Mute/Unmute Button */}
+              <button
+                  onClick={toggleMute}
+                  className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
+                  aria-label={isMuted ? "Enable voiceover" : "Mute voiceover"}
+              >
+                {isMuted ? (
+                    <VolumeX className="w-5 h-5 text-white" />
+                ) : (
+                    <Volume2 className="w-5 h-5 text-white" />
                 )}
               </button>
 
@@ -124,12 +196,15 @@ export default function ProductDemo() {
               </div>
             </div>
           </div>
+          )}
         </div>
 
-        {/* Caption */}
+        {/* Caption — hidden in recording mode */}
+        {!recordingMode && (
         <p className="text-center text-neutral-500 text-sm mt-4">
-          Click anywhere to pause &bull; Click dots to jump to a section
+          Click play/pause to control &bull; Click the speaker icon to enable voiceover
         </p>
+        )}
       </div>
   );
 }
