@@ -25,7 +25,8 @@ const LINKEDIN_API_VERSION = "202601";
 const SCOPES = ["openid", "profile", "w_member_social"];
 
 // Organization app scopes (Community Management API)
-const ORG_SCOPES = ["w_organization_social", "r_organization_social"];
+// rw_organization_admin is required to list administered organizations via organizationAcls
+const ORG_SCOPES = ["w_organization_social", "r_organization_social", "rw_organization_admin"];
 
 // ============================================
 // TYPES

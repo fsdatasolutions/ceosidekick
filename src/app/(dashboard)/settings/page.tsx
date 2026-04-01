@@ -1140,7 +1140,7 @@ export default function SettingsPage() {
                                 Connected
                               </span>
                             </div>
-                            {linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
+                            {linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 ? (
                                 <div className="mb-2 space-y-1">
                                   {linkedInOrgStatus.orgs.map((org) => (
                                       <div key={org.id} className="flex items-center gap-2 text-sm text-neutral-700">
@@ -1148,6 +1148,11 @@ export default function SettingsPage() {
                                         {org.name}
                                       </div>
                                   ))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 mb-2 text-amber-600">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span className="text-sm">No organization pages found. Reconnect to refresh permissions.</span>
                                 </div>
                             )}
                             {linkedInOrgStatus.tokenExpired && (
@@ -1157,7 +1162,7 @@ export default function SettingsPage() {
                                 </div>
                             )}
                             <div className="flex items-center gap-2 mt-2">
-                              {linkedInOrgStatus.tokenExpired && (
+                              {(linkedInOrgStatus.tokenExpired || !linkedInOrgStatus.orgs || linkedInOrgStatus.orgs.length === 0) && (
                                   <a href="/api/linkedin/org/authorize">
                                     <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
                                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
