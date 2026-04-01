@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
 
         // 4. Build authorization URL and redirect
         const authUrl = getOrgAuthorizationUrl(state);
+        console.log("[LinkedIn Org Auth] Auth URL:", authUrl);
         const response = NextResponse.redirect(authUrl);
+
+        // Prevent caching of this redirect (scope changes must take effect immediately)
+        response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.headers.set("Pragma", "no-cache");
 
         // 5. Store state in httpOnly cookie for CSRF validation
         response.cookies.set("linkedin_org_oauth_state", state, {

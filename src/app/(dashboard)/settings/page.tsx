@@ -181,25 +181,37 @@ export default function SettingsPage() {
   const [linkedInOrgMessage, setLinkedInOrgMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showLinkedInOrgReassign, setShowLinkedInOrgReassign] = useState(false);
   const [orgVanityName, setOrgVanityName] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const [showOrgIdInput, setShowOrgIdInput] = useState(false);
   const [addingOrgPage, setAddingOrgPage] = useState(false);
   const [addOrgPageError, setAddOrgPageError] = useState<string | null>(null);
 
   async function handleAddOrgPage() {
-    if (!orgVanityName.trim()) return;
+    if (!orgVanityName.trim() && !orgId.trim()) return;
     setAddingOrgPage(true);
     setAddOrgPageError(null);
     try {
       const response = await fetch("/api/linkedin/org/add-page", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vanityName: orgVanityName.trim() }),
+        body: JSON.stringify({
+          vanityName: orgVanityName.trim(),
+          ...(orgId.trim() && { orgId: orgId.trim() }),
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
-        setAddOrgPageError(data.error || "Failed to add organization page");
+        if (data.needsManualId) {
+          setShowOrgIdInput(true);
+          setAddOrgPageError("API lookup unavailable. Enter your Organization ID below.");
+        } else {
+          setAddOrgPageError(data.error || "Failed to add organization page");
+        }
         return;
       }
       setOrgVanityName("");
+      setOrgId("");
+      setShowOrgIdInput(false);
       setLinkedInOrgMessage({ type: "success", text: `Added ${data.org.name} successfully!` });
       refetchLinkedInOrg();
       setTimeout(() => setLinkedInOrgMessage(null), 5000);
@@ -1182,10 +1194,10 @@ export default function SettingsPage() {
                                 </div>
                             )}
 
-                            {/* Add organization page by vanity name */}
+                            {/* Add organization page */}
                             <div className="mb-3 mt-2">
                               <label className="block text-xs text-neutral-500 mb-1">
-                                Add a company page by vanity name
+                                Add a company page
                               </label>
                               <p className="text-xs text-neutral-400 mb-1.5">
                                 Enter the vanity name from your LinkedIn company URL (e.g. <code className="bg-neutral-100 px-1 rounded">linkedin.com/company/<strong>your-company</strong></code>)
@@ -1201,7 +1213,7 @@ export default function SettingsPage() {
                                 <Button
                                     size="sm"
                                     onClick={handleAddOrgPage}
-                                    disabled={addingOrgPage || !orgVanityName.trim()}
+                                    disabled={addingOrgPage || (!orgVanityName.trim() && !orgId.trim())}
                                     className="bg-[#0A66C2] hover:bg-[#004182] text-white"
                                 >
                                   {addingOrgPage ? (
@@ -1212,6 +1224,23 @@ export default function SettingsPage() {
                                   Add
                                 </Button>
                               </div>
+                              {showOrgIdInput && (
+                                  <div className="mt-2">
+                                    <label className="block text-xs text-neutral-500 mb-1">
+                                      Organization ID
+                                    </label>
+                                    <p className="text-xs text-neutral-400 mb-1.5">
+                                      Find this in your LinkedIn Page admin URL: <code className="bg-neutral-100 px-1 rounded">linkedin.com/company/<strong>12345678</strong>/admin/</code>
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={orgId}
+                                        onChange={(e) => { setOrgId(e.target.value); setAddOrgPageError(null); }}
+                                        placeholder="12345678"
+                                        className="w-full px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                    />
+                                  </div>
+                              )}
                               {addOrgPageError && (
                                   <p className="text-xs text-red-600 mt-1">{addOrgPageError}</p>
                               )}

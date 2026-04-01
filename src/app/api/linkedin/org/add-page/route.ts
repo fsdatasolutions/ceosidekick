@@ -10,9 +10,6 @@ import {
     addOrgToAccount,
     getLinkedInOrgAccount,
 } from "@/lib/linkedin";
-import { db } from "@/db";
-import { accounts } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,16 +19,17 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const vanityName = (body.vanityName || "").trim().toLowerCase();
+        const vanityName = (body.vanityName || "").trim();
+        const manualOrgId = (body.orgId || "").trim();
 
-        if (!vanityName) {
+        if (!vanityName && !manualOrgId) {
             return NextResponse.json(
-                { error: "Please enter a company vanity name" },
+                { error: "Please enter a company vanity name or organization ID" },
                 { status: 400 }
             );
         }
 
-        // Ensure an org account exists (even if token is expired, we need the record)
+        // Ensure an org account exists
         const orgAccount = await getLinkedInOrgAccount(session.user.id);
         if (!orgAccount) {
             return NextResponse.json(
@@ -40,7 +38,18 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Collect available tokens (org + personal) to try
+        // If manual org ID is provided, save directly without API lookup
+        if (manualOrgId) {
+            const org = {
+                id: manualOrgId,
+                name: vanityName || `Organization ${manualOrgId}`,
+                vanityName: vanityName || undefined,
+            };
+            await addOrgToAccount(session.user.id, org);
+            return NextResponse.json({ success: true, org });
+        }
+
+        // Otherwise, try API lookup with available tokens
         const tokens: string[] = [];
         const orgTokenResult = await getValidOrgAccessToken(session.user.id);
         if (orgTokenResult) tokens.push(orgTokenResult.accessToken);
@@ -54,33 +63,28 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Try each token until one works (org token may be revoked)
+        // Try each token until one works
         let org = null;
         for (const token of tokens) {
             try {
                 org = await lookupOrganizationByVanityName(token, vanityName);
                 if (org) break;
             } catch (err) {
-                // Auth error — try next token
                 console.warn("[LinkedIn Org Add Page] Token failed, trying next:", err instanceof Error ? err.message : err);
                 continue;
             }
         }
 
         if (!org) {
+            // API lookup failed — tell user to provide org ID manually
             return NextResponse.json(
-                { error: `No organization found for "${vanityName}". Check the vanity name from your LinkedIn company URL.` },
+                { error: `Could not look up "${vanityName}" via LinkedIn API. Try entering your Organization ID instead (find it in your LinkedIn Page admin URL).`, needsManualId: true },
                 { status: 404 }
             );
         }
 
-        // Add to the user's stored org list
         await addOrgToAccount(session.user.id, org);
-
-        return NextResponse.json({
-            success: true,
-            org,
-        });
+        return NextResponse.json({ success: true, org });
     } catch (error) {
         console.error("[LinkedIn Org Add Page] Error:", error);
         return NextResponse.json(
