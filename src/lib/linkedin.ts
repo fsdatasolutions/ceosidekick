@@ -25,8 +25,8 @@ const LINKEDIN_API_VERSION = "202601";
 const SCOPES = ["openid", "profile", "w_member_social"];
 
 // Organization app scopes (Community Management API)
-// rw_organization_admin is required to list administered organizations via organizationAcls
-const ORG_SCOPES = ["w_organization_social", "r_organization_social", "rw_organization_admin"];
+// rw_organization_admin needed for organizationAcls but must be approved on the LinkedIn app
+const ORG_SCOPES = ["w_organization_social", "r_organization_social"];
 
 // ============================================
 // TYPES
@@ -295,6 +295,96 @@ export async function getAdministeredOrganizations(accessToken: string): Promise
     }
 
     return orgs;
+}
+
+/**
+ * Look up a LinkedIn organization by its vanity name (the slug in the company URL).
+ * e.g. "ceosidekick" from linkedin.com/company/ceosidekick
+ *
+ * Works with r_organization_social scope (no admin scope needed).
+ */
+export async function lookupOrganizationByVanityName(
+    accessToken: string,
+    vanityName: string
+): Promise<LinkedInOrg | null> {
+    const url = `https://api.linkedin.com/rest/organizations?q=vanityName&vanityName=${encodeURIComponent(vanityName)}`;
+
+    const response = await fetch(url, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "LinkedIn-Version": LINKEDIN_API_VERSION,
+            "X-Restli-Protocol-Version": "2.0.0",
+        },
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[LinkedIn Org] Vanity name lookup failed:", response.status, errorText);
+        // Throw on auth errors so caller can try another token
+        if (response.status === 401 || response.status === 403) {
+            throw new Error(`LinkedIn auth error: ${response.status}`);
+        }
+        return null;
+    }
+
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    if (elements.length === 0) {
+        return null;
+    }
+
+    const org = elements[0];
+    return {
+        id: String(org.id),
+        name: org.localizedName || org.name || vanityName,
+        vanityName: org.vanityName || vanityName,
+        logoUrl: org.logoV2?.original || undefined,
+    };
+}
+
+/**
+ * Add an organization to the stored org list for the current user's org account.
+ */
+export async function addOrgToAccount(userId: string, org: LinkedInOrg): Promise<void> {
+    const account = await getLinkedInOrgAccount(userId);
+    if (!account) throw new Error("No LinkedIn org account found");
+
+    const existingOrgs = parseOrgListFromIdToken(account.idToken);
+
+    // Don't add duplicates
+    if (existingOrgs.some((o) => o.id === org.id)) {
+        return;
+    }
+
+    existingOrgs.push(org);
+
+    await db
+        .update(accounts)
+        .set({
+            idToken: JSON.stringify({ orgs: existingOrgs }),
+            // Also update providerAccountId to reference the first org
+            providerAccountId: `org_${existingOrgs[0].id}`,
+        })
+        .where(eq(accounts.id, account.id));
+}
+
+/**
+ * Remove an organization from the stored org list.
+ */
+export async function removeOrgFromAccount(userId: string, orgId: string): Promise<void> {
+    const account = await getLinkedInOrgAccount(userId);
+    if (!account) throw new Error("No LinkedIn org account found");
+
+    const existingOrgs = parseOrgListFromIdToken(account.idToken);
+    const filtered = existingOrgs.filter((o) => o.id !== orgId);
+
+    await db
+        .update(accounts)
+        .set({
+            idToken: JSON.stringify({ orgs: filtered }),
+        })
+        .where(eq(accounts.id, account.id));
 }
 
 // ============================================

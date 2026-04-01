@@ -663,10 +663,10 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                             </div>
                         ) : linkedInOrgStatus?.connected && (!linkedInOrgStatus.orgs || linkedInOrgStatus.orgs.length === 0) ? (
                             <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                              <p className="font-medium mb-1">No organization pages found</p>
+                              <p className="font-medium mb-1">No organization pages added</p>
                               <p className="text-amber-500">
-                                <a href="/api/linkedin/org/authorize" className="underline hover:text-amber-700">Reconnect</a> your organization in{" "}
-                                <Link href="/settings" className="underline hover:text-amber-700">Settings</Link> to refresh permissions.
+                                Add a company page in{" "}
+                                <Link href="/settings" className="underline hover:text-amber-700">Settings</Link> to post as your organization.
                               </p>
                             </div>
                         ) : null}

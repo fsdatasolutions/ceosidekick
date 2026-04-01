@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   ExternalLink,
   Unlink,
+  Plus,
 } from "lucide-react";
 import { useLinkedInStatus, useLinkedInOrgStatus } from "@/lib/hooks/useLinkedInStatus";
 import {
@@ -179,6 +180,35 @@ export default function SettingsPage() {
   const [disconnectingOrg, setDisconnectingOrg] = useState(false);
   const [linkedInOrgMessage, setLinkedInOrgMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showLinkedInOrgReassign, setShowLinkedInOrgReassign] = useState(false);
+  const [orgVanityName, setOrgVanityName] = useState("");
+  const [addingOrgPage, setAddingOrgPage] = useState(false);
+  const [addOrgPageError, setAddOrgPageError] = useState<string | null>(null);
+
+  async function handleAddOrgPage() {
+    if (!orgVanityName.trim()) return;
+    setAddingOrgPage(true);
+    setAddOrgPageError(null);
+    try {
+      const response = await fetch("/api/linkedin/org/add-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vanityName: orgVanityName.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAddOrgPageError(data.error || "Failed to add organization page");
+        return;
+      }
+      setOrgVanityName("");
+      setLinkedInOrgMessage({ type: "success", text: `Added ${data.org.name} successfully!` });
+      refetchLinkedInOrg();
+      setTimeout(() => setLinkedInOrgMessage(null), 5000);
+    } catch {
+      setAddOrgPageError("Failed to add organization page");
+    } finally {
+      setAddingOrgPage(false);
+    }
+  }
 
   // Handle LinkedIn callback query params (personal + org)
   useEffect(() => {
@@ -1140,7 +1170,8 @@ export default function SettingsPage() {
                                 Connected
                               </span>
                             </div>
-                            {linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 ? (
+                            {/* List connected org pages */}
+                            {linkedInOrgStatus.orgs && linkedInOrgStatus.orgs.length > 0 && (
                                 <div className="mb-2 space-y-1">
                                   {linkedInOrgStatus.orgs.map((org) => (
                                       <div key={org.id} className="flex items-center gap-2 text-sm text-neutral-700">
@@ -1149,12 +1180,43 @@ export default function SettingsPage() {
                                       </div>
                                   ))}
                                 </div>
-                            ) : (
-                                <div className="flex items-center gap-2 mb-2 text-amber-600">
-                                  <AlertTriangle className="w-4 h-4" />
-                                  <span className="text-sm">No organization pages found. Reconnect to refresh permissions.</span>
-                                </div>
                             )}
+
+                            {/* Add organization page by vanity name */}
+                            <div className="mb-3 mt-2">
+                              <label className="block text-xs text-neutral-500 mb-1">
+                                Add a company page by vanity name
+                              </label>
+                              <p className="text-xs text-neutral-400 mb-1.5">
+                                Enter the vanity name from your LinkedIn company URL (e.g. <code className="bg-neutral-100 px-1 rounded">linkedin.com/company/<strong>your-company</strong></code>)
+                              </p>
+                              <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={orgVanityName}
+                                    onChange={(e) => { setOrgVanityName(e.target.value); setAddOrgPageError(null); }}
+                                    placeholder="your-company"
+                                    className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                />
+                                <Button
+                                    size="sm"
+                                    onClick={handleAddOrgPage}
+                                    disabled={addingOrgPage || !orgVanityName.trim()}
+                                    className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+                                >
+                                  {addingOrgPage ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                  ) : (
+                                      <Plus className="w-3.5 h-3.5 mr-1" />
+                                  )}
+                                  Add
+                                </Button>
+                              </div>
+                              {addOrgPageError && (
+                                  <p className="text-xs text-red-600 mt-1">{addOrgPageError}</p>
+                              )}
+                            </div>
+
                             {linkedInOrgStatus.tokenExpired && (
                                 <div className="flex items-center gap-2 mb-2 text-amber-600">
                                   <AlertTriangle className="w-4 h-4" />
@@ -1162,7 +1224,7 @@ export default function SettingsPage() {
                                 </div>
                             )}
                             <div className="flex items-center gap-2 mt-2">
-                              {(linkedInOrgStatus.tokenExpired || !linkedInOrgStatus.orgs || linkedInOrgStatus.orgs.length === 0) && (
+                              {linkedInOrgStatus.tokenExpired && (
                                   <a href="/api/linkedin/org/authorize">
                                     <Button size="sm" className="bg-[#0A66C2] hover:bg-[#004182] text-white">
                                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />

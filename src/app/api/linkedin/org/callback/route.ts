@@ -57,10 +57,28 @@ export async function GET(request: NextRequest) {
         console.log("[LinkedIn Org Callback] Exchanging authorization code for tokens...");
         const tokens = await exchangeOrgCodeForTokens(code);
 
-        // 6. Fetch administered organizations
+        // 6. Fetch administered organizations (may fail if rw_organization_admin scope not available)
         console.log("[LinkedIn Org Callback] Fetching administered organizations...");
-        const orgs = await getAdministeredOrganizations(tokens.access_token);
+        let orgs = await getAdministeredOrganizations(tokens.access_token);
         console.log("[LinkedIn Org Callback] Found", orgs.length, "administered organizations");
+
+        // If no orgs found via API, preserve any previously added orgs (added via vanity name)
+        if (orgs.length === 0) {
+            const existingAccount = await db
+                .select()
+                .from(accounts)
+                .where(and(eq(accounts.provider, "linkedin_org"), eq(accounts.userId, userId)))
+                .limit(1);
+            if (existingAccount.length > 0 && existingAccount[0].idToken) {
+                try {
+                    const prev = JSON.parse(existingAccount[0].idToken);
+                    if (prev.orgs && prev.orgs.length > 0) {
+                        orgs = prev.orgs;
+                        console.log("[LinkedIn Org Callback] Preserved", orgs.length, "previously added organizations");
+                    }
+                } catch { /* ignore parse error */ }
+            }
+        }
 
         // 7. Calculate token expiry timestamp
         const expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
