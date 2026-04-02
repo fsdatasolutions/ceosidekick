@@ -3,10 +3,28 @@
 
 import Stripe from "stripe";
 
-// Initialize Stripe with API key
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
-  typescript: true,
+// Lazy-initialize Stripe so the module can be imported at build time
+// without crashing when STRIPE_SECRET_KEY is not yet available.
+let _stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (_stripe) return _stripe;
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY environment variable is not set");
+  }
+  _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-12-15.clover",
+    typescript: true,
+  });
+  return _stripe;
+}
+
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    const realStripe = getStripe();
+    const value = Reflect.get(realStripe, prop, receiver);
+    return typeof value === "function" ? value.bind(realStripe) : value;
+  },
 });
 
 // Helper to get or create a Stripe customer for a user
