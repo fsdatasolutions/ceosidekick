@@ -656,7 +656,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
                                 </option>
                                 {linkedInOrgStatus.orgs.map((org) => (
                                     <option key={org.id} value={org.id}>
-                                      {org.name}
+                                      {org.vanityName || org.name}
                                     </option>
                                 ))}
                               </select>

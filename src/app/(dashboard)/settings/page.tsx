@@ -1188,7 +1188,13 @@ export default function SettingsPage() {
                                   {linkedInOrgStatus.orgs.map((org) => (
                                       <div key={org.id} className="flex items-center gap-2 text-sm text-neutral-700">
                                         <Building className="w-3.5 h-3.5 text-neutral-400" />
-                                        {org.name}
+                                        <span>
+                                          {org.vanityName || org.name}
+                                          {org.vanityName && org.name !== org.vanityName && (
+                                            <span className="text-neutral-400 ml-1">({org.name})</span>
+                                          )}
+                                          <span className="text-neutral-400 text-xs ml-1">ID: {org.id}</span>
+                                        </span>
                                       </div>
                                   ))}
                                 </div>

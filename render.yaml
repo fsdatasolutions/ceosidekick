@@ -42,5 +42,25 @@ services:
         sync: false # Set to your production URL, e.g., https://ceosidekick.onrender.com
       - key: AUTH_TRUST_HOST
         value: "true"
+      - key: CRON_SECRET
+        sync: false # Shared secret for cron job auth (must match cron job service)
     healthCheckPath: /
     autoDeploy: true # Auto-deploy on git push
+
+  # Cron Job - Publish Scheduled LinkedIn Posts
+  # Runs every 5 minutes to check for and publish due scheduled posts
+  - type: cron
+    name: ceosidekick-publish-scheduled
+    runtime: image
+    image:
+      url: curlimages/curl:latest
+    region: oregon # Same region as web service
+    schedule: "*/5 * * * *"
+    startCommand: >-
+      curl -sf -X POST
+      https://ceosidekick.biz/api/cron/publish-scheduled
+      -H "Authorization: Bearer $CRON_SECRET"
+      -H "Content-Type: application/json"
+    envVars:
+      - key: CRON_SECRET
+        sync: false # Set manually in Render dashboard (must match web service)
