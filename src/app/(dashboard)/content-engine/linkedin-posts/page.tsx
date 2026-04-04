@@ -4,6 +4,8 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getLinkedInOrgAccount, parseOrgListFromIdToken } from "@/lib/linkedin";
+import type { SchedulingMeta } from "@/lib/types/scheduling";
 import {
   ArrowLeft,
   ArrowRight,
@@ -75,6 +77,7 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
     linkedinPostType: string | null;
     publishedAt: Date | null;
     scheduledFor: Date | null;
+    schedulingMeta: SchedulingMeta | null;
     updatedAt: Date;
   }> = [];
   let pagination = { total: 0, limit, offset, hasMore: false };
@@ -91,6 +94,21 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
     pagination = result.pagination;
   } catch (error) {
     console.error("Failed to fetch posts:", error);
+  }
+
+  // Build a map of org ID → org name for displaying which page posts are scheduled on
+  let orgNameMap: Record<string, string> = {};
+  const hasScheduledPosts = posts.some((p) => p.status === "scheduled" && p.schedulingMeta?.postAs && p.schedulingMeta.postAs !== "personal");
+  if (hasScheduledPosts) {
+    try {
+      const orgAccount = await getLinkedInOrgAccount(userId);
+      const orgs = parseOrgListFromIdToken(orgAccount?.idToken ?? null);
+      for (const org of orgs) {
+        orgNameMap[org.id] = org.name;
+      }
+    } catch {
+      // Non-critical — will just show "Organization" as fallback
+    }
   }
 
   const total = pagination.total;
@@ -245,6 +263,28 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
                     }`}>
                       {post.status}
                     </span>
+                    {post.status === "scheduled" && post.scheduledFor && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 flex items-center gap-1">
+                        <CalendarClock className="w-3 h-3" />
+                        {new Date(post.scheduledFor).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        at{" "}
+                        {new Date(post.scheduledFor).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                    {post.status === "scheduled" && post.schedulingMeta?.postAs && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600">
+                        {post.schedulingMeta.postAs === "personal"
+                          ? "Personal Profile"
+                          : orgNameMap[post.schedulingMeta.postAs] || "Organization"}
+                      </span>
+                    )}
                     {post.linkedinPostType && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
                         {post.linkedinPostType}
@@ -257,9 +297,6 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
                   <p className="text-xs text-neutral-400 mt-2">
                     Updated {formatRelativeTime(post.updatedAt)}
                     {post.publishedAt && ` • Published ${formatRelativeTime(post.publishedAt)}`}
-                    {post.status === "scheduled" && post.scheduledFor && (
-                      <span> • Scheduled for {new Date(post.scheduledFor).toLocaleString()}</span>
-                    )}
                   </p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-neutral-400 flex-shrink-0 mt-2" />
