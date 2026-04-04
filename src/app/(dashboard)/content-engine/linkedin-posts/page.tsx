@@ -90,7 +90,10 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
       limit,
       offset,
     });
-    posts = result.items;
+    posts = result.items.map((item) => ({
+      ...item,
+      schedulingMeta: (item.schedulingMeta as SchedulingMeta | null) ?? null,
+    }));
     pagination = result.pagination;
   } catch (error) {
     console.error("Failed to fetch posts:", error);
