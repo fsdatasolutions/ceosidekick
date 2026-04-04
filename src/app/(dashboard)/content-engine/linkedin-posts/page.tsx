@@ -15,6 +15,7 @@ import {
   Archive,
   CalendarClock,
   AlertCircle,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listContentItems } from "@/lib/services/content-items";
@@ -121,12 +122,20 @@ export default async function LinkedInPostsPage({ searchParams }: PageProps) {
             </div>
           </div>
           
-          <Link href="/content-engine/linkedin-posts/new">
-            <Button>
-              <Plus className="w-4 h-4" />
-              New Post
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/content-engine/linkedin-posts/bulk">
+              <Button variant="outline">
+                <Layers className="w-4 h-4" />
+                Bulk Create
+              </Button>
+            </Link>
+            <Link href="/content-engine/linkedin-posts/new">
+              <Button>
+                <Plus className="w-4 h-4" />
+                New Post
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

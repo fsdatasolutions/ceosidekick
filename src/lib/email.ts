@@ -3,7 +3,21 @@
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize Resend so the module can be imported at build time
+// without crashing when RESEND_API_KEY is not yet available.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (_resend) return _resend;
+  _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
+const resend = new Proxy({} as Resend, {
+  get(_target, prop, receiver) {
+    const r = getResend();
+    const value = Reflect.get(r, prop, receiver);
+    return typeof value === "function" ? value.bind(r) : value;
+  },
+});
 
 // Use verified domain in production, Resend onboarding email for dev
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "CEO Sidekick <onboarding@resend.dev>";
