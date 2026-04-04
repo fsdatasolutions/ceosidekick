@@ -98,6 +98,13 @@ export default function BulkCreatePage() {
 
     // Schedule state
     const [schedules, setSchedules] = useState<ScheduleSuggestion[]>([]);
+    const [startDateTime, setStartDateTime] = useState(() => {
+        // Default to tomorrow at 9:00 AM
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        return formatDateTimeLocal(tomorrow);
+    });
     const [postAs, setPostAs] = useState("personal");
     const [visibility, setVisibility] = useState<"PUBLIC" | "CONNECTIONS">("PUBLIC");
     const [scheduling, setScheduling] = useState(false);
@@ -255,16 +262,20 @@ export default function BulkCreatePage() {
     };
 
     // Move to schedule step
-    const handleProceedToSchedule = async () => {
+    const handleProceedToSchedule = () => {
         setStep("schedule");
         setScheduleError(null);
+    };
 
+    // Fetch schedule suggestions based on selected start time
+    const handleGenerateSchedule = async () => {
         try {
             const response = await fetch("/api/content/posts/suggest-schedule", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     postIds: posts.map((p) => p.id),
+                    startDateTime: new Date(startDateTime).toISOString(),
                 }),
             });
 
@@ -732,6 +743,35 @@ export default function BulkCreatePage() {
                         <h3 className="text-sm font-medium text-neutral-700">
                             Posting Options
                         </h3>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-600 mb-1">
+                                    Start Date & Time
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={startDateTime}
+                                    onChange={(e) => setStartDateTime(e.target.value)}
+                                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                    First post publishes at this time, then one per day after
+                                </p>
+                            </div>
+
+                            <div className="flex items-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleGenerateSchedule}
+                                    className="w-full"
+                                >
+                                    <CalendarClock className="w-4 h-4" />
+                                    Generate Schedule
+                                </Button>
+                            </div>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
