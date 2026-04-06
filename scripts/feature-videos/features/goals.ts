@@ -44,30 +44,34 @@ export const goals: FeatureConfig = {
     },
     {
       timestamp: 20000,
-      description: "Click Active filter",
+      description: "Scroll back to top and click Active filter",
       action: async (page) => {
         await page.evaluate(() =>
           window.scrollTo({ top: 0, behavior: "smooth" })
         );
         await page.waitForTimeout(500);
-        const btn = page.locator('button:has-text("Active")').first();
+        // Status filters are links or buttons near the top
+        const btn = page.locator('a:has-text("Active"), button:has-text("Active")').first();
         if (await btn.isVisible()) await btn.click();
+        await page.waitForTimeout(1000);
       },
     },
     {
       timestamp: 26000,
       description: "Click Completed filter",
       action: async (page) => {
-        const btn = page.locator('button:has-text("Completed")').first();
+        const btn = page.locator('a:has-text("Completed"), button:has-text("Completed")').first();
         if (await btn.isVisible()) await btn.click();
+        await page.waitForTimeout(1000);
       },
     },
     {
       timestamp: 30000,
-      description: "Click All filter",
+      description: "Click All filter to show all goals",
       action: async (page) => {
-        const btn = page.locator('button:has-text("All")').first();
+        const btn = page.locator('a:has-text("All"), button:has-text("All")').first();
         if (await btn.isVisible()) await btn.click();
+        await page.waitForTimeout(1000);
       },
     },
     {

@@ -31,27 +31,35 @@ export async function recordFeature(
 
   const browser = await chromium.launch({ headless: true });
 
-  const contextOptions: Parameters<typeof browser.newContext>[0] = {
+  // Step 1: Log in using a throwaway context (no video recording)
+  // This keeps the login screen out of the final video.
+  const authContext = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+  });
+  const authPage = await authContext.newPage();
+
+  const { login } = await import("./auth");
+  await login(authPage, baseUrl);
+
+  // Save auth cookies/storage state
+  const storageState = await authContext.storageState();
+  await authContext.close();
+
+  // Step 2: Create the recording context with the authenticated state
+  const recordContext = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     recordVideo: {
       dir: featureTmpDir,
       size: { width: 1920, height: 1080 },
     },
-  };
+    storageState,
+  });
+  const page = await recordContext.newPage();
 
-  const context = await browser.newContext(contextOptions);
-  const page = await context.newPage();
-
-  // Log in via credentials
-  const { login } = await import("./auth");
-  await login(page, baseUrl);
-
-  // Navigate to feature route (login already lands on /dashboard)
-  if (feature.route !== "/dashboard") {
-    await page.goto(`${baseUrl}${feature.route}`, {
-      waitUntil: "networkidle",
-    });
-  }
+  // Navigate directly to feature route (already authenticated)
+  await page.goto(`${baseUrl}${feature.route}`, {
+    waitUntil: "networkidle",
+  });
 
   // Wait a moment for the page to fully render
   await page.waitForTimeout(2000);
@@ -94,7 +102,7 @@ export async function recordFeature(
     }
   }
 
-  await context.close();
+  await recordContext.close();
   await browser.close();
 
   return videoPath;

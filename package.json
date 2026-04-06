@@ -16,7 +16,9 @@
     "generate-demo-video": "npx tsx scripts/generate-demo-video.ts",
     "generate-feature-audio": "npx tsx scripts/feature-videos/generate-feature-audio.ts",
     "generate-feature-videos": "npx tsx scripts/feature-videos/generate-all.ts",
-    "save-auth-state": "npx tsx scripts/feature-videos/save-auth-state.ts"
+    "save-auth-state": "npx tsx scripts/feature-videos/save-auth-state.ts",
+    "generate-tutorial-audio": "npx tsx scripts/tutorial-videos/generate-tutorial-audio.ts",
+    "generate-tutorial-videos": "npx tsx scripts/tutorial-videos/generate-all.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

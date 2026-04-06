@@ -23,7 +23,7 @@ const AI_MODELS: Record<AIDomain, string> = {
   roundTable:      "claude-opus-4-6",
   onboarding:      "claude-sonnet-4-5-20250929",
   goals:           "claude-sonnet-4-5-20250929",
-  support:         "claude-haiku-4-5-20250929",
+  support:         "claude-haiku-4-5-20251001",
 };
 
 /** Get the model ID for a given domain. */

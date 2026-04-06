@@ -10,114 +10,151 @@ When you open a conversation, you'll see the full message thread with rich forma
 Notice the suggested prompts that appear when you start a new chat. These are designed to help you get the most value quickly. You can also toggle voice mode for hands-free interaction. Every conversation is saved and searchable, building an ongoing knowledge base of advice specific to your business.`;
 
 export const advisorChat: FeatureConfig = {
-  id: "advisor-chat",
-  title: "AI Advisor Chat",
-  route: "/chat?agent=technology",
-  narration: NARRATION,
-  estimatedDurationMs: 95_000,
-  actions: [
-    {
-      timestamp: 4000,
-      description: "Hover over conversation sidebar",
-      action: async (page) => {
-        // Hover over the sidebar area
-        const sidebar = page.locator("nav").first();
-        if (await sidebar.isVisible()) await sidebar.hover();
-      },
-    },
-    {
-      timestamp: 10000,
-      description: "Click on an existing conversation in sidebar",
-      action: async (page) => {
-        const conv = page.locator('a[href*="/chat?agent="][href*="&id="]').first();
-        if (await conv.isVisible()) await conv.click();
-      },
-    },
-    {
-      timestamp: 16000,
-      description: "Wait for messages, then scroll through them",
-      action: async (page) => {
-        await page.waitForTimeout(1000);
-        await smoothScroll(page, 300);
-      },
-    },
-    {
-      timestamp: 22000,
-      description: "Continue scrolling through messages",
-      action: async (page) => {
-        await smoothScroll(page, 400);
-      },
-    },
-    {
-      timestamp: 28000,
-      description: "Hover over an assistant response",
-      action: async (page) => {
-        const response = page.locator(".prose").first();
-        if (await response.isVisible()) await response.hover();
-      },
-    },
-    {
-      timestamp: 36000,
-      description: "Scroll down more to see more messages",
-      action: async (page) => {
-        await smoothScroll(page, 400);
-      },
-    },
-    {
-      timestamp: 44000,
-      description: "Scroll back to top of messages",
-      action: async (page) => {
-        await page.evaluate(() =>
-          window.scrollTo({ top: 0, behavior: "smooth" })
-        );
-      },
-    },
-    {
-      timestamp: 52000,
-      description: "Click New Conversation button",
-      action: async (page) => {
-        const newBtn = page.locator('button:has-text("New"), a:has-text("New")').first();
-        if (await newBtn.isVisible()) await newBtn.click();
-      },
-    },
-    {
-      timestamp: 58000,
-      description: "Hover over suggested prompts",
-      action: async (page) => {
-        const prompt = page.locator("button.rounded-lg.border.text-sm").first();
-        if (await prompt.isVisible()) await prompt.hover();
-      },
-    },
-    {
-      timestamp: 64000,
-      description: "Hover over second suggested prompt",
-      action: async (page) => {
-        const prompt = page.locator("button.rounded-lg.border.text-sm").nth(1);
-        if (await prompt.isVisible()) await prompt.hover();
-      },
-    },
-    {
-      timestamp: 72000,
-      description: "Hover over voice mode toggle",
-      action: async (page) => {
-        const voiceBtn = page.locator('button[aria-label*="voice"], button[aria-label*="Voice"]').first();
-        if (await voiceBtn.isVisible()) await voiceBtn.hover();
-      },
-    },
-    {
-      timestamp: 78000,
-      description: "Click back on existing conversation",
-      action: async (page) => {
-        const conv = page.locator('a[href*="/chat?agent="][href*="&id="]').first();
-        if (await conv.isVisible()) await conv.click();
-      },
-    },
-    {
-      timestamp: 84000,
-      description: "Slowly scroll through messages",
-      action: async (page) => {
-        await smoothScroll(page, 300);
-      },
-    },
-  ],
+    id: "advisor-chat",
+    title: "AI Advisor Chat",
+    route: "/chat?agent=technology",
+    narration: NARRATION,
+    estimatedDurationMs: 95_000,
+    actions: [
+        // Narration: "conversation sidebar showing your chat history"
+        {
+            timestamp: 4000,
+            description: "Open chat history sidebar",
+            action: async (page) => {
+                const historyBtn = page.locator('button[title="Chat History"]').first();
+                if (await historyBtn.isVisible()) await historyBtn.click();
+                await page.waitForTimeout(500);
+            },
+        },
+        {
+            timestamp: 10000,
+            description: "Close history sidebar",
+            action: async (page) => {
+                // Close button inside the history panel
+                const closeBtn = page.locator('button:has(svg.lucide-chevron-left)').first();
+                if (await closeBtn.isVisible()) await closeBtn.click();
+                await page.waitForTimeout(500);
+            },
+        },
+        // Narration: "choose which advisor to speak with"
+        {
+            timestamp: 16000,
+            description: "Open agent selector dropdown",
+            action: async (page) => {
+                // Click the agent name/avatar area which toggles the dropdown
+                const agentSelector = page.locator('button:has(.lucide-chevron-down)').first();
+                if (await agentSelector.isVisible()) await agentSelector.click();
+                await page.waitForTimeout(500);
+            },
+        },
+        // Narration: "Technology Partner acts as your virtual CTO"
+        {
+            timestamp: 22000,
+            description: "Hover over Technology Partner in dropdown",
+            action: async (page) => {
+                const techOption = page.locator('button:has-text("Technology Partner")').first();
+                if (await techOption.isVisible()) await techOption.hover();
+            },
+        },
+        // Narration: "Executive Coach supports your leadership"
+        {
+            timestamp: 28000,
+            description: "Hover over Executive Coach in dropdown",
+            action: async (page) => {
+                const coachOption = page.locator('button:has-text("Executive Coach")').first();
+                if (await coachOption.isVisible()) await coachOption.hover();
+            },
+        },
+        // Narration: "Legal Advisor helps with contracts"
+        {
+            timestamp: 33000,
+            description: "Hover over Legal Advisor in dropdown",
+            action: async (page) => {
+                const legalOption = page.locator('button:has-text("Legal Advisor")').first();
+                if (await legalOption.isVisible()) await legalOption.hover();
+            },
+        },
+        // Narration: "HR, Marketing, and Sales partners"
+        {
+            timestamp: 37000,
+            description: "Scroll down in agent dropdown to show more advisors",
+            action: async (page) => {
+                const marketingOption = page.locator('button:has-text("Marketing Partner")').first();
+                if (await marketingOption.isVisible()) await marketingOption.hover();
+            },
+        },
+        {
+            timestamp: 41000,
+            description: "Select Marketing Partner to switch advisor",
+            action: async (page) => {
+                const marketingOption = page.locator('button:has-text("Marketing Partner")').first();
+                if (await marketingOption.isVisible()) await marketingOption.click();
+                await page.waitForLoadState("networkidle");
+                await page.waitForTimeout(1000);
+            },
+        },
+        // Narration: "suggested prompts that appear when you start a new chat"
+        {
+            timestamp: 52000,
+            description: "Hover over first suggested prompt",
+            action: async (page) => {
+                // Suggested prompt buttons in the empty chat state
+                const prompt = page.locator("button.rounded-lg.border").first();
+                if (await prompt.isVisible()) await prompt.hover();
+            },
+        },
+        {
+            timestamp: 57000,
+            description: "Hover over second suggested prompt",
+            action: async (page) => {
+                const prompt = page.locator("button.rounded-lg.border").nth(1);
+                if (await prompt.isVisible()) await prompt.hover();
+            },
+        },
+        // Narration: "type a message to get started"
+        {
+            timestamp: 62000,
+            description: "Click into the message input textarea",
+            action: async (page) => {
+                const textarea = page.locator("textarea").first();
+                if (await textarea.isVisible()) {
+                    await textarea.click();
+                    await page.waitForTimeout(500);
+                    await textarea.type("What marketing channels should I focus on with a $5K monthly budget?", { delay: 40 });
+                }
+            },
+        },
+        // Narration: "voice mode for hands-free interaction"
+        {
+            timestamp: 74000,
+            description: "Clear textarea and hover over voice mode button",
+            action: async (page) => {
+                const textarea = page.locator("textarea").first();
+                if (await textarea.isVisible()) {
+                    await textarea.fill("");
+                }
+                // Look for voice/mic button
+                const voiceBtn = page.locator("button:has(.lucide-mic), button:has(.lucide-radio)").first();
+                if (await voiceBtn.isVisible()) await voiceBtn.hover();
+            },
+        },
+        // Narration: "Every conversation is saved and searchable"
+        {
+            timestamp: 80000,
+            description: "Open history sidebar again to show saved conversations",
+            action: async (page) => {
+                const historyBtn = page.locator('button[title="Chat History"]').first();
+                if (await historyBtn.isVisible()) await historyBtn.click();
+                await page.waitForTimeout(500);
+            },
+        },
+        {
+            timestamp: 88000,
+            description: "Close history sidebar",
+            action: async (page) => {
+                const closeBtn = page.locator('button:has(svg.lucide-chevron-left)').first();
+                if (await closeBtn.isVisible()) await closeBtn.click();
+            },
+        },
+    ],
 };

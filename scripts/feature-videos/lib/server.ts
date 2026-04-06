@@ -4,7 +4,7 @@ import http from "http";
 /**
  * Wait for the dev server to respond to HTTP requests.
  */
-function waitForServer(port: number, timeoutMs = 60_000): Promise<void> {
+function waitForServer(port: number, timeoutMs = 120_000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
 
@@ -35,11 +35,15 @@ export async function startDevServer(
   port: number,
   cwd: string
 ): Promise<ChildProcess> {
-  const devServer = spawn("npx", ["next", "dev", "-p", String(port)], {
-    cwd,
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, NODE_ENV: "development" },
-  });
+  const devServer = spawn(
+    "/bin/zsh",
+    ["-c", `export PATH=/opt/homebrew/bin:$PATH && npx next dev -p ${port}`],
+    {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NODE_ENV: "development" },
+    }
+  );
 
   // Capture output for debugging
   devServer.stdout?.on("data", () => {});
