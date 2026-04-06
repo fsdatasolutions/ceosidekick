@@ -243,6 +243,25 @@
 .stagger-7 { animation-delay: 0.7s; }
 .stagger-8 { animation-delay: 0.8s; }
 
+/* Support chat widget animations */
+@keyframes support-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 15px -3px rgba(200, 16, 46, 0.2); }
+  50% { transform: scale(1.08); box-shadow: 0 20px 25px -5px rgba(200, 16, 46, 0.3); }
+}
+
+@keyframes support-open {
+  from { opacity: 0; transform: scale(0.9); transform-origin: bottom right; }
+  to { opacity: 1; transform: scale(1); transform-origin: bottom right; }
+}
+
+.animate-support-pulse {
+  animation: support-pulse 2s ease-in-out 3;
+}
+
+.animate-support-open {
+  animation: support-open 200ms ease-out forwards;
+}
+
 /* Selection */
 ::selection {
   background: var(--color-primary-red);

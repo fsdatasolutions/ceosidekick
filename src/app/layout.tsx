@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AuthProvider } from "@/components/auth-provider";
 import { PageViewTracker } from "@/components/page-view-tracker";
+import { SupportChatWidget } from "@/components/support-chat-widget";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -136,6 +137,7 @@ export default function RootLayout({
         <AuthProvider>
             <PageViewTracker />
             {children}
+            <SupportChatWidget />
         </AuthProvider>
 
         {/* Google Analytics */}
