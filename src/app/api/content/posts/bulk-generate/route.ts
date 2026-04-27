@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
         } = body;
 
         // Validate count
-        if (!count || count < 1 || count > 20) {
+        if (!count || count < 1 || count > 31) {
             return NextResponse.json(
-                { error: "Count must be between 1 and 20" },
+                { error: "Count must be between 1 and 31" },
                 { status: 400 }
             );
         }

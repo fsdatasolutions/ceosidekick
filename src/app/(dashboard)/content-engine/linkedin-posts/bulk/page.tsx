@@ -425,7 +425,7 @@ export default function BulkCreatePage() {
                             <input
                                 type="range"
                                 min={1}
-                                max={20}
+                                max={31}
                                 value={count}
                                 onChange={(e) => setCount(parseInt(e.target.value))}
                                 className="flex-1 h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
@@ -434,19 +434,44 @@ export default function BulkCreatePage() {
                                 <input
                                     type="number"
                                     min={1}
-                                    max={20}
+                                    max={31}
                                     value={count}
                                     onChange={(e) => {
                                         const v = parseInt(e.target.value);
-                                        if (v >= 1 && v <= 20) setCount(v);
+                                        if (v >= 1 && v <= 31) setCount(v);
                                     }}
                                     className="w-full px-2 py-1 text-center border border-neutral-300 rounded-lg text-sm"
                                 />
                             </div>
                         </div>
-                        <p className="text-xs text-neutral-500 mt-1">
-                            {count} post{count !== 1 ? "s" : ""} = {count} credit{count !== 1 ? "s" : ""}
-                        </p>
+                        <div className="flex items-center justify-between mt-1">
+                            <p className="text-xs text-neutral-500">
+                                {count} post{count !== 1 ? "s" : ""} = {count} credit{count !== 1 ? "s" : ""}
+                            </p>
+                            <div className="flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setCount(7)}
+                                    className="text-xs px-2 py-0.5 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                                >
+                                    1 week
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCount(14)}
+                                    className="text-xs px-2 py-0.5 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                                >
+                                    2 weeks
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCount(30)}
+                                    className="text-xs px-2 py-0.5 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                                >
+                                    1 month
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Theme */}

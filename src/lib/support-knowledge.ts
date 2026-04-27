@@ -94,7 +94,7 @@ Navigate: Sidebar → Content Engine
 - Navigate: Content Engine → LinkedIn Posts → New Post
 
 ### Bulk Create Posts
-- Generate 1-20 research-driven LinkedIn posts at once
+- Generate 1-31 research-driven LinkedIn posts at once (full month of content)
 - Web research powered by Tavily for real data and trends
 - Choose a theme or let AI pick diverse topics
 - Review, edit, and regenerate individual posts
